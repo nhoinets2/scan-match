@@ -1,0 +1,10 @@
+appId: com.anonymous.vibecode
+---
+# Example Maestro test for vibecode app
+# This test verifies the login screen loads correctly
+
+- launchApp
+- assertVisible: "Sign in"
+- assertVisible: "Create account"
+- takeScreenshot: "login-screen.png"
+

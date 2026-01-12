@@ -1,0 +1,16 @@
+appId: com.anonymous.vibecode
+---
+# Basic login screen test
+# Verifies the authentication flow UI is accessible
+
+- launchApp
+# Wait for app to load
+- waitForAnimationToEnd
+# Check that login screen elements are visible
+- assertVisible: 
+    text: "Sign in"
+- assertVisible:
+    text: "Create account"
+# Take a screenshot for verification
+- takeScreenshot: "login-screen.png"
+

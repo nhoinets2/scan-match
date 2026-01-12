@@ -8,7 +8,13 @@
     "ios": "expo start --ios",
     "web": "DARK_MODE=class expo start --web",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "prebuild:ios": "EXPO_USE_NPM=1 npx expo prebuild --platform ios",
+    "build:ios": "bash scripts/run-ios-maestro.sh",
+    "ios:maestro": "bash scripts/run-ios-simple.sh"
   },
   "dependencies": {
     "@babel/plugin-proposal-export-namespace-from": "^7.18.9",
@@ -165,6 +171,7 @@
     "@typescript-eslint/eslint-plugin": "^8.29.1",
     "@typescript-eslint/parser": "^8.29.1",
     "babel-plugin-module-resolver": "^5.0.2",
+    "eas-cli": "^16.28.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~9.2.0",
     "eslint-config-prettier": "^9.1.0",
@@ -175,6 +182,7 @@
     "prettier": "^3.3.3",
     "react-native-svg-transformer": "^1.5.1",
     "react-test-renderer": "19.0.0",
+    "sharp": "^0.34.5",
     "typescript": "~5.8.3"
   },
   "private": true,

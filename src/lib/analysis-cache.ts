@@ -60,38 +60,27 @@ export function generateCacheKey(imageSha256: string): string {
 }
 
 // ============================================
-// SUPABASE IMPORT (deferred to avoid polyfill issues in tests)
+// SUPABASE IMPORT
 // ============================================
 
-// Dynamic import to avoid React Native polyfill issues in Jest
-let supabaseClient: typeof import('./supabase').supabase | null = null;
-let isPrewarming = false;
-
-async function getSupabase() {
-  if (!supabaseClient) {
-    const mod = await import('./supabase');
-    supabaseClient = mod.supabase;
-  }
-  return supabaseClient;
-}
+// Regular import - supabase.ts handles missing credentials gracefully
+import { supabase as supabaseClient } from './supabase';
 
 /**
  * Pre-warm the Supabase connection.
  * Call this early (e.g., when scan screen opens) to avoid cold start latency.
- * Safe to call multiple times - only initializes once.
+ * Safe to call multiple times - supabase client is already initialized.
  */
 export async function prewarmCacheConnection(): Promise<void> {
-  if (supabaseClient || isPrewarming) return;
-  
-  isPrewarming = true;
+  // Supabase client is already initialized via import
+  // This function exists for API compatibility
   try {
     const start = Date.now();
-    await getSupabase();
-    console.log(`[Cache] Connection prewarmed in ${Date.now() - start}ms`);
+    // Access supabase to ensure it's loaded
+    void supabaseClient;
+    console.log(`[Cache] Connection ready (${Date.now() - start}ms)`);
   } catch (err) {
-    console.log('[Cache] Prewarm failed (non-fatal):', err);
-  } finally {
-    isPrewarming = false;
+    console.log('[Cache] Prewarm check failed (non-fatal):', err);
   }
 }
 
@@ -113,14 +102,8 @@ export async function getCachedAnalysis(
   analysisKey: string
 ): Promise<ClothingAnalysisResult | null> {
   try {
-    const startTime = Date.now();
-    
-    // Get Supabase client (may involve dynamic import on first call)
-    const supabase = await getSupabase();
-    const clientTime = Date.now() - startTime;
-    if (clientTime > 100) {
-      console.log(`[Cache] Supabase client init: ${clientTime}ms (cold start)`);
-    }
+    // Get Supabase client
+    const supabase = supabaseClient;
     
     // Query the cache
     const queryStart = Date.now();
@@ -181,7 +164,7 @@ export async function setCachedAnalysis(params: {
 }): Promise<boolean> {
   try {
     console.log('[Cache] Storing analysis for:', params.imageSha256.slice(0, 8));
-    const supabase = await getSupabase();
+    const supabase = supabaseClient;
     const { error } = await supabase
       .from('clothing_image_analysis_cache')
       .upsert(
