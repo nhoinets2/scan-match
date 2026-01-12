@@ -56,6 +56,9 @@ import { getTextStyle } from "@/lib/typography-helpers";
 import { ButtonPrimary } from "@/components/ButtonPrimary";
 import { ButtonTertiary } from "@/components/ButtonTertiary";
 import { capitalizeFirst, capitalizeItems } from "@/lib/text-utils";
+import { useQuotaStore } from "@/lib/quota-store";
+import { useProStatus } from "@/lib/useProStatus";
+import { Paywall } from "@/components/Paywall";
 
 type ScreenState = "ready" | "processing" | "analyzed";
 
@@ -701,8 +704,21 @@ export default function AddItemScreen() {
   const [brand, setBrand] = useState("");
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+
+  // Quota and Pro status
+  const { isPro, refetch: refetchProStatus } = useProStatus();
+  const hasAddsRemaining = useQuotaStore((s) => s.hasWardrobeAddsRemaining);
+  const incrementAdds = useQuotaStore((s) => s.incrementWardrobeAdds);
 
   const captureScale = useSharedValue(1);
+
+  // Check quota on mount - show paywall if exceeded and not Pro
+  useEffect(() => {
+    if (!isPro && !hasAddsRemaining()) {
+      setShowPaywall(true);
+    }
+  }, [isPro, hasAddsRemaining]);
 
   // Rotate tips every 4 seconds (same as Scan)
   useEffect(() => {
@@ -727,9 +743,32 @@ export default function AddItemScreen() {
     transform: [{ scale: captureScale.value }],
   }));
 
+  // Check quota before allowing capture
+  const checkQuotaAndProceed = (): boolean => {
+    if (isPro) return true; // Pro users have unlimited adds
+    if (hasAddsRemaining()) return true; // Free user with adds remaining
+
+    // Show paywall
+    setShowPaywall(true);
+    return false;
+  };
+
   const handleClose = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.back();
+  };
+
+  const handlePaywallClose = () => {
+    setShowPaywall(false);
+    // Go back since user declined to upgrade
+    router.back();
+  };
+
+  const handlePaywallSuccess = () => {
+    setShowPaywall(false);
+    // Refetch pro status to update state
+    refetchProStatus();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   const processImage = async (uri: string) => {
@@ -761,6 +800,11 @@ export default function AddItemScreen() {
   const handleCapture = async () => {
     if (!cameraRef.current || isCapturing || screenState === "processing") return;
 
+    // Check quota first
+    if (!checkQuotaAndProceed()) {
+      return;
+    }
+
     setIsCapturing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     captureScale.value = withSpring(0.9, {}, () => {
@@ -784,6 +828,11 @@ export default function AddItemScreen() {
 
   const handlePickImage = async () => {
     if (screenState === "processing") return;
+
+    // Check quota first
+    if (!checkQuotaAndProceed()) {
+      return;
+    }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -812,6 +861,11 @@ export default function AddItemScreen() {
     if (!canAdd || !imageUri || !category || selectedStyles.length === 0) return;
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    // Increment quota usage for free users
+    if (!isPro) {
+      incrementAdds();
+    }
 
     const attributes = analysis?.itemSignals
       ? {
@@ -1004,7 +1058,7 @@ export default function AddItemScreen() {
                 >
                   <ImageIcon size={18} color={colors.text.inverse} style={{ marginRight: spacing.sm }} />
                   <Text
-                    style={{ 
+                    style={{
                       ...typography.ui.bodyMedium,
                       color: colors.text.inverse,
                       opacity: 0.8,
@@ -1017,6 +1071,14 @@ export default function AddItemScreen() {
             </Animated.View>
           </View>
         </CameraView>
+
+        {/* Paywall modal */}
+        <Paywall
+          visible={showPaywall}
+          onClose={handlePaywallClose}
+          onSuccess={handlePaywallSuccess}
+          reason="wardrobe_limit"
+        />
       </View>
     );
   }

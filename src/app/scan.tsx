@@ -39,6 +39,9 @@ import { ButtonTertiary } from "@/components/ButtonTertiary";
 import { IconButton } from "@/components/IconButton";
 import { ButtonPrimary } from "@/components/ButtonPrimary";
 import { useWardrobe, usePreferences } from "@/lib/database";
+import { useQuotaStore } from "@/lib/quota-store";
+import { useProStatus } from "@/lib/useProStatus";
+import { Paywall } from "@/components/Paywall";
 
 const TIPS = [
   "Lay flat or hang up for best results",
@@ -381,17 +384,30 @@ export default function ScanScreen() {
   const [scanError, setScanError] = useState<string | null>(null);
   const [lastImageUri, setLastImageUri] = useState<string | null>(null);
   const [lastImageSource, setLastImageSource] = useState<'camera' | 'gallery'>('camera');
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const setScannedItem = useSnapToMatchStore((s) => s.setScannedItem);
   const clearScan = useSnapToMatchStore((s) => s.clearScan);
   const setCachedWardrobe = useSnapToMatchStore((s) => s.setCachedWardrobe);
   const setCachedPreferences = useSnapToMatchStore((s) => s.setCachedPreferences);
 
+  // Quota and Pro status
+  const { isPro, refetch: refetchProStatus } = useProStatus();
+  const hasScansRemaining = useQuotaStore((s) => s.hasInStoreScansRemaining);
+  const incrementScans = useQuotaStore((s) => s.incrementInStoreScans);
+
   // Fetch wardrobe and preferences to cache for Confidence Engine
   const { data: wardrobe = [] } = useWardrobe();
   const { data: preferences } = usePreferences();
 
   const captureScale = useSharedValue(1);
+
+  // Check quota on mount - show paywall if exceeded and not Pro
+  useEffect(() => {
+    if (!isPro && !hasScansRemaining()) {
+      setShowPaywall(true);
+    }
+  }, [isPro, hasScansRemaining]);
 
   // Clear any previous scan when entering this screen
   useEffect(() => {
@@ -415,8 +431,23 @@ export default function ScanScreen() {
     transform: [{ scale: captureScale.value }],
   }));
 
+  // Check quota before allowing capture
+  const checkQuotaAndProceed = (): boolean => {
+    if (isPro) return true; // Pro users have unlimited scans
+    if (hasScansRemaining()) return true; // Free user with scans remaining
+
+    // Show paywall
+    setShowPaywall(true);
+    return false;
+  };
+
   const handleCapture = async () => {
     if (!cameraRef.current || isCapturing || isProcessing) return;
+
+    // Check quota first
+    if (!checkQuotaAndProceed()) {
+      return;
+    }
 
     setIsCapturing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -442,6 +473,11 @@ export default function ScanScreen() {
 
   const handlePickImage = async () => {
     if (isProcessing) return;
+
+    // Check quota first
+    if (!checkQuotaAndProceed()) {
+      return;
+    }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -506,6 +542,11 @@ export default function ScanScreen() {
       setScannedItem(scannedItem);
       console.log("Scanned item set");
 
+      // Increment quota usage for free users
+      if (!isPro) {
+        incrementScans();
+      }
+
       // Sync wardrobe and preferences to store for Confidence Engine
       setCachedWardrobe(wardrobe);
       if (preferences) {
@@ -554,12 +595,25 @@ export default function ScanScreen() {
     router.back();
   };
 
+  const handlePaywallClose = () => {
+    setShowPaywall(false);
+    // Go back since user declined to upgrade
+    router.back();
+  };
+
+  const handlePaywallSuccess = () => {
+    setShowPaywall(false);
+    // Refetch pro status to update state
+    refetchProStatus();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
   // Permission handling
   if (!permission) {
     return (
       <View className="flex-1 bg-black items-center justify-center">
-        <Text 
-          style={{ 
+        <Text
+          style={{
             fontFamily: "Inter_400Regular",
             fontSize: typography.sizes.body,
             color: colors.text.inverse,
@@ -578,8 +632,8 @@ export default function ScanScreen() {
           <Camera size={40} color={colors.accent.terracotta} strokeWidth={1.5} />
         </View>
         <Text
-          style={{ 
-            fontFamily: "Poppins_600SemiBold", 
+          style={{
+            fontFamily: "Poppins_600SemiBold",
             fontSize: typography.styles.h2.fontSize,
             lineHeight: typography.styles.h2.lineHeight,
             color: colors.text.primary,
@@ -590,8 +644,8 @@ export default function ScanScreen() {
           Camera Access
         </Text>
         <Text
-          style={{ 
-            fontFamily: "Inter_400Regular", 
+          style={{
+            fontFamily: "Inter_400Regular",
             fontSize: typography.sizes.body,
             color: colors.text.secondary,
             lineHeight: typography.lineHeight.normal * typography.sizes.body,
@@ -730,6 +784,14 @@ export default function ScanScreen() {
 
       {/* Help bottom sheet */}
       <HelpBottomSheet visible={showHelp} onClose={() => setShowHelp(false)} />
+
+      {/* Paywall modal */}
+      <Paywall
+        visible={showPaywall}
+        onClose={handlePaywallClose}
+        onSuccess={handlePaywallSuccess}
+        reason="in_store_limit"
+      />
     </View>
   );
 }
