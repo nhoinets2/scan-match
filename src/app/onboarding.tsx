@@ -50,8 +50,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 type OnboardingStep = "style" | "colors" | "fit_reference";
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
 interface StepIndicatorProps {
   currentStep: number;
   totalSteps: number;

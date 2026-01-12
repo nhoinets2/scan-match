@@ -1,10 +1,15 @@
-import React, { useEffect } from "react";
-import { Pressable, Text, ActivityIndicator, StyleSheet } from "react-native";
+import React, { useEffect, forwardRef } from "react";
+import { Pressable, Text, ActivityIndicator, StyleSheet, View, PressableProps } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming, cancelAnimation } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { button } from "@/lib/design-tokens";
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const ForwardedPressable = forwardRef<View, PressableProps>(
+  function ForwardedPressable(props, ref) {
+    return <Pressable ref={ref} {...props} />;
+  }
+);
+const AnimatedPressable = Animated.createAnimatedComponent(ForwardedPressable);
 
 interface ButtonDestructiveProps {
   label: string;

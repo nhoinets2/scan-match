@@ -1,10 +1,15 @@
-import React from "react";
-import { Pressable, Text, StyleSheet } from "react-native";
+import React, { forwardRef } from "react";
+import { Pressable, Text, StyleSheet, View, PressableProps } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { button } from "@/lib/design-tokens";
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const ForwardedPressable = forwardRef<View, PressableProps>(
+  function ForwardedPressable(props, ref) {
+    return <Pressable ref={ref} {...props} />;
+  }
+);
+const AnimatedPressable = Animated.createAnimatedComponent(ForwardedPressable);
 
 interface ButtonSecondaryOutlineProps {
   label: string;
