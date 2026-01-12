@@ -43,23 +43,9 @@ function getCategoryIcon(category: string) {
     case "tops":
       return <Shirt {...iconProps} />;
     case "bottoms":
-      return (
-        <Image
-          source={require("../../assets/icons/bottoms.png")}
-          style={{ width: 20, height: 20 }}
-          tintColor={colors.text.tertiary}
-          contentFit="contain"
-        />
-      );
+      return <Shirt size={20} color={colors.text.tertiary} style={{ transform: [{ rotate: "90deg" }] }} />;
     case "outerwear":
-      return (
-        <Image
-          source={require("../../assets/icons/coats.png")}
-          style={{ width: 20, height: 20 }}
-          tintColor={colors.text.tertiary}
-          contentFit="contain"
-        />
-      );
+      return <Shirt size={20} color={colors.text.tertiary} />;
     case "bags":
       return <ShoppingBag {...iconProps} />;
     default:

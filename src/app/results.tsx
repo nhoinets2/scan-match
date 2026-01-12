@@ -1294,15 +1294,7 @@ export default function ResultsScreen() {
         // V3: icon drop shadow
         ...shadows.sm,
       }}>
-        <Image
-          source={require("../../assets/icons/bottoms.png")}
-          style={{
-            width: size,
-            height: size,
-          }}
-          tintColor={colors.text.primary}
-          contentFit="contain"
-        />
+        <Shirt size={size} color={colors.text.primary} style={{ transform: [{ rotate: "90deg" }] }} />
       </View>
     );
   };
@@ -1315,15 +1307,7 @@ export default function ResultsScreen() {
         // V3: icon drop shadow
         ...shadows.sm,
       }}>
-        <Image
-          source={require("../../assets/icons/coats.png")}
-          style={{
-            width: size,
-            height: size,
-          }}
-          tintColor={colors.text.primary}
-          contentFit="contain"
-        />
+        <Shirt size={size} color={colors.text.primary} />
       </View>
     );
   };

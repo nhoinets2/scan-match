@@ -79,8 +79,7 @@ function AppleIcon({ size = 20, color = "#000" }: { size?: number; color?: strin
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
-// Hero landing page image
-const HERO_LANDING_IMAGE = require("../../assets/onboarding_screens/landing_page/landing_page.webp");
+// Hero landing page image - replaced with gradient background
 
 // ============================================
 // CURVED GRADIENT SHEET COMPONENTS
@@ -954,11 +953,8 @@ export default function AuthFlow(props: AuthFlowProps) {
           {/* Spotlight radial gradient behind mannequin */}
           <SpotlightBg width={SCREEN_WIDTH} height={screenHeight} />
           
-          <Image
-            source={HERO_LANDING_IMAGE}
-            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }}
-            resizeMode="cover"
-          />
+          {/* Hero image placeholder - using gradient background instead */}
+          <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%", backgroundColor: "#E8F5E9" }} />
 
           {/* 1) Contrast gradient for white text readability */}
                 <LinearGradient
