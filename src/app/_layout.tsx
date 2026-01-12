@@ -1,0 +1,205 @@
+import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
+import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
+import { useFonts } from "expo-font";
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+} from "@expo-google-fonts/inter";
+import {
+  BodoniModa_600SemiBold,
+  BodoniModa_700Bold,
+} from "@expo-google-fonts/bodoni-moda";
+import { useColorScheme } from "@/lib/useColorScheme";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
+import { AuthProvider } from "@/lib/auth-context";
+import { AuthGuard } from "@/components/AuthGuard";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
+import { colors } from "@/lib/design-tokens";
+
+export const unstable_settings = {
+  initialRouteName: "login",
+};
+
+// Prevent the splash screen from auto-hiding before asset loading is complete.
+SplashScreen.preventAutoHideAsync();
+
+const queryClient = new QueryClient();
+
+// Custom light theme for SnapToMatch - using design tokens
+const SnapToMatchLightTheme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: colors.accent.terracotta,
+    background: colors.bg.primary,
+    card: colors.bg.secondary,
+    text: colors.text.primary,
+    border: colors.border.hairline,
+  },
+};
+
+function RootLayoutNav({
+  colorScheme,
+}: {
+  colorScheme: "light" | "dark" | null | undefined;
+}) {
+  return (
+    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : SnapToMatchLightTheme}>
+      <AuthGuard>
+        <OfflineIndicator />
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen
+            name="login"
+            options={{ headerShown: false, gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="signup"
+            options={{ headerShown: false, presentation: "card" }}
+          />
+          <Stack.Screen
+            name="onboarding"
+            options={{ 
+              headerShown: false, 
+              gestureEnabled: true,
+              presentation: "fullScreenModal"
+            }}
+          />
+          <Stack.Screen
+            name="scan"
+            options={{
+              headerShown: false,
+              presentation: "fullScreenModal",
+            }}
+          />
+          <Stack.Screen
+            name="results"
+            options={{
+              headerShown: false,
+              presentation: "fullScreenModal",
+            }}
+          />
+          <Stack.Screen
+            name="add-item"
+            options={{
+              title: "Add Item",
+              presentation: "fullScreenModal",
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="all-checks"
+            options={{
+              headerShown: false,
+              presentation: "card",
+            }}
+          />
+          <Stack.Screen
+            name="wardrobe-item"
+            options={{
+              headerShown: false,
+              presentation: "fullScreenModal",
+            }}
+          />
+          <Stack.Screen
+            name="account"
+            options={{
+              headerShown: false,
+              presentation: "modal",
+            }}
+          />
+          <Stack.Screen
+            name="preferences"
+            options={{
+              headerShown: false,
+              presentation: "modal",
+            }}
+          />
+          <Stack.Screen
+            name="change-password"
+            options={{
+              headerShown: false,
+              presentation: "modal",
+            }}
+          />
+          <Stack.Screen
+            name="reset-password"
+            options={{
+              headerShown: false,
+              presentation: "modal",
+            }}
+          />
+          <Stack.Screen
+            name="help-center"
+            options={{
+              headerShown: false,
+              presentation: "modal",
+            }}
+          />
+          <Stack.Screen
+            name="report-problem"
+            options={{
+              headerShown: false,
+              presentation: "modal",
+            }}
+          />
+        </Stack>
+      </AuthGuard>
+    </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  const colorScheme = useColorScheme();
+
+  // Load custom fonts
+  const [fontsLoaded, fontError] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    BodoniModa_600SemiBold,
+    BodoniModa_700Bold,
+  });
+
+  // Hide splash screen when fonts are loaded
+  useEffect(() => {
+    if (fontsLoaded) {
+      console.log("✅ FONTS LOADED:", {
+        Inter_400Regular: !!Inter_400Regular,
+        Inter_500Medium: !!Inter_500Medium,
+        Inter_600SemiBold: !!Inter_600SemiBold,
+        BodoniModa_600SemiBold: !!BodoniModa_600SemiBold,
+        BodoniModa_700Bold: !!BodoniModa_700Bold,
+      });
+      SplashScreen.hideAsync();
+    }
+    if (fontError) {
+      console.error("❌ FONT ERROR:", fontError);
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError]);
+
+  // Keep splash visible until fonts are ready
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <KeyboardProvider>
+            <StatusBar style="dark" />
+            <RootLayoutNav colorScheme={colorScheme} />
+          </KeyboardProvider>
+        </GestureHandlerRootView>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+}
