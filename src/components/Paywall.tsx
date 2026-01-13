@@ -554,7 +554,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
                       color: "#1A1A1A",
                     }}
                   >
-                    Subscribe
+                    Start free trial
                   </Text>
                 )}
               </Pressable>
