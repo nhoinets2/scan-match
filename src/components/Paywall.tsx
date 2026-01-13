@@ -561,6 +561,18 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
             </View>
           </Animated.View>
 
+          {/* Trial terms */}
+          <Text
+            style={{
+              ...typography.ui.caption,
+              color: "rgba(255, 255, 255, 0.6)",
+              textAlign: "center",
+              marginTop: spacing.sm,
+            }}
+          >
+            7 days free, then {annualPrice}/year. Cancel anytime before trial ends.
+          </Text>
+
           {/* Restore purchases */}
           <Pressable
             onPress={handleRestore}
