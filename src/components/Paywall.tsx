@@ -18,6 +18,7 @@ import {
   ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
   FadeInDown,
   FadeInUp,
@@ -31,7 +32,6 @@ import {
   Check,
   Sparkles,
   Zap,
-  Shirt,
   Star,
   Crown,
   Infinity,
@@ -341,86 +341,90 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
           backgroundColor: colors.bg.primary,
         }}
       >
-        {/* Header with close button */}
-        <View
+        {/* Hero Section with Gradient Background */}
+        <LinearGradient
+          colors={["#171717", "#3D322F", "#C45A28", "#E86A33"]}
+          locations={[0, 0.3, 0.6, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
           style={{
             paddingTop: insets.top + spacing.sm,
-            paddingHorizontal: spacing.lg,
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
+            paddingBottom: spacing.xl,
+            borderBottomLeftRadius: borderRadius.xl,
+            borderBottomRightRadius: borderRadius.xl,
           }}
         >
-          {/* Drag indicator */}
-          <View style={{ flex: 1, alignItems: "center" }}>
-            <View
-              style={{
-                width: spacing.xxl,
-                height: spacing.xs,
-                borderRadius: borderRadius.pill,
-                backgroundColor: colors.bg.tertiary,
-              }}
-            />
-          </View>
-          
-          {/* Close button */}
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              onClose();
-            }}
-            hitSlop={12}
+          {/* Header with close button */}
+          <View
             style={{
-              position: "absolute",
-              right: spacing.lg,
-              width: 32,
-              height: 32,
-              borderRadius: 16,
-              backgroundColor: colors.surface.icon,
+              paddingHorizontal: spacing.lg,
+              flexDirection: "row",
+              justifyContent: "space-between",
               alignItems: "center",
-              justifyContent: "center",
             }}
           >
-            <X size={18} color={colors.text.secondary} strokeWidth={2} />
-          </Pressable>
-        </View>
+            {/* Drag indicator */}
+            <View style={{ flex: 1, alignItems: "center" }}>
+              <View
+                style={{
+                  width: spacing.xxl,
+                  height: spacing.xs,
+                  borderRadius: borderRadius.pill,
+                  backgroundColor: "rgba(255, 255, 255, 0.3)",
+                }}
+              />
+            </View>
+            
+            {/* Close button */}
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onClose();
+              }}
+              hitSlop={12}
+              style={{
+                position: "absolute",
+                right: spacing.lg,
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: "rgba(255, 255, 255, 0.15)",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <X size={18} color={colors.text.inverse} strokeWidth={2} />
+            </Pressable>
+          </View>
 
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{
-            paddingHorizontal: spacing.lg,
-            paddingBottom: spacing.xl,
-          }}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Hero Section */}
+          {/* Hero Content */}
           <Animated.View
             entering={FadeInDown.delay(100).springify()}
             style={{
               alignItems: "center",
               marginTop: spacing.xl,
-              marginBottom: spacing.lg,
+              paddingHorizontal: spacing.lg,
             }}
           >
-            {/* Crown icon in accent container */}
+            {/* Crown icon */}
             <View
               style={{
-                width: 72,
-                height: 72,
-                borderRadius: 36,
-                backgroundColor: colors.accent.terracottaLight,
+                width: 80,
+                height: 80,
+                borderRadius: 40,
+                backgroundColor: "rgba(255, 255, 255, 0.15)",
                 alignItems: "center",
                 justifyContent: "center",
                 marginBottom: spacing.md,
               }}
             >
-              <Crown size={36} color={colors.accent.terracotta} strokeWidth={1.5} />
+              <Crown size={40} color={colors.text.inverse} strokeWidth={1.5} />
             </View>
 
             <Text
               style={{
                 ...typography.display.screenTitle,
-                color: colors.text.primary,
+                color: colors.text.inverse,
                 textAlign: "center",
                 marginBottom: spacing.xs,
               }}
@@ -430,14 +434,25 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
             <Text
               style={{
                 ...typography.ui.body,
-                color: colors.text.secondary,
+                color: "rgba(255, 255, 255, 0.8)",
                 textAlign: "center",
-                maxWidth: 280,
+                maxWidth: 300,
               }}
             >
               {subtitle}
             </Text>
           </Animated.View>
+        </LinearGradient>
+
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.lg,
+            paddingBottom: spacing.xl,
+          }}
+          showsVerticalScrollIndicator={false}
+        >
 
           {/* Benefits Card */}
           <Animated.View
