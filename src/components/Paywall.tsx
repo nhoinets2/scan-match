@@ -320,18 +320,13 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
   };
 
   // Dynamic header based on reason
-  const headerConfig = {
-    in_store_limit: {
-      title: "You've used your 5 free scans",
-      subtitle: "Upgrade to Pro for unlimited in-store checks",
-    },
-    wardrobe_limit: {
-      title: "You've hit your wardrobe limit",
-      subtitle: "Upgrade to Pro for unlimited wardrobe adds",
-    },
+  const titleConfig = {
+    in_store_limit: "You've used your 5 free scans",
+    wardrobe_limit: "You've hit your wardrobe limit",
   };
 
-  const { title, subtitle } = headerConfig[reason];
+  const title = titleConfig[reason];
+  const subtitle = "Upgrade to Pro for unlimited in-store checks and wardrobe adds";
 
   return (
     <Modal
