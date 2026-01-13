@@ -10,12 +10,18 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.snaptomatch.app",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "entitlements": {
+        "com.apple.developer.applesignin": ["Default"]
+      }
     },
     "android": {
       "edgeToEdgeEnabled": true
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      "expo-apple-authentication"
+    ],
     "experiments": {
       "typedRoutes": true
     }
