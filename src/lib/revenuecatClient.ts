@@ -214,11 +214,31 @@ export const restorePurchases = (): Promise<
 export const setUserId = (userId: string): Promise<RevenueCatResult<void>> => {
   return guardRevenueCatUsage("setUserId", async () => {
     console.log(`${LOG_PREFIX} Attempting to link user ID:`, userId);
+    
+    // Get current customer info to check if anonymous
+    const currentInfo = await Purchases.getCustomerInfo();
+    const currentUserId = currentInfo.originalAppUserId;
+    console.log(`${LOG_PREFIX} Current customer ID:`, currentUserId);
+    
+    // If currently anonymous and trying to link, logout first then login
+    if (currentUserId.startsWith("$RCAnonymousID")) {
+      console.log(`${LOG_PREFIX} Logging out anonymous user first...`);
+      await Purchases.logOut();
+    }
+    
+    // Now log in with the real user ID
     const { customerInfo, created } = await Purchases.logIn(userId);
     console.log(`${LOG_PREFIX} User linked successfully!`);
     console.log(`${LOG_PREFIX} - App User ID:`, customerInfo.originalAppUserId);
     console.log(`${LOG_PREFIX} - New customer:`, created);
     console.log(`${LOG_PREFIX} - Active entitlements:`, Object.keys(customerInfo.entitlements.active || {}));
+    
+    // Verify it worked
+    if (customerInfo.originalAppUserId !== userId) {
+      console.warn(`${LOG_PREFIX} ⚠️  Warning: User ID mismatch! Expected ${userId}, got ${customerInfo.originalAppUserId}`);
+    } else {
+      console.log(`${LOG_PREFIX} ✅ User ID correctly linked!`);
+    }
   });
 };
 
