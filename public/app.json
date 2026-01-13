@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "SnapToMatch",
+    "slug": "snaptomatch",
+    "scheme": "snaptomatch",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.snaptomatch.app"
+    },
+    "android": {
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "fbb01e5a-af3a-45fe-8b11-c904ddc278d5"
+      }
+    }
+  }
+}
