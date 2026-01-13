@@ -17,7 +17,6 @@ import * as Haptics from "expo-haptics";
 
 import { useAuth } from "@/lib/auth-context";
 import { useProStatus } from "@/lib/useProStatus";
-import { getCustomerInfo } from "@/lib/revenuecatClient";
 import { colors, spacing, typography, borderRadius, cards, button } from "@/lib/design-tokens";
 import { forceRequestReview } from "@/lib/useStoreReview";
 import { Paywall } from "@/components/Paywall";
@@ -326,34 +325,6 @@ export default function AccountScreen() {
               title="Change password"
               onPress={handleChangePassword}
             />
-            {/* Show Manage Subscription only for Pro users */}
-            {isPro && (
-              <SettingsRow
-                icon={<Crown size={18} color="#E86A33" />}
-                title="Manage Subscription"
-                subtitle="Cancel or change your plan"
-                onPress={async () => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  try {
-                    const result = await getCustomerInfo();
-                    if (result.ok && result.data.managementURL) {
-                      await Linking.openURL(result.data.managementURL);
-                    } else {
-                      // Fallback to platform subscription settings
-                      const url = Platform.OS === "ios"
-                        ? "https://apps.apple.com/account/subscriptions"
-                        : "https://play.google.com/store/account/subscriptions";
-                      await Linking.openURL(url);
-                    }
-                  } catch (error) {
-                    Alert.alert(
-                      "Unable to Open",
-                      "Please manage your subscription through Settings → Apple ID → Subscriptions (iOS) or Play Store → Subscriptions (Android)."
-                    );
-                  }
-                }}
-              />
-            )}
             <SettingsRow
               icon={<LogOut size={18} color={colors.state.destructive} />}
               title="Sign out"

@@ -19,6 +19,7 @@ import {
   Bookmark,
   Settings,
   Mail,
+  Crown,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 
@@ -196,6 +197,49 @@ const HELP_SECTIONS: HelpSection[] = [
         question: "What are the limits on the All scans page?",
         answer:
           "The All scans page shows both your saved scans (unlimited, never auto-deleted) and up to 20 unsaved scans. Once you have 20 unsaved scans, adding a new scan will automatically remove your oldest unsaved scan. To keep a scan permanently, tap 'Save for later' on the results screen.",
+      },
+    ],
+  },
+  {
+    id: "subscription",
+    title: "Subscription & Billing",
+    icon: <Crown size={20} color={colors.text.secondary} />,
+    topics: [
+      {
+        id: "plans",
+        question: "What subscription plans are available?",
+        answer:
+          "Scan & Match offers two Pro plans: Monthly ($5.99/month) and Annual ($39.99/year, save 44%). The free plan includes 15 wardrobe adds and 5 in-store scans. Pro members get unlimited access to all features with no restrictions.",
+      },
+      {
+        id: "free-trial",
+        question: "Is there a free trial?",
+        answer:
+          "Yes! The annual plan includes a 7-day free trial. You can explore all Pro features risk-free. Cancel anytime during the trial period and you won't be charged.",
+      },
+      {
+        id: "cancel-subscription",
+        question: "How do I cancel my subscription?",
+        answer:
+          "To cancel your subscription:\n\niOS: Settings → [Your Name] → Subscriptions → Scan & Match → Cancel Subscription\n\nAndroid: Google Play Store → Menu → Subscriptions → Scan & Match → Cancel Subscription\n\nYour subscription will remain active until the end of the current billing period.",
+      },
+      {
+        id: "refund-policy",
+        question: "What is your refund policy?",
+        answer:
+          "We offer full refunds if you cancel within 24 hours of your initial purchase. After 24 hours, no refunds are available. To request a refund within the 24-hour window, cancel your subscription and contact us at support@snaptomatch.app with your purchase details. We'll process your refund within 3-5 business days.",
+      },
+      {
+        id: "billing-cycle",
+        question: "When will I be charged?",
+        answer:
+          "For monthly subscriptions, you'll be charged on the same day each month. For annual subscriptions, you'll be charged once per year on your subscription anniversary. If you're on a free trial, you won't be charged until the trial period ends unless you cancel before then.",
+      },
+      {
+        id: "change-plan",
+        question: "Can I change my plan?",
+        answer:
+          "Yes! To switch between monthly and annual plans, cancel your current subscription and subscribe to the new plan. Your current subscription will remain active until the end of the billing period, then the new plan will take effect.",
       },
     ],
   },
