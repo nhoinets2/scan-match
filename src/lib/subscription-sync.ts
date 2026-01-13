@@ -17,6 +17,10 @@ export interface UserSubscription {
   subscription_type: "monthly" | "annual" | null;
   revenuecat_customer_id: string | null;
   expires_at: string | null;
+  will_renew: boolean;
+  show_winback_offer: boolean;
+  winback_offer_shown_at: string | null;
+  winback_offer_accepted: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -69,6 +73,7 @@ export async function syncSubscriptionToDb(userId: string): Promise<boolean> {
     // Determine subscription details
     const isPro = !!proEntitlement;
     const expiresAt = proEntitlement?.expirationDate || null;
+    const willRenew = proEntitlement?.willRenew ?? true;
     
     // Try to determine subscription type from product identifier
     let subscriptionType: "monthly" | "annual" | null = null;
@@ -91,6 +96,8 @@ export async function syncSubscriptionToDb(userId: string): Promise<boolean> {
           subscription_type: subscriptionType,
           revenuecat_customer_id: customerInfo.originalAppUserId,
           expires_at: expiresAt,
+          will_renew: willRenew,
+          // Note: show_winback_offer is managed by webhook
           updated_at: new Date().toISOString(),
         },
         { onConflict: "user_id" }
@@ -163,6 +170,62 @@ export async function isProFromDb(userId: string): Promise<boolean> {
   
   if (expiresAt < now) {
     console.log("[Subscription] DB subscription expired:", subscription.expires_at);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Check if user should see winback offer
+ * Returns true if user cancelled but still has active access
+ */
+export async function shouldShowWinbackOffer(userId: string): Promise<boolean> {
+  const subscription = await getSubscriptionFromDb(userId);
+  
+  if (!subscription) {
+    return false;
+  }
+
+  return subscription.show_winback_offer === true;
+}
+
+/**
+ * Mark winback offer as shown
+ * Call this when displaying the winback popup
+ */
+export async function markWinbackOfferShown(userId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from("user_subscriptions")
+    .update({
+      show_winback_offer: false, // Don't show again
+      winback_offer_shown_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId);
+
+  if (error) {
+    console.log("[Subscription] Error marking winback shown:", error.message);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Mark winback offer as accepted
+ * Call this when user accepts the retention offer
+ */
+export async function markWinbackOfferAccepted(userId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from("user_subscriptions")
+    .update({
+      winback_offer_accepted: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId);
+
+  if (error) {
+    console.log("[Subscription] Error marking winback accepted:", error.message);
     return false;
   }
 

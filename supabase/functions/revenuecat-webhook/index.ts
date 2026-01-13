@@ -100,6 +100,8 @@ Deno.serve(async (req) => {
     let isPro = false;
     let subscriptionType: "monthly" | "annual" | null = null;
     let expiresAt: string | null = null;
+    let willRenew = true;
+    let showWinbackOffer = false;
 
     // Determine subscription type from product ID
     const productId = event.product_id.toLowerCase();
@@ -122,6 +124,8 @@ Deno.serve(async (req) => {
       case "NON_RENEWING_PURCHASE":
         // Active subscription
         isPro = true;
+        willRenew = event.type !== "NON_RENEWING_PURCHASE"; // Non-renewing don't auto-renew
+        showWinbackOffer = false; // Clear winback flag on renewal/uncancellation
         console.log(`[RevenueCat Webhook] Setting user ${userId} to Pro`);
         break;
 
@@ -129,14 +133,18 @@ Deno.serve(async (req) => {
       case "REFUND":
         // Subscription ended
         isPro = false;
+        willRenew = false;
+        showWinbackOffer = false; // Too late, already expired
         console.log(`[RevenueCat Webhook] Removing Pro from user ${userId}`);
         break;
 
       case "CANCELLATION":
         // User cancelled but still has access until expiration
-        // Keep isPro based on expiration date
+        // Keep isPro based on expiration date, but set will_renew to false
         isPro = expiresAt ? new Date(expiresAt) > new Date() : false;
-        console.log(`[RevenueCat Webhook] User ${userId} cancelled, access until: ${expiresAt}`);
+        willRenew = false; // User cancelled, won't auto-renew
+        showWinbackOffer = isPro; // Only show winback if they still have active access
+        console.log(`[RevenueCat Webhook] User ${userId} cancelled, access until: ${expiresAt}, showing winback: ${showWinbackOffer}`);
         break;
 
       case "BILLING_ISSUE":
@@ -178,6 +186,8 @@ Deno.serve(async (req) => {
           subscription_type: subscriptionType,
           revenuecat_customer_id: event.original_app_user_id,
           expires_at: expiresAt,
+          will_renew: willRenew,
+          show_winback_offer: showWinbackOffer,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "user_id" }

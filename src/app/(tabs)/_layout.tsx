@@ -14,6 +14,8 @@ import * as Haptics from "expo-haptics";
 
 import { useOnboardingComplete } from "@/lib/database";
 import { useAuth } from "@/lib/auth-context";
+import { useWinbackOffer } from "@/lib/useWinbackOffer";
+import { WinbackOffer } from "@/components/WinbackOffer";
 import { colors, spacing, borderRadius, shadows, tabBar } from "@/lib/design-tokens";
 
 interface CustomTabBarProps {
@@ -147,6 +149,7 @@ function CustomTabBar({ state, descriptors, navigation }: CustomTabBarProps) {
 export default function TabLayout() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const { isComplete: onboardingComplete, isLoading: isOnboardingLoading } = useOnboardingComplete();
+  const { showWinback, hideWinback, userId } = useWinbackOffer();
 
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
@@ -219,6 +222,13 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
+
+      {/* Winback retention offer */}
+      <WinbackOffer
+        visible={showWinback}
+        onClose={hideWinback}
+        userId={userId}
+      />
     </View>
   );
 }
