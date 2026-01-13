@@ -710,12 +710,19 @@ export default function AddItemScreen() {
   const { isPro, refetch: refetchProStatus } = useProStatus();
   const hasAddsRemaining = useQuotaStore((s) => s.hasWardrobeAddsRemaining);
   const incrementAdds = useQuotaStore((s) => s.incrementWardrobeAdds);
+  const wardrobeAddsUsed = useQuotaStore((s) => s.wardrobeAddsUsed);
 
   const captureScale = useSharedValue(1);
+
+  // Debug: Log quota state on mount and changes
+  useEffect(() => {
+    console.log("[Quota Debug] Add Item Screen - isPro:", isPro, "wardrobeAddsUsed:", wardrobeAddsUsed, "hasAddsRemaining:", hasAddsRemaining());
+  }, [isPro, wardrobeAddsUsed, hasAddsRemaining]);
 
   // Check quota on mount - show paywall if exceeded and not Pro
   useEffect(() => {
     if (!isPro && !hasAddsRemaining()) {
+      console.log("[Quota Debug] Showing paywall - quota exceeded");
       setShowPaywall(true);
     }
   }, [isPro, hasAddsRemaining]);
@@ -745,10 +752,18 @@ export default function AddItemScreen() {
 
   // Check quota before allowing capture
   const checkQuotaAndProceed = (): boolean => {
-    if (isPro) return true; // Pro users have unlimited adds
-    if (hasAddsRemaining()) return true; // Free user with adds remaining
+    console.log("[Quota Debug] checkQuotaAndProceed - isPro:", isPro, "hasAddsRemaining:", hasAddsRemaining(), "wardrobeAddsUsed:", wardrobeAddsUsed);
+    if (isPro) {
+      console.log("[Quota Debug] User is Pro - bypassing quota");
+      return true;
+    }
+    if (hasAddsRemaining()) {
+      console.log("[Quota Debug] Free user has adds remaining");
+      return true;
+    }
 
     // Show paywall
+    console.log("[Quota Debug] Showing paywall - no adds remaining");
     setShowPaywall(true);
     return false;
   };
@@ -864,7 +879,10 @@ export default function AddItemScreen() {
 
     // Increment quota usage for free users
     if (!isPro) {
+      console.log("[Quota Debug] Incrementing wardrobeAddsUsed from:", wardrobeAddsUsed);
       incrementAdds();
+    } else {
+      console.log("[Quota Debug] User is Pro - not incrementing quota");
     }
 
     const attributes = analysis?.itemSignals
