@@ -75,7 +75,7 @@ import {
   OkayReasonCode,
   RecentCheck,
 } from "@/lib/types";
-import { colors, spacing, typography, borderRadius, shadows, cards, button } from "@/lib/design-tokens";
+import { colors, spacing, typography, borderRadius, shadows, cards, button, components } from "@/lib/design-tokens";
 import { getTextStyle } from "@/lib/typography-helpers";
 import { runDecisionTree, outcomeToConfidence, DecisionTreeResult } from "@/lib/decision-tree";
 import { ItemSignalsResult } from "@/lib/openai";
@@ -3330,7 +3330,7 @@ width: spacing.xs / 2,
                           />
                         ) : (
                           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                            <Text style={{ fontSize: typography.sizes.sectionTitle }}>🧺</Text>
+                            <Text style={{ fontSize: 18 }}>🧺</Text>
                           </View>
                         )}
                       </View>
