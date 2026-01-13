@@ -227,7 +227,7 @@ const HELP_SECTIONS: HelpSection[] = [
         id: "refund-policy",
         question: "What is your refund policy?",
         answer:
-          "Full refunds are available if you cancel within 24 hours of purchase. After 24 hours, no refunds are available. To request a refund, cancel your subscription and email snaptomatch@gmail.com.",
+          "We offer full refunds if you cancel within 24 hours of your initial purchase. After 24 hours, no refunds are available. To request a refund within the 24-hour window, cancel your subscription and contact us at snaptomatch@gmail.com with your purchase details. We'll process your refund within 3-5 business days.",
       },
       {
         id: "billing-cycle",
