@@ -72,7 +72,7 @@ interface PaywallProps {
 
 // Benefits with icons
 const BENEFITS = [
-  { icon: Infinity, text: "Unlimited wardrobe scans", highlight: true },
+  { icon: Infinity, text: "Unlimited wardrobe scans" },
   { icon: Zap, text: "Unlimited in-store checks" },
   { icon: Sparkles, text: "AI-powered outfit suggestions" },
   { icon: Star, text: "Priority processing" },
@@ -474,9 +474,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
                       width: 36,
                       height: 36,
                       borderRadius: 18,
-                      backgroundColor: benefit.highlight
-                        ? colors.accent.terracottaLight
-                        : colors.surface.icon,
+                      backgroundColor: colors.surface.icon,
                       alignItems: "center",
                       justifyContent: "center",
                       marginRight: spacing.md,
@@ -484,7 +482,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
                   >
                     <Icon
                       size={18}
-                      color={benefit.highlight ? colors.accent.terracotta : colors.text.secondary}
+                      color={colors.text.secondary}
                       strokeWidth={2}
                     />
                   </View>
