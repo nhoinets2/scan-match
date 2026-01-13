@@ -117,10 +117,10 @@ function PlanCard({
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           style={{
-            backgroundColor: "#1A1A1A",
+            backgroundColor: colors.bg.secondary,
             borderRadius: borderRadius.card,
             borderWidth: isSelected ? 2 : 1,
-            borderColor: isSelected ? "#E8A838" : "rgba(255, 255, 255, 0.15)",
+            borderColor: isSelected ? colors.accent.terracotta : colors.border.hairline,
             overflow: "hidden",
           }}
         >
@@ -128,7 +128,7 @@ function PlanCard({
           {isAnnual && (
             <View
               style={{
-                backgroundColor: "#E8A838",
+                backgroundColor: colors.accent.terracotta,
                 paddingVertical: spacing.sm,
                 paddingHorizontal: spacing.md,
                 alignItems: "center",
@@ -136,9 +136,8 @@ function PlanCard({
             >
               <Text
                 style={{
-                  fontFamily: "Inter_600SemiBold",
-                  fontSize: 12,
-                  color: "#1A1A1A",
+                  ...typography.ui.micro,
+                  color: colors.text.inverse,
                   textTransform: "uppercase",
                   letterSpacing: 1,
                 }}
@@ -163,23 +162,22 @@ function PlanCard({
                 height: 24,
                 borderRadius: 12,
                 borderWidth: isSelected ? 0 : 2,
-                borderColor: "rgba(255, 255, 255, 0.3)",
-                backgroundColor: isSelected ? "#E8A838" : "transparent",
+                borderColor: colors.border.subtle,
+                backgroundColor: isSelected ? colors.accent.terracotta : "transparent",
                 alignItems: "center",
                 justifyContent: "center",
                 marginRight: spacing.md,
               }}
             >
-              {isSelected && <Check size={14} color="#1A1A1A" strokeWidth={3} />}
+              {isSelected && <Check size={14} color={colors.text.inverse} strokeWidth={3} />}
             </View>
 
             {/* Plan details - left side */}
             <View style={{ flex: 1 }}>
               <Text
                 style={{
-                  fontFamily: "Inter_600SemiBold",
-                  fontSize: 18,
-                  color: "#FFFFFF",
+                  ...typography.ui.sectionTitle,
+                  color: colors.text.primary,
                   marginBottom: 2,
                 }}
               >
@@ -190,9 +188,8 @@ function PlanCard({
                 <>
                   <Text
                     style={{
-                      fontFamily: "Inter_500Medium",
-                      fontSize: 14,
-                      color: "#4ADE80",
+                      ...typography.ui.label,
+                      color: colors.status.success,
                       marginBottom: 2,
                     }}
                   >
@@ -200,9 +197,8 @@ function PlanCard({
                   </Text>
                   <Text
                     style={{
-                      fontFamily: "Inter_400Regular",
-                      fontSize: 13,
-                      color: "rgba(255, 255, 255, 0.5)",
+                      ...typography.ui.caption,
+                      color: colors.text.secondary,
                     }}
                   >
                     {price}/year billed annually
@@ -211,9 +207,8 @@ function PlanCard({
               ) : (
                 <Text
                   style={{
-                    fontFamily: "Inter_400Regular",
-                    fontSize: 13,
-                    color: "rgba(255, 255, 255, 0.5)",
+                    ...typography.ui.caption,
+                    color: colors.text.secondary,
                   }}
                 >
                   No free trial
@@ -225,18 +220,17 @@ function PlanCard({
             <View style={{ alignItems: "flex-end" }}>
               <Text
                 style={{
-                  fontFamily: "Inter_700Bold",
+                  ...typography.ui.sectionTitle,
                   fontSize: 22,
-                  color: "#FFFFFF",
+                  color: colors.text.primary,
                 }}
               >
                 {isAnnual ? monthlyEquivalent : price}
               </Text>
               <Text
                 style={{
-                  fontFamily: "Inter_400Regular",
-                  fontSize: 13,
-                  color: "rgba(255, 255, 255, 0.5)",
+                  ...typography.ui.caption,
+                  color: colors.text.secondary,
                 }}
               >
                 / month
