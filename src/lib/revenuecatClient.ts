@@ -213,7 +213,12 @@ export const restorePurchases = (): Promise<
  */
 export const setUserId = (userId: string): Promise<RevenueCatResult<void>> => {
   return guardRevenueCatUsage("setUserId", async () => {
-    await Purchases.logIn(userId);
+    console.log(`${LOG_PREFIX} Attempting to link user ID:`, userId);
+    const { customerInfo, created } = await Purchases.logIn(userId);
+    console.log(`${LOG_PREFIX} User linked successfully!`);
+    console.log(`${LOG_PREFIX} - App User ID:`, customerInfo.originalAppUserId);
+    console.log(`${LOG_PREFIX} - New customer:`, created);
+    console.log(`${LOG_PREFIX} - Active entitlements:`, Object.keys(customerInfo.entitlements.active || {}));
   });
 };
 

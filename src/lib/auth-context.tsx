@@ -123,10 +123,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("Session restored for user:", initialSession.user?.email);
         // Link RevenueCat user ID on session restore
         if (initialSession.user?.id) {
-          console.log("[Auth] Linking RevenueCat user on session restore:", initialSession.user.id);
-          setUserId(initialSession.user.id).catch((err) => {
-            console.log("[Auth] Failed to link RevenueCat user:", err);
-          });
+          console.log("[Auth] === Linking RevenueCat on Session Restore ===");
+          console.log("[Auth] User ID:", initialSession.user.id);
+          setUserId(initialSession.user.id)
+            .then((result) => {
+              if (result.ok) {
+                console.log("[Auth] ✅ RevenueCat user linked successfully");
+              } else {
+                console.log("[Auth] ❌ RevenueCat linking failed:", result.reason);
+              }
+            })
+            .catch((err) => {
+              console.log("[Auth] ❌ RevenueCat linking error:", err);
+            });
         }
       } else {
         console.log("No active session found");
@@ -142,10 +151,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Link RevenueCat user ID to Supabase user on sign in
       if (event === "SIGNED_IN" && newSession?.user?.id) {
-        console.log("[Auth] Linking RevenueCat user:", newSession.user.id);
-        setUserId(newSession.user.id).catch((err) => {
-          console.log("[Auth] Failed to link RevenueCat user:", err);
-        });
+        console.log("[Auth] === Linking RevenueCat on Sign In ===");
+        console.log("[Auth] Event:", event);
+        console.log("[Auth] User ID:", newSession.user.id);
+        setUserId(newSession.user.id)
+          .then((result) => {
+            if (result.ok) {
+              console.log("[Auth] ✅ RevenueCat user linked successfully");
+            } else {
+              console.log("[Auth] ❌ RevenueCat linking failed:", result.reason);
+            }
+          })
+          .catch((err) => {
+            console.log("[Auth] ❌ RevenueCat linking error:", err);
+          });
       }
     });
 
