@@ -562,7 +562,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
           {/* Trial terms */}
           <Text
             style={{
-              ...typography.ui.caption,
+              ...typography.ui.micro,
               color: "rgba(255, 255, 255, 0.6)",
               textAlign: "center",
               marginTop: spacing.sm,
