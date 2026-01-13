@@ -12,10 +12,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { ChevronLeft, ChevronRight, KeyRound, FileText, Shield, Mail, LogOut, Settings, HelpCircle, AlertCircle, Star } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, KeyRound, FileText, Shield, Mail, LogOut, Settings, HelpCircle, AlertCircle, Star, Crown } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 
 import { useAuth } from "@/lib/auth-context";
+import { useProStatus } from "@/lib/useProStatus";
 import { colors, spacing, typography, borderRadius, cards, button } from "@/lib/design-tokens";
 import { forceRequestReview } from "@/lib/useStoreReview";
 
@@ -130,6 +131,7 @@ function SectionHeader({ title }: { title: string }) {
 
 export default function AccountScreen() {
   const { user, signOut } = useAuth();
+  const { isPro, isLoading: isLoadingPro } = useProStatus();
   const [loading, setLoading] = useState(false);
 
   const handleSignOut = async () => {
@@ -227,6 +229,7 @@ export default function AccountScreen() {
                 padding: spacing.lg - 4,
               }}
             >
+              {/* Email row */}
               <Text
                 style={{
                   ...typography.ui.sectionTitle,
@@ -244,6 +247,55 @@ export default function AccountScreen() {
               >
                 Email
               </Text>
+
+              {/* Separator */}
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: colors.border.hairline,
+                  marginVertical: spacing.md,
+                }}
+              />
+
+              {/* Subscription status row */}
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 14,
+                    backgroundColor: isPro ? "#FFF4EF" : colors.surface.icon,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginRight: spacing.sm,
+                  }}
+                >
+                  <Crown
+                    size={14}
+                    color={isPro ? "#E86A33" : colors.text.tertiary}
+                    strokeWidth={2}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      ...typography.ui.bodyMedium,
+                      color: colors.text.primary,
+                    }}
+                  >
+                    {isLoadingPro ? "Loading..." : isPro ? "Pro Member" : "Free Plan"}
+                  </Text>
+                  <Text
+                    style={{
+                      ...typography.ui.caption,
+                      color: isPro ? "#E86A33" : colors.text.secondary,
+                      marginTop: 2,
+                    }}
+                  >
+                    {isPro ? "Unlimited access" : "15 wardrobe adds • 5 scans"}
+                  </Text>
+                </View>
+              </View>
             </View>
           </Animated.View>
 
