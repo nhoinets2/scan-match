@@ -340,7 +340,7 @@ function AuthContent({
         <View style={{ flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.25)" }} />
       </View>
 
-      {/* Primary CTA - Sign in with email (dark button) */}
+      {/* Primary CTA - Sign in with email (primaryInverse) */}
       <Pressable
         onPress={() => {
           clearForm();
@@ -355,9 +355,11 @@ function AuthContent({
       >
         <View
           style={{
-            height: 56,
-            borderRadius: borderRadius.lg,
-            backgroundColor: loading ? "rgba(23,23,23,0.6)" : "#1C1C1E",
+            height: button.height.primary,
+            borderRadius: button.primaryInverse.borderRadius,
+            backgroundColor: loading 
+              ? button.primaryInverse.backgroundColorDisabled 
+              : button.primaryInverse.backgroundColor,
             alignItems: "center",
             justifyContent: "center",
           }}
@@ -365,7 +367,9 @@ function AuthContent({
           <Text
             style={{
               ...typography.button.primary,
-              color: "#FFFFFF",
+              color: loading 
+                ? button.primaryInverse.textColorDisabled 
+                : button.primaryInverse.textColor,
             }}
           >
             Sign in with email
