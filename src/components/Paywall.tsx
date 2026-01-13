@@ -118,113 +118,132 @@ function PlanCard({
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           style={{
-            backgroundColor: colors.bg.secondary,
+            backgroundColor: "#1A1A1A",
             borderRadius: borderRadius.card,
             borderWidth: isSelected ? 2 : 1,
-            borderColor: isSelected ? colors.accent.terracotta : colors.border.hairline,
-            padding: spacing.md,
-            position: "relative",
-            overflow: "visible",
-            minHeight: isAnnual ? 140 : 100,
+            borderColor: isSelected ? "#E8A838" : "rgba(255, 255, 255, 0.15)",
+            overflow: "hidden",
           }}
         >
-          {/* Best value badge for annual */}
+          {/* Best value header bar for annual */}
           {isAnnual && (
             <View
               style={{
-                position: "absolute",
-                top: -12,
-                left: spacing.md,
-                backgroundColor: colors.accent.terracotta,
-                paddingHorizontal: spacing.sm + 2,
-                paddingVertical: spacing.xs,
-                borderRadius: borderRadius.pill,
+                backgroundColor: "#E8A838",
+                paddingVertical: spacing.sm,
+                paddingHorizontal: spacing.md,
+                alignItems: "center",
               }}
             >
               <Text
                 style={{
-                  ...typography.ui.micro,
-                  color: colors.text.inverse,
+                  fontFamily: "Inter_600SemiBold",
+                  fontSize: 12,
+                  color: "#1A1A1A",
                   textTransform: "uppercase",
-                  letterSpacing: 0.5,
+                  letterSpacing: 1,
                 }}
               >
-                Best value
+                Best value — {savings}
               </Text>
             </View>
           )}
 
-          {/* Selection indicator */}
+          {/* Card content */}
           <View
             style={{
-              position: "absolute",
-              top: spacing.md,
-              right: spacing.md,
-              width: 22,
-              height: 22,
-              borderRadius: 11,
-              borderWidth: isSelected ? 0 : 1.5,
-              borderColor: colors.border.subtle,
-              backgroundColor: isSelected ? colors.accent.terracotta : "transparent",
+              flexDirection: "row",
               alignItems: "center",
-              justifyContent: "center",
+              padding: spacing.md,
             }}
           >
-            {isSelected && <Check size={13} color={colors.text.inverse} strokeWidth={3} />}
+            {/* Selection indicator on left */}
+            <View
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 12,
+                borderWidth: isSelected ? 0 : 2,
+                borderColor: "rgba(255, 255, 255, 0.3)",
+                backgroundColor: isSelected ? "#E8A838" : "transparent",
+                alignItems: "center",
+                justifyContent: "center",
+                marginRight: spacing.md,
+              }}
+            >
+              {isSelected && <Check size={14} color="#1A1A1A" strokeWidth={3} />}
+            </View>
+
+            {/* Plan details - left side */}
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  fontFamily: "Inter_600SemiBold",
+                  fontSize: 18,
+                  color: "#FFFFFF",
+                  marginBottom: 2,
+                }}
+              >
+                {isAnnual ? "Annual" : "Monthly"}
+              </Text>
+              
+              {isAnnual ? (
+                <>
+                  <Text
+                    style={{
+                      fontFamily: "Inter_500Medium",
+                      fontSize: 14,
+                      color: "#4ADE80",
+                      marginBottom: 2,
+                    }}
+                  >
+                    7-day free trial included
+                  </Text>
+                  <Text
+                    style={{
+                      fontFamily: "Inter_400Regular",
+                      fontSize: 13,
+                      color: "rgba(255, 255, 255, 0.5)",
+                    }}
+                  >
+                    {price}/year billed annually
+                  </Text>
+                </>
+              ) : (
+                <Text
+                  style={{
+                    fontFamily: "Inter_400Regular",
+                    fontSize: 13,
+                    color: "rgba(255, 255, 255, 0.5)",
+                  }}
+                >
+                  No free trial
+                </Text>
+              )}
+            </View>
+
+            {/* Price on right */}
+            <View style={{ alignItems: "flex-end" }}>
+              <Text
+                style={{
+                  fontFamily: "Inter_700Bold",
+                  fontSize: 22,
+                  color: "#FFFFFF",
+                }}
+              >
+                {isAnnual ? monthlyEquivalent : price}
+              </Text>
+              <Text
+                style={{
+                  fontFamily: "Inter_400Regular",
+                  fontSize: 13,
+                  color: "rgba(255, 255, 255, 0.5)",
+                }}
+              >
+                / month
+              </Text>
+            </View>
           </View>
-
-          {/* Plan details */}
-          <Text
-            style={{
-              ...typography.ui.label,
-              color: colors.text.secondary,
-              marginBottom: spacing.xs,
-              marginTop: isAnnual ? spacing.sm : 0,
-            }}
-          >
-            {isAnnual ? "Annual" : "Monthly"}
-          </Text>
-
-          <Text
-            style={{
-              ...typography.ui.sectionTitle,
-              color: colors.text.primary,
-              marginBottom: isAnnual ? spacing.xs : 0,
-            }}
-          >
-            {price}
-            <Text
-              style={{
-                ...typography.ui.body,
-                color: colors.text.secondary,
-              }}
-            >
-              {isAnnual ? " / year" : " / month"}
-            </Text>
-          </Text>
-
-          {isAnnual && monthlyEquivalent && (
-            <Text
-              style={{
-                ...typography.ui.caption,
-                color: colors.text.secondary,
-              }}
-            >
-              Only {monthlyEquivalent}/mo
-            </Text>
-          )}
-
-          {isAnnual && savings && (
-            <Text
-              style={{
-                ...typography.ui.micro,
-                color: colors.accent.terracotta,
-                marginTop: spacing.xs,
-              }}
-            >
-              {savings}
-            </Text>
-          )}
         </Pressable>
       </Animated.View>
     </View>
