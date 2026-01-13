@@ -543,40 +543,45 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
         >
           {/* CTA Button - Off-black with white text */}
           <Animated.View entering={FadeInUp.delay(400).springify()}>
-            <Pressable
-              onPress={handlePurchase}
-              disabled={isPurchasing || isLoadingOfferings}
-              style={({ pressed }) => ({
+            <View
+              style={{
                 height: 52,
                 borderRadius: 999,
-                backgroundColor: pressed ? "#0D0D0D" : "#1A1A1A",
+                backgroundColor: "#1A1A1A",
                 alignItems: "center",
                 justifyContent: "center",
-                opacity: isPurchasing || isLoadingOfferings ? 0.7 : 1,
-                shadowColor: "#171717",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.04,
-                shadowRadius: 8,
-                elevation: 2,
-              })}
+                overflow: "hidden",
+              }}
             >
-              {isPurchasing ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text
-                  style={{
-                    fontFamily: "Inter_600SemiBold",
-                    fontSize: 16,
-                    lineHeight: 22,
-                    color: "#FFFFFF",
-                  }}
-                >
-                  {selectedPlan === "annual"
-                    ? `Continue with Annual (${annualPrice})`
-                    : `Continue with Monthly (${monthlyPrice})`}
-                </Text>
-              )}
-            </Pressable>
+              <Pressable
+                onPress={handlePurchase}
+                disabled={isPurchasing || isLoadingOfferings}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  opacity: isPurchasing || isLoadingOfferings ? 0.7 : 1,
+                }}
+              >
+                {isPurchasing ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text
+                    style={{
+                      fontFamily: "Inter_600SemiBold",
+                      fontSize: 16,
+                      lineHeight: 22,
+                      color: "#FFFFFF",
+                    }}
+                  >
+                    {selectedPlan === "annual"
+                      ? `Continue with Annual (${annualPrice})`
+                      : `Continue with Monthly (${monthlyPrice})`}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
           </Animated.View>
 
           {/* Restore purchases */}
