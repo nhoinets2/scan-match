@@ -101,7 +101,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Check if Apple Auth is available (iOS only)
     if (Platform.OS === "ios") {
-      AppleAuthentication.isAvailableAsync().then(setIsAppleAuthAvailable);
+      AppleAuthentication.isAvailableAsync().then((available) => {
+        console.log("[Auth] Apple Sign-In available:", available);
+        setIsAppleAuthAvailable(available);
+      });
+    } else {
+      console.log("[Auth] Apple Sign-In not available on platform:", Platform.OS);
     }
 
     // Get initial session
@@ -147,11 +152,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithApple = async () => {
+    console.log("[Auth] signInWithApple called, isAppleAuthAvailable:", isAppleAuthAvailable);
+    
     // Check if Apple auth is available (iOS only)
     if (!isAppleAuthAvailable) {
       const errorMsg = Platform.OS === "ios" 
-        ? "Apple Sign-In is not available on this device."
+        ? "Apple Sign-In is not available on this device. Make sure 'Sign in with Apple' capability is added in Xcode."
         : "Apple Sign-In is only available on iOS devices. Please use another sign-in method.";
+      console.log("[Auth] Apple Sign-In not available:", errorMsg);
       setAppleError(new Error(errorMsg));
       return { error: new Error(errorMsg) };
     }
