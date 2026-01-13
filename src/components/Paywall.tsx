@@ -3,9 +3,11 @@
  *
  * Shows when user exceeds free quota for scanning features.
  * Offers monthly ($5.99) and annual ($39.99) subscription options.
+ * 
+ * Uses design token system for consistent styling.
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -13,10 +15,10 @@ import {
   Modal,
   ActivityIndicator,
   Linking,
+  ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
-  FadeIn,
   FadeInDown,
   FadeInUp,
   useAnimatedStyle,
@@ -32,9 +34,9 @@ import {
   Shirt,
   Star,
   Crown,
+  Infinity,
 } from "lucide-react-native";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import type { PurchasesPackage } from "react-native-purchases";
+import { useQuery } from "@tanstack/react-query";
 
 import {
   getOfferings,
@@ -43,24 +45,20 @@ import {
   hasEntitlement,
   isRevenueCatEnabled,
 } from "@/lib/revenuecatClient";
-import { borderRadius, spacing } from "@/lib/design-tokens";
+import {
+  colors,
+  typography,
+  spacing,
+  borderRadius,
+  shadows,
+  cards,
+  button,
+} from "@/lib/design-tokens";
 
-// Paywall colors (per spec)
-const PAYWALL_COLORS = {
-  background: "#FAFAFA",
-  primaryText: "#171717",
-  secondaryText: "#6B6B6B",
-  accent: "#E86A33",
-  accentLight: "#FFF4EF",
-  border: "#E5E5E5",
-  cardBg: "#FFFFFF",
-  bestValueBg: "#E86A33",
-} as const;
-
-// Legal URLs (placeholders - replace with actual URLs)
+// Legal URLs
 const LEGAL_URLS = {
-  terms: "https://fitmatch.app/terms",
-  privacy: "https://fitmatch.app/privacy",
+  terms: "https://snaptomatch.app/terms",
+  privacy: "https://snaptomatch.app/privacy",
 } as const;
 
 type PaywallReason = "in_store_limit" | "wardrobe_limit";
@@ -68,16 +66,16 @@ type PaywallReason = "in_store_limit" | "wardrobe_limit";
 interface PaywallProps {
   visible: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onPurchaseComplete?: () => void;
   reason: PaywallReason;
 }
 
-// Benefits list
+// Benefits with icons
 const BENEFITS = [
-  { icon: Zap, text: "Unlimited in-store scans" },
-  { icon: Shirt, text: "Unlimited wardrobe adds" },
-  { icon: Sparkles, text: "More outfit ideas" },
-  { icon: Star, text: "Priority results" },
+  { icon: Infinity, text: "Unlimited wardrobe scans", highlight: true },
+  { icon: Zap, text: "Unlimited in-store checks" },
+  { icon: Sparkles, text: "AI-powered outfit suggestions" },
+  { icon: Star, text: "Priority processing" },
 ];
 
 function PlanCard({
@@ -110,143 +108,137 @@ function PlanCard({
   };
 
   return (
-    <Animated.View style={animatedStyle}>
-      <Pressable
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          onSelect();
-        }}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={{
-          backgroundColor: PAYWALL_COLORS.cardBg,
-          borderRadius: borderRadius.card,
-          borderWidth: isSelected ? 2 : 1,
-          borderColor: isSelected ? PAYWALL_COLORS.accent : PAYWALL_COLORS.border,
-          padding: spacing.md,
-          position: "relative",
-          overflow: "visible",
-        }}
-      >
-        {/* Best value badge for annual */}
-        {isAnnual && (
+    <View>
+      <Animated.View style={animatedStyle}>
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onSelect();
+          }}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          style={{
+            backgroundColor: colors.bg.secondary,
+            borderRadius: borderRadius.card,
+            borderWidth: isSelected ? 2 : 1,
+            borderColor: isSelected ? colors.accent.terracotta : colors.border.hairline,
+            padding: spacing.md,
+            position: "relative",
+            overflow: "visible",
+            minHeight: isAnnual ? 140 : 100,
+          }}
+        >
+          {/* Best value badge for annual */}
+          {isAnnual && (
+            <View
+              style={{
+                position: "absolute",
+                top: -12,
+                left: spacing.md,
+                backgroundColor: colors.accent.terracotta,
+                paddingHorizontal: spacing.sm + 2,
+                paddingVertical: spacing.xs,
+                borderRadius: borderRadius.pill,
+              }}
+            >
+              <Text
+                style={{
+                  ...typography.ui.micro,
+                  color: colors.text.inverse,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                }}
+              >
+                Best value
+              </Text>
+            </View>
+          )}
+
+          {/* Selection indicator */}
           <View
             style={{
               position: "absolute",
-              top: -10,
-              left: spacing.md,
-              backgroundColor: PAYWALL_COLORS.bestValueBg,
-              paddingHorizontal: spacing.sm,
-              paddingVertical: 4,
-              borderRadius: borderRadius.pill,
+              top: spacing.md,
+              right: spacing.md,
+              width: 22,
+              height: 22,
+              borderRadius: 11,
+              borderWidth: isSelected ? 0 : 1.5,
+              borderColor: colors.border.subtle,
+              backgroundColor: isSelected ? colors.accent.terracotta : "transparent",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
+            {isSelected && <Check size={13} color={colors.text.inverse} strokeWidth={3} />}
+          </View>
+
+          {/* Plan details */}
+          <Text
+            style={{
+              ...typography.ui.label,
+              color: colors.text.secondary,
+              marginBottom: spacing.xs,
+              marginTop: isAnnual ? spacing.sm : 0,
+            }}
+          >
+            {isAnnual ? "Annual" : "Monthly"}
+          </Text>
+
+          <Text
+            style={{
+              ...typography.ui.sectionTitle,
+              color: colors.text.primary,
+              marginBottom: isAnnual ? spacing.xs : 0,
+            }}
+          >
+            {price}
             <Text
               style={{
-                fontFamily: "Inter_600SemiBold",
-                fontSize: 11,
-                color: "#FFFFFF",
-                textTransform: "uppercase",
-                letterSpacing: 0.5,
+                ...typography.ui.body,
+                color: colors.text.secondary,
               }}
             >
-              Best value
+              {isAnnual ? " / year" : " / month"}
             </Text>
-          </View>
-        )}
-
-        {/* Selection indicator */}
-        <View
-          style={{
-            position: "absolute",
-            top: spacing.md,
-            right: spacing.md,
-            width: 20,
-            height: 20,
-            borderRadius: 10,
-            borderWidth: isSelected ? 0 : 1.5,
-            borderColor: PAYWALL_COLORS.border,
-            backgroundColor: isSelected ? PAYWALL_COLORS.accent : "transparent",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          {isSelected && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
-        </View>
-
-        {/* Plan details */}
-        <Text
-          style={{
-            fontFamily: "Inter_600SemiBold",
-            fontSize: 15,
-            color: PAYWALL_COLORS.primaryText,
-            marginBottom: spacing.xs,
-            marginTop: isAnnual ? spacing.sm : 0,
-          }}
-        >
-          {isAnnual ? "Annual" : "Monthly"}
-        </Text>
-
-        <Text
-          style={{
-            fontFamily: "Inter_600SemiBold",
-            fontSize: 22,
-            color: PAYWALL_COLORS.primaryText,
-            marginBottom: isAnnual ? spacing.xs : 0,
-          }}
-        >
-          {price}
-          <Text
-            style={{
-              fontFamily: "Inter_400Regular",
-              fontSize: 14,
-              color: PAYWALL_COLORS.secondaryText,
-            }}
-          >
-            {isAnnual ? " / year" : " / month"}
           </Text>
-        </Text>
 
-        {isAnnual && monthlyEquivalent && (
-          <Text
-            style={{
-              fontFamily: "Inter_400Regular",
-              fontSize: 13,
-              color: PAYWALL_COLORS.secondaryText,
-            }}
-          >
-            Only {monthlyEquivalent}/mo
-          </Text>
-        )}
+          {isAnnual && monthlyEquivalent && (
+            <Text
+              style={{
+                ...typography.ui.caption,
+                color: colors.text.secondary,
+              }}
+            >
+              Only {monthlyEquivalent}/mo
+            </Text>
+          )}
 
-        {isAnnual && savings && (
-          <Text
-            style={{
-              fontFamily: "Inter_500Medium",
-              fontSize: 12,
-              color: PAYWALL_COLORS.accent,
-              marginTop: 4,
-            }}
-          >
-            {savings}
-          </Text>
-        )}
-      </Pressable>
-    </Animated.View>
+          {isAnnual && savings && (
+            <Text
+              style={{
+                ...typography.ui.micro,
+                color: colors.accent.terracotta,
+                marginTop: spacing.xs,
+              }}
+            >
+              {savings}
+            </Text>
+          )}
+        </Pressable>
+      </Animated.View>
+    </View>
   );
 }
 
-export function Paywall({ visible, onClose, onSuccess, reason }: PaywallProps) {
+export function Paywall({ visible, onClose, onPurchaseComplete, reason }: PaywallProps) {
   const insets = useSafeAreaInsets();
   const [selectedPlan, setSelectedPlan] = useState<"annual" | "monthly">("annual");
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
 
   // Fetch offerings from RevenueCat
-  const {
-    data: offerings,
-    isLoading: isLoadingOfferings,
-  } = useQuery({
+  const { data: offerings, isLoading: isLoadingOfferings } = useQuery({
     queryKey: ["revenuecat-offerings"],
     queryFn: async () => {
       const result = await getOfferings();
@@ -256,7 +248,7 @@ export function Paywall({ visible, onClose, onSuccess, reason }: PaywallProps) {
       return null;
     },
     enabled: visible && isRevenueCatEnabled(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 
   // Get packages
@@ -270,7 +262,7 @@ export function Paywall({ visible, onClose, onSuccess, reason }: PaywallProps) {
   // Format prices
   const monthlyPrice = monthlyPackage?.product.priceString || "$5.99";
   const annualPrice = annualPackage?.product.priceString || "$39.99";
-  const annualMonthlyEquivalent = "$3.33"; // 39.99 / 12
+  const annualMonthlyEquivalent = "$3.33";
   const annualSavings = "Save 44%";
 
   const handlePurchase = async () => {
@@ -288,11 +280,10 @@ export function Paywall({ visible, onClose, onSuccess, reason }: PaywallProps) {
       const result = await purchasePackage(packageToPurchase);
 
       if (result.ok) {
-        // Check if purchase granted the "pro" entitlement
         const hasProResult = await hasEntitlement("pro");
         if (hasProResult.ok && hasProResult.data) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          onSuccess();
+          onPurchaseComplete?.();
         }
       }
     } catch (error) {
@@ -311,11 +302,10 @@ export function Paywall({ visible, onClose, onSuccess, reason }: PaywallProps) {
       const result = await restorePurchases();
 
       if (result.ok) {
-        // Check if restore gave us the "pro" entitlement
         const hasProResult = await hasEntitlement("pro");
         if (hasProResult.ok && hasProResult.data) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          onSuccess();
+          onPurchaseComplete?.();
         }
       }
     } catch (error) {
@@ -329,11 +319,19 @@ export function Paywall({ visible, onClose, onSuccess, reason }: PaywallProps) {
     Linking.openURL(url);
   };
 
-  // Header text based on reason
-  const headerText =
-    reason === "in_store_limit"
-      ? "You've used your 5 free in-store scans"
-      : "You've used your 15 free wardrobe adds";
+  // Dynamic header based on reason
+  const headerConfig = {
+    in_store_limit: {
+      title: "You've used your 5 free scans",
+      subtitle: "Upgrade to Pro for unlimited in-store checks",
+    },
+    wardrobe_limit: {
+      title: "You've hit your wardrobe limit",
+      subtitle: "Upgrade to Pro for unlimited wardrobe adds",
+    },
+  };
+
+  const { title, subtitle } = headerConfig[reason];
 
   return (
     <Modal
@@ -345,17 +343,32 @@ export function Paywall({ visible, onClose, onSuccess, reason }: PaywallProps) {
       <View
         style={{
           flex: 1,
-          backgroundColor: PAYWALL_COLORS.background,
+          backgroundColor: colors.bg.primary,
         }}
       >
-        {/* Close button */}
+        {/* Header with close button */}
         <View
           style={{
             paddingTop: insets.top + spacing.sm,
             paddingHorizontal: spacing.lg,
-            alignItems: "flex-end",
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
           }}
         >
+          {/* Drag indicator */}
+          <View style={{ flex: 1, alignItems: "center" }}>
+            <View
+              style={{
+                width: spacing.xxl,
+                height: spacing.xs,
+                borderRadius: borderRadius.pill,
+                backgroundColor: colors.bg.tertiary,
+              }}
+            />
+          </View>
+          
+          {/* Close button */}
           <Pressable
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -363,68 +376,93 @@ export function Paywall({ visible, onClose, onSuccess, reason }: PaywallProps) {
             }}
             hitSlop={12}
             style={{
+              position: "absolute",
+              right: spacing.lg,
               width: 32,
               height: 32,
               borderRadius: 16,
-              backgroundColor: "rgba(0,0,0,0.05)",
+              backgroundColor: colors.surface.icon,
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <X size={18} color={PAYWALL_COLORS.secondaryText} strokeWidth={2} />
+            <X size={18} color={colors.text.secondary} strokeWidth={2} />
           </Pressable>
         </View>
 
-        {/* Content */}
-        <View style={{ flex: 1, paddingHorizontal: spacing.lg }}>
-          {/* Header */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            paddingHorizontal: spacing.lg,
+            paddingBottom: spacing.xl,
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Hero Section */}
           <Animated.View
-            entering={FadeInDown.delay(100)}
-            style={{ alignItems: "center", marginTop: spacing.lg }}
+            entering={FadeInDown.delay(100).springify()}
+            style={{
+              alignItems: "center",
+              marginTop: spacing.xl,
+              marginBottom: spacing.lg,
+            }}
           >
-            {/* Crown icon */}
+            {/* Crown icon in accent container */}
             <View
               style={{
-                width: 64,
-                height: 64,
-                borderRadius: 32,
-                backgroundColor: PAYWALL_COLORS.accentLight,
+                width: 72,
+                height: 72,
+                borderRadius: 36,
+                backgroundColor: colors.accent.terracottaLight,
                 alignItems: "center",
                 justifyContent: "center",
                 marginBottom: spacing.md,
               }}
             >
-              <Crown size={32} color={PAYWALL_COLORS.accent} strokeWidth={1.5} />
+              <Crown size={36} color={colors.accent.terracotta} strokeWidth={1.5} />
             </View>
 
             <Text
               style={{
-                fontFamily: "Inter_600SemiBold",
-                fontSize: 20,
-                color: PAYWALL_COLORS.primaryText,
+                ...typography.display.screenTitle,
+                color: colors.text.primary,
                 textAlign: "center",
                 marginBottom: spacing.xs,
               }}
             >
-              {headerText}
+              {title}
             </Text>
             <Text
               style={{
-                fontFamily: "Inter_400Regular",
-                fontSize: 15,
-                color: PAYWALL_COLORS.secondaryText,
+                ...typography.ui.body,
+                color: colors.text.secondary,
                 textAlign: "center",
+                maxWidth: 280,
               }}
             >
-              Go unlimited with Pro.
+              {subtitle}
             </Text>
           </Animated.View>
 
-          {/* Benefits */}
+          {/* Benefits Card */}
           <Animated.View
-            entering={FadeInDown.delay(200)}
-            style={{ marginTop: spacing.xl }}
+            entering={FadeInDown.delay(200).springify()}
+            style={{
+              ...cards.standard,
+              padding: spacing.lg,
+              marginBottom: spacing.lg,
+            }}
           >
+            <Text
+              style={{
+                ...typography.ui.cardTitle,
+                color: colors.text.primary,
+                marginBottom: spacing.md,
+              }}
+            >
+              What you get with Pro
+            </Text>
+
             {BENEFITS.map((benefit, index) => {
               const Icon = benefit.icon;
               return (
@@ -433,100 +471,105 @@ export function Paywall({ visible, onClose, onSuccess, reason }: PaywallProps) {
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    marginBottom: spacing.md,
+                    marginBottom: index === BENEFITS.length - 1 ? 0 : spacing.md,
                   }}
                 >
                   <View
                     style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 16,
-                      backgroundColor: PAYWALL_COLORS.accentLight,
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      backgroundColor: benefit.highlight
+                        ? colors.accent.terracottaLight
+                        : colors.surface.icon,
                       alignItems: "center",
                       justifyContent: "center",
                       marginRight: spacing.md,
                     }}
                   >
-                    <Icon size={16} color={PAYWALL_COLORS.accent} strokeWidth={2} />
+                    <Icon
+                      size={18}
+                      color={benefit.highlight ? colors.accent.terracotta : colors.text.secondary}
+                      strokeWidth={2}
+                    />
                   </View>
                   <Text
                     style={{
-                      fontFamily: "Inter_500Medium",
-                      fontSize: 15,
-                      color: PAYWALL_COLORS.primaryText,
+                      ...typography.ui.bodyMedium,
+                      color: colors.text.primary,
+                      flex: 1,
                     }}
                   >
                     {benefit.text}
                   </Text>
+                  <Check size={16} color={colors.status.success} strokeWidth={2.5} />
                 </View>
               );
             })}
           </Animated.View>
 
-          {/* Plan selector */}
+          {/* Plan selector - Vertical layout */}
           <Animated.View
-            entering={FadeInDown.delay(300)}
-            style={{
-              flexDirection: "row",
-              gap: spacing.md,
-              marginTop: spacing.xl,
-            }}
+            entering={FadeInDown.delay(300).springify()}
+            style={{ gap: spacing.md }}
           >
-            <View style={{ flex: 1 }}>
-              <PlanCard
-                isAnnual={true}
-                isSelected={selectedPlan === "annual"}
-                onSelect={() => setSelectedPlan("annual")}
-                price={annualPrice}
-                monthlyEquivalent={annualMonthlyEquivalent}
-                savings={annualSavings}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <PlanCard
-                isAnnual={false}
-                isSelected={selectedPlan === "monthly"}
-                onSelect={() => setSelectedPlan("monthly")}
-                price={monthlyPrice}
-              />
-            </View>
+            <PlanCard
+              isAnnual={true}
+              isSelected={selectedPlan === "annual"}
+              onSelect={() => setSelectedPlan("annual")}
+              price={annualPrice}
+              monthlyEquivalent={annualMonthlyEquivalent}
+              savings={annualSavings}
+            />
+            <PlanCard
+              isAnnual={false}
+              isSelected={selectedPlan === "monthly"}
+              onSelect={() => setSelectedPlan("monthly")}
+              price={monthlyPrice}
+            />
           </Animated.View>
-        </View>
+        </ScrollView>
 
-        {/* Bottom section */}
+        {/* Bottom CTA Section */}
         <View
           style={{
             paddingHorizontal: spacing.lg,
+            paddingTop: spacing.md,
             paddingBottom: insets.bottom + spacing.md,
+            backgroundColor: colors.bg.primary,
+            borderTopWidth: 1,
+            borderTopColor: colors.border.hairline,
           }}
         >
           {/* CTA Button */}
-          <Animated.View entering={FadeInUp.delay(400)}>
+          <Animated.View entering={FadeInUp.delay(400).springify()}>
             <Pressable
               onPress={handlePurchase}
               disabled={isPurchasing || isLoadingOfferings}
               style={({ pressed }) => ({
-                height: 56,
-                borderRadius: borderRadius.pill,
-                backgroundColor: PAYWALL_COLORS.accent,
+                height: button.height.primary,
+                borderRadius: button.primary.borderRadius,
+                backgroundColor: pressed
+                  ? button.primary.backgroundColorPressed
+                  : button.primary.backgroundColor,
                 alignItems: "center",
                 justifyContent: "center",
-                opacity: pressed ? 0.9 : 1,
+                opacity: isPurchasing || isLoadingOfferings ? 0.7 : 1,
+                ...shadows.sm,
               })}
             >
               {isPurchasing ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={button.primary.textColor} />
               ) : (
                 <Text
                   style={{
-                    fontFamily: "Inter_600SemiBold",
-                    fontSize: 16,
-                    color: "#FFFFFF",
+                    ...typography.button.primary,
+                    color: button.primary.textColor,
                   }}
                 >
                   {selectedPlan === "annual"
-                    ? "Start Pro (Annual)"
-                    : "Start Pro (Monthly)"}
+                    ? `Continue with Annual (${annualPrice})`
+                    : `Continue with Monthly (${monthlyPrice})`}
                 </Text>
               )}
             </Pressable>
@@ -543,13 +586,12 @@ export function Paywall({ visible, onClose, onSuccess, reason }: PaywallProps) {
             }}
           >
             {isRestoring ? (
-              <ActivityIndicator size="small" color={PAYWALL_COLORS.secondaryText} />
+              <ActivityIndicator size="small" color={colors.text.secondary} />
             ) : (
               <Text
                 style={{
-                  fontFamily: "Inter_500Medium",
-                  fontSize: 14,
-                  color: PAYWALL_COLORS.secondaryText,
+                  ...typography.ui.label,
+                  color: colors.text.secondary,
                 }}
               >
                 Restore purchases
@@ -558,14 +600,12 @@ export function Paywall({ visible, onClose, onSuccess, reason }: PaywallProps) {
           </Pressable>
 
           {/* Legal footer */}
-          <View style={{ alignItems: "center", marginTop: spacing.md }}>
+          <View style={{ alignItems: "center", marginTop: spacing.sm }}>
             <Text
               style={{
-                fontFamily: "Inter_400Regular",
-                fontSize: 11,
-                color: PAYWALL_COLORS.secondaryText,
+                ...typography.ui.caption,
+                color: colors.text.tertiary,
                 textAlign: "center",
-                lineHeight: 16,
               }}
             >
               Subscription auto-renews. Cancel anytime in Settings.
@@ -579,9 +619,8 @@ export function Paywall({ visible, onClose, onSuccess, reason }: PaywallProps) {
               <Pressable onPress={() => handleOpenLink(LEGAL_URLS.terms)}>
                 <Text
                   style={{
-                    fontFamily: "Inter_400Regular",
-                    fontSize: 11,
-                    color: PAYWALL_COLORS.secondaryText,
+                    ...typography.ui.caption,
+                    color: colors.text.tertiary,
                     textDecorationLine: "underline",
                   }}
                 >
@@ -590,9 +629,8 @@ export function Paywall({ visible, onClose, onSuccess, reason }: PaywallProps) {
               </Pressable>
               <Text
                 style={{
-                  fontFamily: "Inter_400Regular",
-                  fontSize: 11,
-                  color: PAYWALL_COLORS.secondaryText,
+                  ...typography.ui.caption,
+                  color: colors.text.tertiary,
                   marginHorizontal: spacing.xs,
                 }}
               >
@@ -601,9 +639,8 @@ export function Paywall({ visible, onClose, onSuccess, reason }: PaywallProps) {
               <Pressable onPress={() => handleOpenLink(LEGAL_URLS.privacy)}>
                 <Text
                   style={{
-                    fontFamily: "Inter_400Regular",
-                    fontSize: 11,
-                    color: PAYWALL_COLORS.secondaryText,
+                    ...typography.ui.caption,
+                    color: colors.text.tertiary,
                     textDecorationLine: "underline",
                   }}
                 >
