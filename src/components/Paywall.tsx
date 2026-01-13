@@ -541,30 +541,34 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
             borderTopColor: colors.border.hairline,
           }}
         >
-          {/* CTA Button */}
+          {/* CTA Button - Off-black with white text */}
           <Animated.View entering={FadeInUp.delay(400).springify()}>
             <Pressable
               onPress={handlePurchase}
               disabled={isPurchasing || isLoadingOfferings}
               style={({ pressed }) => ({
-                height: button.height.primary,
-                borderRadius: button.primary.borderRadius,
-                backgroundColor: pressed
-                  ? button.primary.backgroundColorPressed
-                  : button.primary.backgroundColor,
+                height: 52,
+                borderRadius: 999,
+                backgroundColor: pressed ? "#0D0D0D" : "#1A1A1A",
                 alignItems: "center",
                 justifyContent: "center",
                 opacity: isPurchasing || isLoadingOfferings ? 0.7 : 1,
-                ...shadows.sm,
+                shadowColor: "#171717",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.04,
+                shadowRadius: 8,
+                elevation: 2,
               })}
             >
               {isPurchasing ? (
-                <ActivityIndicator color={button.primary.textColor} />
+                <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <Text
                   style={{
-                    ...typography.button.primary,
-                    color: button.primary.textColor,
+                    fontFamily: "Inter_600SemiBold",
+                    fontSize: 16,
+                    lineHeight: 22,
+                    color: "#FFFFFF",
                   }}
                 >
                   {selectedPlan === "annual"
