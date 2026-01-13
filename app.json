@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.snaptomatch.app",
-      "usesAppleSignIn": false
+      "usesAppleSignIn": true
     },
     "android": {
       "edgeToEdgeEnabled": true
