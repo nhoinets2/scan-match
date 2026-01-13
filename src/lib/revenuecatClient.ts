@@ -86,25 +86,55 @@ const guardRevenueCatUsage = async <T>(
   }
 };
 
-// Initialize RevenueCat if key exists
-if (isEnabled) {
+// Track if RevenueCat has been initialized
+let isInitialized = false;
+
+/**
+ * Initialize RevenueCat SDK with optional user ID
+ * 
+ * @param userId - Optional Supabase user ID to link RevenueCat customer to
+ * 
+ * This should be called early in the app lifecycle, ideally:
+ * - With userId if user is already logged in (session restored)
+ * - Without userId if no user session exists (anonymous mode)
+ * 
+ * If called with userId, RevenueCat will be configured with that user from the start,
+ * avoiding the need for aliasing later.
+ */
+export const initializeRevenueCat = async (userId?: string): Promise<void> => {
+  if (!isEnabled) {
+    console.log(`${LOG_PREFIX} Initialization skipped: not configured`);
+    return;
+  }
+
+  if (isInitialized) {
+    console.log(`${LOG_PREFIX} Already initialized, skipping`);
+    return;
+  }
+
   try {
     // Set up custom log handler to suppress Test Store and expected errors
-    // These are non-errors thrown as errors by the SDK, and will be confusing to the user.
     Purchases.setLogHandler((logLevel, message) => {
-
-      // Log ERROR messages normally
       if (logLevel === Purchases.LOG_LEVEL.ERROR) {
         console.log(LOG_PREFIX, message);
       }
     });
 
-    Purchases.configure({ apiKey: apiKey! });
+    // Configure with user ID if available
+    if (userId) {
+      console.log(`${LOG_PREFIX} Initializing with user ID:`, userId);
+      Purchases.configure({ apiKey: apiKey!, appUserID: userId });
+    } else {
+      console.log(`${LOG_PREFIX} Initializing anonymously`);
+      Purchases.configure({ apiKey: apiKey! });
+    }
+
+    isInitialized = true;
     console.log(`${LOG_PREFIX} SDK initialized successfully`);
   } catch (error) {
     console.error(`${LOG_PREFIX} Failed to initialize:`, error);
   }
-}
+};
 
 /**
  * Check if RevenueCat is configured and enabled

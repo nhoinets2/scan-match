@@ -7,7 +7,7 @@ import * as WebBrowser from "expo-web-browser";
 import { supabase } from "./supabase";
 import { useSnapToMatchStore } from "./store";
 import { useQuotaStore } from "./quota-store";
-import { setUserId, logoutUser } from "./revenuecatClient";
+import { initializeRevenueCat, logoutUser } from "./revenuecatClient";
 
 // Required for expo-auth-session to close the browser on completion
 WebBrowser.maybeCompleteAuthSession();
@@ -111,61 +111,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("[Auth] Apple Sign-In not available on platform:", Platform.OS);
     }
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session: initialSession }, error }) => {
+    // Get initial session and initialize RevenueCat
+    supabase.auth.getSession().then(async ({ data: { session: initialSession }, error }) => {
       if (error) {
         console.error("Error getting session:", error);
       }
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
-      setIsLoading(false);
+      
       if (initialSession) {
-        console.log("Session restored for user:", initialSession.user?.email);
-        // Link RevenueCat user ID on session restore
-        if (initialSession.user?.id) {
-          console.log("[Auth] === Linking RevenueCat on Session Restore ===");
-          console.log("[Auth] User ID:", initialSession.user.id);
-          setUserId(initialSession.user.id)
-            .then((result) => {
-              if (result.ok) {
-                console.log("[Auth] ✅ RevenueCat user linked successfully");
-              } else {
-                console.log("[Auth] ❌ RevenueCat linking failed:", result.reason);
-              }
-            })
-            .catch((err) => {
-              console.log("[Auth] ❌ RevenueCat linking error:", err);
-            });
-        }
+        console.log("[Auth] Session restored for user:", initialSession.user?.email);
+        console.log("[Auth] Initializing RevenueCat with user ID:", initialSession.user.id);
+        await initializeRevenueCat(initialSession.user.id);
       } else {
-        console.log("No active session found");
+        console.log("[Auth] No active session, initializing RevenueCat anonymously");
+        await initializeRevenueCat();
       }
+      
+      setIsLoading(false);
     });
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      console.log("[Auth] Auth state changed:", event);
       setSession(newSession);
       setUser(newSession?.user ?? null);
 
-      // Link RevenueCat user ID to Supabase user on sign in
-      if (event === "SIGNED_IN" && newSession?.user?.id) {
-        console.log("[Auth] === Linking RevenueCat on Sign In ===");
-        console.log("[Auth] Event:", event);
-        console.log("[Auth] User ID:", newSession.user.id);
-        setUserId(newSession.user.id)
-          .then((result) => {
-            if (result.ok) {
-              console.log("[Auth] ✅ RevenueCat user linked successfully");
-            } else {
-              console.log("[Auth] ❌ RevenueCat linking failed:", result.reason);
-            }
-          })
-          .catch((err) => {
-            console.log("[Auth] ❌ RevenueCat linking error:", err);
-          });
-      }
+      // Note: RevenueCat is initialized once at app start with the user ID if session exists.
+      // For users who sign in after starting anonymously, the SDK should handle aliasing,
+      // but this may not work reliably in all environments (esp. sandbox/test mode).
+      // Production users who start logged in will have their ID from the start.
     });
 
     return () => subscription.unsubscribe();
