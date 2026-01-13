@@ -259,9 +259,15 @@ export const hasEntitlement = async (
     };
   }
 
-  const isActive = Boolean(
-    customerInfoResult.data.entitlements.active?.[entitlementId],
-  );
+  // Debug: Log entitlement check details
+  const activeEntitlements = customerInfoResult.data.entitlements.active;
+  console.log(`${LOG_PREFIX} Checking entitlement "${entitlementId}"`);
+  console.log(`${LOG_PREFIX} Active entitlements:`, Object.keys(activeEntitlements || {}));
+  console.log(`${LOG_PREFIX} Customer ID:`, customerInfoResult.data.originalAppUserId);
+
+  const isActive = Boolean(activeEntitlements?.[entitlementId]);
+  console.log(`${LOG_PREFIX} "${entitlementId}" is active:`, isActive);
+  
   return { ok: true, data: isActive };
 };
 
