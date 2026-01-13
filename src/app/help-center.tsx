@@ -311,16 +311,13 @@ function TopicItem({ topic, isExpanded, onToggle }: { topic: HelpTopic; isExpand
           style={{
             paddingHorizontal: spacing.md,
             paddingBottom: spacing.sm + 6,
-            width: '100%',
           }}
         >
           <Text
             style={{
               ...typography.ui.body,
               color: colors.text.secondary,
-              flex: 1,
               flexShrink: 1,
-              flexWrap: 'wrap',
             }}
           >
             {topic.answer}
