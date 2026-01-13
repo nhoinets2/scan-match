@@ -215,27 +215,33 @@ export const setUserId = (userId: string): Promise<RevenueCatResult<void>> => {
   return guardRevenueCatUsage("setUserId", async () => {
     console.log(`${LOG_PREFIX} Attempting to link user ID:`, userId);
     
-    // Get current customer info to check if anonymous
+    // Get current customer info to check if already linked
     const currentInfo = await Purchases.getCustomerInfo();
     const currentUserId = currentInfo.originalAppUserId;
     console.log(`${LOG_PREFIX} Current customer ID:`, currentUserId);
     
-    // If currently anonymous and trying to link, logout first then login
-    if (currentUserId.startsWith("$RCAnonymousID")) {
-      console.log(`${LOG_PREFIX} Logging out anonymous user first...`);
-      await Purchases.logOut();
+    // If already linked to this user, skip
+    if (currentUserId === userId) {
+      console.log(`${LOG_PREFIX} ✅ Already linked to this user ID, skipping`);
+      return;
     }
     
-    // Now log in with the real user ID
+    // Log in with the real user ID (RevenueCat will alias anonymous → real)
+    console.log(`${LOG_PREFIX} Calling logIn to link/alias user...`);
     const { customerInfo, created } = await Purchases.logIn(userId);
-    console.log(`${LOG_PREFIX} User linked successfully!`);
+    console.log(`${LOG_PREFIX} logIn completed!`);
     console.log(`${LOG_PREFIX} - App User ID:`, customerInfo.originalAppUserId);
     console.log(`${LOG_PREFIX} - New customer:`, created);
     console.log(`${LOG_PREFIX} - Active entitlements:`, Object.keys(customerInfo.entitlements.active || {}));
     
     // Verify it worked
     if (customerInfo.originalAppUserId !== userId) {
-      console.warn(`${LOG_PREFIX} ⚠️  Warning: User ID mismatch! Expected ${userId}, got ${customerInfo.originalAppUserId}`);
+      console.error(`${LOG_PREFIX} ❌ LINKING FAILED: Expected ${userId}, got ${customerInfo.originalAppUserId}`);
+      console.error(`${LOG_PREFIX} This is a RevenueCat SDK issue. The anonymous ID was not properly aliased.`);
+      console.error(`${LOG_PREFIX} Possible causes:`);
+      console.error(`${LOG_PREFIX} 1. SDK version incompatibility`);
+      console.error(`${LOG_PREFIX} 2. Sandbox environment issue`);
+      console.error(`${LOG_PREFIX} 3. Previous purchase data conflict`);
     } else {
       console.log(`${LOG_PREFIX} ✅ User ID correctly linked!`);
     }
