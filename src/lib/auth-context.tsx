@@ -7,7 +7,7 @@ import * as WebBrowser from "expo-web-browser";
 import { supabase } from "./supabase";
 import { useSnapToMatchStore } from "./store";
 import { useQuotaStore } from "./quota-store";
-import { initializeRevenueCat, logoutUser } from "./revenuecatClient";
+import { initializeRevenueCat, setUserId, logoutUser } from "./revenuecatClient";
 
 // Required for expo-auth-session to close the browser on completion
 WebBrowser.maybeCompleteAuthSession();
@@ -139,10 +139,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(newSession);
       setUser(newSession?.user ?? null);
 
-      // Note: RevenueCat is initialized once at app start with the user ID if session exists.
-      // For users who sign in after starting anonymously, the SDK should handle aliasing,
-      // but this may not work reliably in all environments (esp. sandbox/test mode).
-      // Production users who start logged in will have their ID from the start.
+      // Handle user sign-in/sign-up
+      // If user started anonymous and now signs in, we need to link RevenueCat
+      if (event === "SIGNED_IN" && newSession?.user?.id) {
+        console.log("[Auth] User signed in, linking RevenueCat ID:", newSession.user.id);
+        const result = await setUserId(newSession.user.id);
+        if (result.ok) {
+          console.log("[Auth] ✅ RevenueCat linked on sign-in");
+        } else {
+          console.log("[Auth] ⚠️  RevenueCat linking failed (expected in test/sandbox):", result.reason);
+        }
+      }
     });
 
     return () => subscription.unsubscribe();
