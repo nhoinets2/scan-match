@@ -7,7 +7,7 @@ import * as WebBrowser from "expo-web-browser";
 import { supabase } from "./supabase";
 import { useSnapToMatchStore } from "./store";
 import { useQuotaStore } from "./quota-store";
-import { initializeRevenueCat, setUserId, logoutUser } from "./revenuecatClient";
+import { initializeRevenueCat, logoutUser } from "./revenuecatClient";
 
 // Required for expo-auth-session to close the browser on completion
 WebBrowser.maybeCompleteAuthSession();
@@ -119,13 +119,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
       
-      if (initialSession) {
-        console.log("[Auth] Session restored for user:", initialSession.user?.email);
+      // Only initialize RevenueCat if user is signed in
+      if (initialSession?.user?.id) {
+        console.log("[Auth] Session restored for user:", initialSession.user.email);
         console.log("[Auth] Initializing RevenueCat with user ID:", initialSession.user.id);
         await initializeRevenueCat(initialSession.user.id);
       } else {
-        console.log("[Auth] No active session, initializing RevenueCat anonymously");
-        await initializeRevenueCat();
+        console.log("[Auth] No session - RevenueCat will initialize on sign-in");
       }
       
       setIsLoading(false);
@@ -139,16 +139,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(newSession);
       setUser(newSession?.user ?? null);
 
-      // Handle user sign-in/sign-up
-      // If user started anonymous and now signs in, we need to link RevenueCat
+      // Initialize RevenueCat when user signs in
+      // Since we don't initialize for anonymous users, this is the first initialization
       if (event === "SIGNED_IN" && newSession?.user?.id) {
-        console.log("[Auth] User signed in, linking RevenueCat ID:", newSession.user.id);
-        const result = await setUserId(newSession.user.id);
-        if (result.ok) {
-          console.log("[Auth] ✅ RevenueCat linked on sign-in");
-        } else {
-          console.log("[Auth] ⚠️  RevenueCat linking failed (expected in test/sandbox):", result.reason);
-        }
+        console.log("[Auth] User signed in, initializing RevenueCat with ID:", newSession.user.id);
+        await initializeRevenueCat(newSession.user.id);
+        console.log("[Auth] ✅ RevenueCat initialized with user ID from the start");
       }
     });
 
