@@ -33,7 +33,6 @@ import {
   Sparkles,
   Zap,
   Star,
-  Crown,
   Infinity,
 } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
@@ -421,21 +420,6 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
               marginBottom: spacing.xl,
             }}
           >
-            {/* Crown icon */}
-            <View
-              style={{
-                width: 80,
-                height: 80,
-                borderRadius: 40,
-                backgroundColor: "rgba(255, 255, 255, 0.15)",
-                alignItems: "center",
-                justifyContent: "center",
-                marginBottom: spacing.md,
-              }}
-            >
-              <Crown size={40} color={colors.text.inverse} strokeWidth={1.5} />
-            </View>
-
             <Text
               style={{
                 ...typography.display.screenTitle,
