@@ -62,6 +62,9 @@ import { Paywall } from "@/components/Paywall";
 
 type ScreenState = "ready" | "processing" | "analyzed";
 
+// DEBUG: Set to true to show on-screen quota debug info
+const SHOW_DEBUG_OVERLAY = true;
+
 const TIPS = [
   "Lay flat or hang up for best results",
   "Good lighting helps us see colors",
@@ -976,10 +979,47 @@ export default function AddItemScreen() {
     );
   }
 
+  // Debug overlay component
+  const DebugOverlay = () => {
+    if (!SHOW_DEBUG_OVERLAY) return null;
+    const remaining = 15 - wardrobeAddsUsed;
+    return (
+      <View
+        style={{
+          position: "absolute",
+          bottom: 120,
+          left: spacing.md,
+          right: spacing.md,
+          backgroundColor: "rgba(0,0,0,0.85)",
+          borderRadius: 12,
+          padding: spacing.md,
+          zIndex: 9999,
+        }}
+      >
+        <Text style={{ color: "#FFD700", fontWeight: "bold", fontSize: 14, marginBottom: 4 }}>
+          🔧 DEBUG: Quota Status
+        </Text>
+        <Text style={{ color: "#FFF", fontSize: 12 }}>
+          isPro: {isPro ? "✅ YES" : "❌ NO"}
+        </Text>
+        <Text style={{ color: "#FFF", fontSize: 12 }}>
+          wardrobeAddsUsed: {wardrobeAddsUsed} / 15
+        </Text>
+        <Text style={{ color: "#FFF", fontSize: 12 }}>
+          hasAddsRemaining: {hasAddsRemaining() ? "✅ YES" : "❌ NO"}
+        </Text>
+        <Text style={{ color: remaining > 0 ? "#4ADE80" : "#F87171", fontSize: 12, fontWeight: "bold", marginTop: 4 }}>
+          {remaining > 0 ? `${remaining} adds left` : "⚠️ SHOULD SHOW PAYWALL"}
+        </Text>
+      </View>
+    );
+  };
+
   // Camera view (Ready state or Processing state)
   if (screenState === "ready" || screenState === "processing") {
     return (
       <View className="flex-1 bg-black">
+        <DebugOverlay />
         <CameraView
           ref={cameraRef}
           style={{ flex: 1 }}
@@ -1104,6 +1144,7 @@ export default function AddItemScreen() {
   // Analyzed state - show results with category selection
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
+      <DebugOverlay />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
