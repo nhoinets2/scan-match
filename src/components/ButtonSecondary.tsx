@@ -1,16 +1,11 @@
-import React, { useEffect, forwardRef } from "react";
-import { Pressable, Text, StyleSheet, View, PressableProps } from "react-native";
+import React, { useEffect } from "react";
+import { Pressable, Text, StyleSheet } from "react-native";
 import { BlurView } from "expo-blur";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming, cancelAnimation } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { button, shadows } from "@/lib/design-tokens";
 
-const ForwardedPressable = forwardRef<View, PressableProps>(
-  function ForwardedPressable(props, ref) {
-    return <Pressable ref={ref} {...props} />;
-  }
-);
-const AnimatedPressable = Animated.createAnimatedComponent(ForwardedPressable);
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface ButtonSecondaryProps {
   label: string;
@@ -179,4 +174,3 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
-

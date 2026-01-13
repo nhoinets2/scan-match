@@ -79,7 +79,8 @@ function AppleIcon({ size = 20, color = "#000" }: { size?: number; color?: strin
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
-// Hero landing page image - replaced with gradient background
+// Hero landing page image
+const HERO_LANDING_IMAGE = require("../../assets/onboarding_screens/landing_page/landing_page.webp");
 
 // ============================================
 // CURVED GRADIENT SHEET COMPONENTS
@@ -759,7 +760,7 @@ export default function AuthFlow(props: AuthFlowProps) {
   // Bottom sheet refs and values - must be at top level (before any early returns)
   const { height: screenHeight } = Dimensions.get("window");
   const bottomSheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => ["32%", "65%"], []); // 32% shows dramatic swoosh, 65% shows auth
+  const snapPoints = useMemo(() => ["26%", "55%"], []); // 26% shows dramatic swoosh with less overlay, 55% shows auth
 
   // Validate on blur
   const validateEmail = () => {
@@ -953,8 +954,11 @@ export default function AuthFlow(props: AuthFlowProps) {
           {/* Spotlight radial gradient behind mannequin */}
           <SpotlightBg width={SCREEN_WIDTH} height={screenHeight} />
           
-          {/* Hero image placeholder - using gradient background instead */}
-          <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%", backgroundColor: "#E8F5E9" }} />
+          <Image
+            source={HERO_LANDING_IMAGE}
+            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }}
+            resizeMode="cover"
+          />
 
           {/* 1) Contrast gradient for white text readability */}
                 <LinearGradient

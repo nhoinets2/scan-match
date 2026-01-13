@@ -1,17 +1,12 @@
-import React, { forwardRef } from "react";
-import { Pressable, StyleSheet, ViewStyle, View, PressableProps } from "react-native";
+import React from "react";
+import { Pressable, StyleSheet, ViewStyle } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { LucideIcon } from "lucide-react-native";
 
 import { borderRadius, colors } from "@/lib/design-tokens";
 
-const ForwardedPressable = forwardRef<View, PressableProps>(
-  function ForwardedPressable(props, ref) {
-    return <Pressable ref={ref} {...props} />;
-  }
-);
-const AnimatedPressable = Animated.createAnimatedComponent(ForwardedPressable);
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface IconButtonProps {
   icon: LucideIcon;

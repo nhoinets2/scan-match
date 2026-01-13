@@ -1,15 +1,10 @@
-import React, { forwardRef } from "react";
-import { Pressable, Text, StyleSheet, View, PressableProps } from "react-native";
+import React from "react";
+import { Pressable, Text, StyleSheet } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { button } from "@/lib/design-tokens";
 
-const ForwardedPressable = forwardRef<View, PressableProps>(
-  function ForwardedPressable(props, ref) {
-    return <Pressable ref={ref} {...props} />;
-  }
-);
-const AnimatedPressable = Animated.createAnimatedComponent(ForwardedPressable);
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface ButtonSecondaryOutlineProps {
   label: string;
@@ -112,4 +107,3 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
-

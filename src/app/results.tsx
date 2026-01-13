@@ -75,7 +75,7 @@ import {
   OkayReasonCode,
   RecentCheck,
 } from "@/lib/types";
-import { colors, spacing, typography, borderRadius, shadows, cards, button, components } from "@/lib/design-tokens";
+import { colors, spacing, typography, borderRadius, shadows, cards, button } from "@/lib/design-tokens";
 import { getTextStyle } from "@/lib/typography-helpers";
 import { runDecisionTree, outcomeToConfidence, DecisionTreeResult } from "@/lib/decision-tree";
 import { ItemSignalsResult } from "@/lib/openai";
@@ -1294,7 +1294,15 @@ export default function ResultsScreen() {
         // V3: icon drop shadow
         ...shadows.sm,
       }}>
-        <Shirt size={size} color={colors.text.primary} style={{ transform: [{ rotate: "90deg" }] }} />
+        <Image
+          source={require("../../assets/icons/bottoms.png")}
+          style={{
+            width: size,
+            height: size,
+          }}
+          tintColor={colors.text.primary}
+          contentFit="contain"
+        />
       </View>
     );
   };
@@ -1307,7 +1315,15 @@ export default function ResultsScreen() {
         // V3: icon drop shadow
         ...shadows.sm,
       }}>
-        <Shirt size={size} color={colors.text.primary} />
+        <Image
+          source={require("../../assets/icons/coats.png")}
+          style={{
+            width: size,
+            height: size,
+          }}
+          tintColor={colors.text.primary}
+          contentFit="contain"
+        />
       </View>
     );
   };
@@ -3314,7 +3330,7 @@ width: spacing.xs / 2,
                           />
                         ) : (
                           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                            <Text style={{ fontSize: typography.sizes.h3 }}>🧺</Text>
+                            <Text style={{ fontSize: typography.sizes.sectionTitle }}>🧺</Text>
                           </View>
                         )}
                       </View>

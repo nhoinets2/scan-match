@@ -7,6 +7,7 @@ import {
   Dimensions,
   Alert,
 } from "react-native";
+import { Image } from "expo-image";
 import { BlurView } from "expo-blur";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
@@ -21,7 +22,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import * as Haptics from "expo-haptics";
-import { Check, ChevronRight, ChevronLeft, Moon, Circle, Droplet, Leaf, Snowflake, Flame, Shirt, Briefcase, Sparkles, Heart, Dumbbell } from "lucide-react-native";
+import { Check, ChevronRight, ChevronLeft, Moon, Circle, Droplet, Leaf, Snowflake, Flame } from "lucide-react-native";
 import {
   useFonts,
   Inter_400Regular,
@@ -49,6 +50,8 @@ import { getTextStyle } from "@/lib/typography-helpers";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 type OnboardingStep = "style" | "colors" | "fit_reference";
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface StepIndicatorProps {
   currentStep: number;
@@ -99,28 +102,27 @@ function StyleCard({ vibe, selected, onPress, index }: StyleCardProps) {
     scale.value = withSpring(1);
   };
 
-  // Map vibe IDs to colors and icons
-  const getVibeStyle = () => {
+  // Map vibe IDs to icon images
+  const getIconSource = () => {
     switch (vibe.id) {
       case "casual":
-        return { bg: "#E8F5E9", icon: Shirt, iconColor: "#4CAF50" };
+        return require("../../assets/onboarding_screens/style_icons/casual.webp");
       case "minimal":
-        return { bg: "#F5F5F5", icon: Circle, iconColor: "#757575" };
+        return require("../../assets/onboarding_screens/style_icons/minimal.webp");
       case "office":
-        return { bg: "#E3F2FD", icon: Briefcase, iconColor: "#2196F3" };
+        return require("../../assets/onboarding_screens/style_icons/office.webp");
       case "street":
-        return { bg: "#FFF3E0", icon: Sparkles, iconColor: "#FF9800" };
+        return require("../../assets/onboarding_screens/style_icons/street.webp");
       case "feminine":
-        return { bg: "#FCE4EC", icon: Heart, iconColor: "#E91E63" };
+        return require("../../assets/onboarding_screens/style_icons/feminine.webp");
       case "sporty":
-        return { bg: "#E0F2F1", icon: Dumbbell, iconColor: "#009688" };
+        return require("../../assets/onboarding_screens/style_icons/sporty.webp");
       default:
-        return { bg: "#F5F5F5", icon: Circle, iconColor: "#757575" };
+        return require("../../assets/onboarding_screens/style_icons/minimal.webp");
     }
   };
 
-  const vibeStyle = getVibeStyle();
-  const IconComponent = vibeStyle.icon;
+  const iconSource = getIconSource();
 
   return (
     <Animated.View
@@ -139,12 +141,18 @@ function StyleCard({ vibe, selected, onPress, index }: StyleCardProps) {
             borderRadius: borderRadius.card,
             height: 140,
             overflow: "hidden",
-            backgroundColor: vibeStyle.bg,
-            alignItems: "center",
-            justifyContent: "center",
           }}
         >
-          <IconComponent size={64} color={vibeStyle.iconColor} />
+          <Image
+            source={iconSource}
+            style={{ 
+              width: "100%", 
+              height: "100%",
+              borderRadius: borderRadius.card,
+            }}
+            contentFit="cover"
+            contentPosition="center"
+          />
         </Pressable>
       </Animated.View>
       {/* Title with checkmark outside card */}
@@ -200,27 +208,27 @@ function ColorCard({ group, selected, onPress, index }: ColorCardProps) {
     scale.value = withSpring(1);
   };
 
-  // Map color group IDs to colors
-  const getColorStyle = () => {
+  // Map color group IDs to icon images
+  const getIconSource = () => {
     switch (group.id) {
       case "black":
-        return { bg: "#1C1C1C", text: "#FFFFFF" };
+        return require("../../assets/onboarding_screens/color_vibe/mostly_black.webp");
       case "neutrals":
-        return { bg: "#F5F5F5", text: "#757575" };
+        return require("../../assets/onboarding_screens/color_vibe/neutrals.webp");
       case "denim":
-        return { bg: "#2196F3", text: "#FFFFFF" };
+        return require("../../assets/onboarding_screens/color_vibe/denim_blue.webp");
       case "earth":
-        return { bg: "#8B4513", text: "#FFFFFF" };
+        return require("../../assets/onboarding_screens/color_vibe/earth_tones.webp");
       case "warm":
-        return { bg: "#FF6B35", text: "#FFFFFF" };
+        return require("../../assets/onboarding_screens/color_vibe/warm_colors.webp");
       case "cool":
-        return { bg: "#9C27B0", text: "#FFFFFF" };
+        return require("../../assets/onboarding_screens/color_vibe/cool_colors.webp");
       default:
-        return { bg: "#F5F5F5", text: "#757575" };
+        return require("../../assets/onboarding_screens/color_vibe/neutrals.webp");
     }
   };
 
-  const colorStyle = getColorStyle();
+  const iconSource = getIconSource();
 
   return (
     <Animated.View
@@ -239,12 +247,18 @@ function ColorCard({ group, selected, onPress, index }: ColorCardProps) {
             borderRadius: borderRadius.card,
             height: 140,
             overflow: "hidden",
-            backgroundColor: colorStyle.bg,
-            alignItems: "center",
-            justifyContent: "center",
           }}
         >
-          <Text style={{ fontSize: 48 }}>{group.emoji}</Text>
+          <Image
+            source={iconSource}
+            style={{ 
+              width: "100%", 
+              height: "100%",
+              borderRadius: borderRadius.card,
+            }}
+            contentFit="cover"
+            contentPosition="center"
+          />
         </Pressable>
       </Animated.View>
       {/* Title with checkmark outside card */}
@@ -374,21 +388,21 @@ function FitButton({ fit, label, selected, onPress, index }: FitButtonProps) {
     scale.value = withSpring(1);
   };
 
-  // Map fit IDs to colors and icons
-  const getFitStyle = () => {
+  // Map fit IDs to icon images
+  const getIconSource = () => {
     switch (fit) {
       case "slim":
-        return { bg: "#E1F5FE", icon: "👔", iconColor: "#0288D1" };
+        return require("../../assets/onboarding_screens/fit_icons/slim.webp");
       case "regular":
-        return { bg: "#F3E5F5", icon: "👕", iconColor: "#7B1FA2" };
+        return require("../../assets/onboarding_screens/fit_icons/relaxed.webp");
       case "oversized":
-        return { bg: "#FFF3E0", icon: "🧥", iconColor: "#F57C00" };
+        return require("../../assets/onboarding_screens/fit_icons/oversized.webp");
       default:
-        return { bg: "#F3E5F5", icon: "👕", iconColor: "#7B1FA2" };
+        return require("../../assets/onboarding_screens/fit_icons/relaxed.webp");
     }
   };
 
-  const fitStyle = getFitStyle();
+  const iconSource = getIconSource();
 
   return (
     <Animated.View
@@ -407,12 +421,18 @@ function FitButton({ fit, label, selected, onPress, index }: FitButtonProps) {
             borderRadius: borderRadius.card,
             height: 140,
             overflow: "hidden",
-            backgroundColor: fitStyle.bg,
-            alignItems: "center",
-            justifyContent: "center",
           }}
         >
-          <Text style={{ fontSize: 48 }}>{fitStyle.icon}</Text>
+          <Image
+            source={iconSource}
+            style={{ 
+              width: "100%", 
+              height: "100%",
+              borderRadius: borderRadius.card,
+            }}
+            contentFit="cover"
+            contentPosition="center"
+          />
         </Pressable>
       </Animated.View>
       {/* Title with checkmark outside card */}
