@@ -335,32 +335,29 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg.primary,
-        }}
+      <LinearGradient
+        colors={["#171717", "#3D322F", "#C45A28", "#E86A33"]}
+        locations={[0, 0.3, 0.6, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ flex: 1 }}
       >
-        {/* Hero Section with Gradient Background */}
-        <LinearGradient
-          colors={["#171717", "#3D322F", "#C45A28", "#E86A33"]}
-          locations={[0, 0.3, 0.6, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
             paddingTop: insets.top + spacing.sm,
-            paddingBottom: spacing.xl,
-            borderBottomLeftRadius: borderRadius.xl,
-            borderBottomRightRadius: borderRadius.xl,
+            paddingHorizontal: spacing.lg,
+            paddingBottom: insets.bottom + spacing.xl,
           }}
+          showsVerticalScrollIndicator={false}
         >
           {/* Header with close button */}
           <View
             style={{
-              paddingHorizontal: spacing.lg,
               flexDirection: "row",
               justifyContent: "space-between",
               alignItems: "center",
+              marginBottom: spacing.xl,
             }}
           >
             {/* Drag indicator */}
@@ -384,7 +381,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
               hitSlop={12}
               style={{
                 position: "absolute",
-                right: spacing.lg,
+                right: 0,
                 width: 32,
                 height: 32,
                 borderRadius: 16,
@@ -402,8 +399,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
             entering={FadeInDown.delay(100).springify()}
             style={{
               alignItems: "center",
-              marginTop: spacing.xl,
-              paddingHorizontal: spacing.lg,
+              marginBottom: spacing.xl,
             }}
           >
             {/* Crown icon */}
@@ -442,23 +438,13 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
               {subtitle}
             </Text>
           </Animated.View>
-        </LinearGradient>
 
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{
-            paddingHorizontal: spacing.lg,
-            paddingTop: spacing.lg,
-            paddingBottom: spacing.xl,
-          }}
-          showsVerticalScrollIndicator={false}
-        >
-
-          {/* Benefits Card */}
+          {/* Benefits Card - Glass effect */}
           <Animated.View
             entering={FadeInDown.delay(200).springify()}
             style={{
-              ...cards.standard,
+              backgroundColor: "rgba(255, 255, 255, 0.95)",
+              borderRadius: borderRadius.card,
               padding: spacing.lg,
               marginBottom: spacing.lg,
             }}
@@ -519,7 +505,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
           {/* Plan selector - Vertical layout */}
           <Animated.View
             entering={FadeInDown.delay(300).springify()}
-            style={{ gap: spacing.md }}
+            style={{ gap: spacing.md, marginBottom: spacing.xl }}
           >
             <PlanCard
               isAnnual={true}
@@ -536,26 +522,14 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
               price={monthlyPrice}
             />
           </Animated.View>
-        </ScrollView>
 
-        {/* Bottom CTA Section */}
-        <View
-          style={{
-            paddingHorizontal: spacing.lg,
-            paddingTop: spacing.md,
-            paddingBottom: insets.bottom + spacing.md,
-            backgroundColor: colors.bg.primary,
-            borderTopWidth: 1,
-            borderTopColor: colors.border.hairline,
-          }}
-        >
-          {/* CTA Button - Off-black with white text */}
+          {/* CTA Button - White on gradient */}
           <Animated.View entering={FadeInUp.delay(400).springify()}>
             <View
               style={{
                 height: 52,
                 borderRadius: 999,
-                backgroundColor: "#1A1A1A",
+                backgroundColor: "#FFFFFF",
                 alignItems: "center",
                 justifyContent: "center",
                 overflow: "hidden",
@@ -573,14 +547,14 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
                 }}
               >
                 {isPurchasing ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <ActivityIndicator color="#1A1A1A" />
                 ) : (
                   <Text
                     style={{
                       fontFamily: "Inter_600SemiBold",
                       fontSize: 16,
                       lineHeight: 22,
-                      color: "#FFFFFF",
+                      color: "#1A1A1A",
                     }}
                   >
                     Subscribe
@@ -601,12 +575,12 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
             }}
           >
             {isRestoring ? (
-              <ActivityIndicator size="small" color={colors.text.secondary} />
+              <ActivityIndicator size="small" color="rgba(255, 255, 255, 0.7)" />
             ) : (
               <Text
                 style={{
                   ...typography.ui.label,
-                  color: colors.text.secondary,
+                  color: "rgba(255, 255, 255, 0.7)",
                 }}
               >
                 Restore purchases
@@ -615,11 +589,11 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
           </Pressable>
 
           {/* Legal footer */}
-          <View style={{ alignItems: "center", marginTop: spacing.sm }}>
+          <View style={{ alignItems: "center", marginTop: spacing.md }}>
             <Text
               style={{
                 ...typography.ui.caption,
-                color: colors.text.tertiary,
+                color: "rgba(255, 255, 255, 0.5)",
                 textAlign: "center",
               }}
             >
@@ -635,7 +609,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
                 <Text
                   style={{
                     ...typography.ui.caption,
-                    color: colors.text.tertiary,
+                    color: "rgba(255, 255, 255, 0.5)",
                     textDecorationLine: "underline",
                   }}
                 >
@@ -645,7 +619,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
               <Text
                 style={{
                   ...typography.ui.caption,
-                  color: colors.text.tertiary,
+                  color: "rgba(255, 255, 255, 0.5)",
                   marginHorizontal: spacing.xs,
                 }}
               >
@@ -655,7 +629,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
                 <Text
                   style={{
                     ...typography.ui.caption,
-                    color: colors.text.tertiary,
+                    color: "rgba(255, 255, 255, 0.5)",
                     textDecorationLine: "underline",
                   }}
                 >
@@ -664,8 +638,8 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
               </Pressable>
             </View>
           </View>
-        </View>
-      </View>
+        </ScrollView>
+      </LinearGradient>
     </Modal>
   );
 }
