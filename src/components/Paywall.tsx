@@ -110,7 +110,7 @@ function PlanCard({
   };
 
   return (
-    <Animated.View style={[animatedStyle, { flex: 1 }]}>
+    <Animated.View style={animatedStyle}>
       <Pressable
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -119,7 +119,6 @@ function PlanCard({
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         style={{
-          flex: 1,
           backgroundColor: PAYWALL_COLORS.cardBg,
           borderRadius: borderRadius.card,
           borderWidth: isSelected ? 2 : 1,
@@ -473,20 +472,24 @@ export function Paywall({ visible, onClose, onSuccess, reason }: PaywallProps) {
               marginTop: spacing.xl,
             }}
           >
-            <PlanCard
-              isAnnual={true}
-              isSelected={selectedPlan === "annual"}
-              onSelect={() => setSelectedPlan("annual")}
-              price={annualPrice}
-              monthlyEquivalent={annualMonthlyEquivalent}
-              savings={annualSavings}
-            />
-            <PlanCard
-              isAnnual={false}
-              isSelected={selectedPlan === "monthly"}
-              onSelect={() => setSelectedPlan("monthly")}
-              price={monthlyPrice}
-            />
+            <View style={{ flex: 1 }}>
+              <PlanCard
+                isAnnual={true}
+                isSelected={selectedPlan === "annual"}
+                onSelect={() => setSelectedPlan("annual")}
+                price={annualPrice}
+                monthlyEquivalent={annualMonthlyEquivalent}
+                savings={annualSavings}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <PlanCard
+                isAnnual={false}
+                isSelected={selectedPlan === "monthly"}
+                onSelect={() => setSelectedPlan("monthly")}
+                price={monthlyPrice}
+              />
+            </View>
           </Animated.View>
         </View>
 
