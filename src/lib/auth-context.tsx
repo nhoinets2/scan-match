@@ -121,6 +121,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
       if (initialSession) {
         console.log("Session restored for user:", initialSession.user?.email);
+        // Link RevenueCat user ID on session restore
+        if (initialSession.user?.id) {
+          console.log("[Auth] Linking RevenueCat user on session restore:", initialSession.user.id);
+          setUserId(initialSession.user.id).catch((err) => {
+            console.log("[Auth] Failed to link RevenueCat user:", err);
+          });
+        }
       } else {
         console.log("No active session found");
       }
