@@ -2,8 +2,8 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { Session, User } from "@supabase/supabase-js";
 import * as AppleAuthentication from "expo-apple-authentication";
-import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
 import { supabase } from "./supabase";
 import { useSnapToMatchStore } from "./store";
 import { useQuotaStore } from "./quota-store";
@@ -47,58 +47,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [appleError, setAppleError] = useState<Error | null>(null);
   const clearCache = useSnapToMatchStore((s) => s.clearCache);
 
-  // Google Auth setup using expo-auth-session
-  // The webClientId should be set in your environment variables
-  const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
-  const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
-  const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
-
-  // Check if Google auth is configured for the current platform
-  const isGoogleConfigured = Boolean(
-    googleWebClientId &&
-    (Platform.OS === "ios" ? googleIosClientId : true) &&
-    (Platform.OS === "android" ? googleAndroidClientId : true)
-  );
-
-  // Only initialize Google auth if properly configured
-  // Use a placeholder config when not configured to avoid the hook throwing
-  const [googleRequest, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest(
-    isGoogleConfigured
-      ? {
-          webClientId: googleWebClientId,
-          iosClientId: googleIosClientId,
-          androidClientId: googleAndroidClientId,
-        }
-      : {
-          // Placeholder config - won't actually be used since isGoogleConfigured is false
-          clientId: "placeholder",
-        }
-  );
-
-  // Handle Google OAuth response
-  useEffect(() => {
-    if (googleResponse?.type === "success") {
-      const { id_token } = googleResponse.params;
-      setIsGoogleLoading(true);
-      setGoogleError(null);
-      
-      // Sign in with Supabase using the Google ID token
-      supabase.auth.signInWithIdToken({
-        provider: "google",
-        token: id_token,
-      }).then(({ error }) => {
-        if (error) {
-          console.error("Google sign-in error:", error);
-          setGoogleError(error);
-        }
-        setIsGoogleLoading(false);
-      });
-    } else if (googleResponse?.type === "error") {
-      console.error("Google auth error:", googleResponse.error);
-      setGoogleError(new Error(googleResponse.error?.message ?? "Google sign-in failed"));
-      setIsGoogleLoading(false);
-    }
-  }, [googleResponse]);
+  // Google Auth is handled via Supabase OAuth redirect
+  // No client-side credentials needed - configured in Supabase Dashboard
 
   useEffect(() => {
     // Check if Apple Auth is available (iOS only)
@@ -219,14 +169,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signInWithGoogle = () => {
-    if (!googleWebClientId) {
-      setGoogleError(new Error("Google sign-in is not configured. Please add EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID to your environment variables."));
-      return;
+  const signInWithGoogle = async () => {
+    try {
+      setIsGoogleLoading(true);
+      setGoogleError(null);
+      
+      // Get the redirect URL for the current platform
+      const redirectUrl = Linking.createURL("/");
+      
+      // Use Supabase OAuth - credentials are configured in Supabase Dashboard
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: false,
+        },
+      });
+      
+      if (error) {
+        console.error("Google sign-in error:", error);
+        setGoogleError(error);
+      }
+      setIsGoogleLoading(false);
+    } catch (error) {
+      console.error("Google sign-in error:", error);
+      setGoogleError(error as Error);
+      setIsGoogleLoading(false);
     }
-    setIsGoogleLoading(true);
-    setGoogleError(null);
-    promptGoogleAsync();
   };
 
   const signInWithOAuth = async (provider: OAuthProvider) => {
