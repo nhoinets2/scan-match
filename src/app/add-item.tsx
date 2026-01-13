@@ -63,7 +63,7 @@ import { Paywall } from "@/components/Paywall";
 type ScreenState = "ready" | "processing" | "analyzed";
 
 // DEBUG: Set to true to show on-screen quota debug info
-const SHOW_DEBUG_OVERLAY = true;
+const SHOW_DEBUG_OVERLAY = false;
 
 const TIPS = [
   "Lay flat or hang up for best results",
