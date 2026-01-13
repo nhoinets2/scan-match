@@ -19,6 +19,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useProStatus } from "@/lib/useProStatus";
 import { colors, spacing, typography, borderRadius, cards, button } from "@/lib/design-tokens";
 import { forceRequestReview } from "@/lib/useStoreReview";
+import { Paywall } from "@/components/Paywall";
 
 // Settings row component - 56px height, 20px radius
 function SettingsRow({
@@ -131,8 +132,9 @@ function SectionHeader({ title }: { title: string }) {
 
 export default function AccountScreen() {
   const { user, signOut } = useAuth();
-  const { isPro, isLoading: isLoadingPro } = useProStatus();
+  const { isPro, isLoading: isLoadingPro, refetch: refetchProStatus } = useProStatus();
   const [loading, setLoading] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -257,45 +259,53 @@ export default function AccountScreen() {
                 }}
               />
 
-              {/* Subscription status row */}
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <View
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 14,
-                    backgroundColor: isPro ? "#FFF4EF" : colors.surface.icon,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginRight: spacing.sm,
-                  }}
-                >
-                  <Crown
-                    size={14}
-                    color={isPro ? "#E86A33" : colors.text.tertiary}
-                    strokeWidth={2}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text
+              {/* Subscription status row - Long press to preview paywall */}
+              <Pressable
+                onLongPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                  setShowPaywall(true);
+                }}
+                delayLongPress={500}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View
                     style={{
-                      ...typography.ui.bodyMedium,
-                      color: colors.text.primary,
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
+                      backgroundColor: isPro ? "#FFF4EF" : colors.surface.icon,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginRight: spacing.sm,
                     }}
                   >
-                    {isLoadingPro ? "Loading..." : isPro ? "Pro Member" : "Free Plan"}
-                  </Text>
-                  <Text
-                    style={{
-                      ...typography.ui.caption,
-                      color: isPro ? "#E86A33" : colors.text.secondary,
-                      marginTop: 2,
-                    }}
-                  >
-                    {isPro ? "Unlimited access" : "15 wardrobe adds • 5 scans"}
-                  </Text>
+                    <Crown
+                      size={14}
+                      color={isPro ? "#E86A33" : colors.text.tertiary}
+                      strokeWidth={2}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        ...typography.ui.bodyMedium,
+                        color: colors.text.primary,
+                      }}
+                    >
+                      {isLoadingPro ? "Loading..." : isPro ? "Pro Member" : "Free Plan"}
+                    </Text>
+                    <Text
+                      style={{
+                        ...typography.ui.caption,
+                        color: isPro ? "#E86A33" : colors.text.secondary,
+                        marginTop: 2,
+                      }}
+                    >
+                      {isPro ? "Unlimited access" : "15 wardrobe adds • 5 scans"}
+                    </Text>
+                  </View>
                 </View>
-              </View>
+              </Pressable>
             </View>
           </Animated.View>
 
@@ -398,6 +408,17 @@ export default function AccountScreen() {
           </Animated.View>
         </ScrollView>
       </SafeAreaView>
+
+      {/* Paywall Preview - Long press subscription info to show */}
+      <Paywall
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        onPurchaseComplete={() => {
+          setShowPaywall(false);
+          refetchProStatus();
+        }}
+        reason="wardrobe_limit"
+      />
     </View>
   );
 }
