@@ -575,9 +575,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
                       color: "#FFFFFF",
                     }}
                   >
-                    {selectedPlan === "annual"
-                      ? `Continue with Annual (${annualPrice})`
-                      : `Continue with Monthly (${monthlyPrice})`}
+                    Subscribe
                   </Text>
                 )}
               </Pressable>
