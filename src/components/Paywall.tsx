@@ -520,13 +520,13 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
             />
           </Animated.View>
 
-          {/* CTA Button - White on gradient */}
+          {/* CTA Button - Primary Inverse (white on dark gradient) */}
           <Animated.View entering={FadeInUp.delay(400).springify()}>
             <View
               style={{
-                height: 52,
-                borderRadius: 999,
-                backgroundColor: "#FFFFFF",
+                height: button.height.primary,
+                borderRadius: button.primaryInverse.borderRadius,
+                backgroundColor: button.primaryInverse.backgroundColor,
                 alignItems: "center",
                 justifyContent: "center",
                 overflow: "hidden",
@@ -544,14 +544,12 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
                 }}
               >
                 {isPurchasing ? (
-                  <ActivityIndicator color="#1A1A1A" />
+                  <ActivityIndicator color={button.primaryInverse.textColor} />
                 ) : (
                   <Text
                     style={{
-                      fontFamily: "Inter_600SemiBold",
-                      fontSize: 16,
-                      lineHeight: 22,
-                      color: "#1A1A1A",
+                      ...typography.button.primary,
+                      color: button.primaryInverse.textColor,
                     }}
                   >
                     Start free trial
