@@ -6,6 +6,7 @@ import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
 import { supabase } from "./supabase";
 import { useSnapToMatchStore } from "./store";
+import { useQuotaStore } from "./quota-store";
 
 // Required for expo-auth-session to close the browser on completion
 WebBrowser.maybeCompleteAuthSession();
@@ -258,6 +259,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     // Clear the ephemeral store cache
     clearCache();
+    // Reset quota counters so new user starts fresh
+    useQuotaStore.getState().resetQuotas();
     await supabase.auth.signOut();
   };
 
