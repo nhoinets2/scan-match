@@ -354,7 +354,6 @@ function SectionCard({ section, index }: { section: HelpSection; index: number }
           borderWidth: 1.5,
           borderColor: colors.border.subtle,
           borderRadius: borderRadius.card,
-          overflow: "hidden",
         }}
       >
         {/* Section Header */}
