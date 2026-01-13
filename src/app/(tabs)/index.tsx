@@ -43,7 +43,6 @@ import {
   useRemoveRecentCheck,
 } from "@/lib/database";
 import { useAuth } from "@/lib/auth-context";
-import { useScan & MatchStore } from "@/lib/store";
 import { colors, spacing, typography, components, button, borderRadius, shadows, cards } from "@/lib/design-tokens";
 import { getTextStyle } from "@/lib/typography-helpers";
 import { OutcomeState, RecentCheck, WardrobeItem, CATEGORIES } from "@/lib/types";
