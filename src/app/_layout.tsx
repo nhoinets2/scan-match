@@ -31,8 +31,8 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
-// Custom light theme for SnapToMatch - using design tokens
-const SnapToMatchLightTheme = {
+// Custom light theme for Scan & Match - using design tokens
+const ScanMatchLightTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
@@ -50,7 +50,7 @@ function RootLayoutNav({
   colorScheme: "light" | "dark" | null | undefined;
 }) {
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : SnapToMatchLightTheme}>
+    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : ScanMatchLightTheme}>
       <AuthGuard>
         <OfflineIndicator />
         <Stack>

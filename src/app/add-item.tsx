@@ -964,7 +964,7 @@ export default function AddItemScreen() {
             marginBottom: spacing.xl,
           }}
         >
-          SnapToMatch needs camera access to{"\n"}capture your wardrobe items
+          Scan & Match needs camera access to{"\n"}capture your wardrobe items
         </Text>
         <ButtonPrimary
           label="Allow Camera"

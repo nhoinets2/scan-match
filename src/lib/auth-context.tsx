@@ -7,6 +7,7 @@ import * as WebBrowser from "expo-web-browser";
 import { supabase } from "./supabase";
 import { useSnapToMatchStore } from "./store";
 import { useQuotaStore } from "./quota-store";
+import { setUserId, logoutUser } from "./revenuecatClient";
 
 // Required for expo-auth-session to close the browser on completion
 WebBrowser.maybeCompleteAuthSession();
@@ -128,9 +129,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       setSession(newSession);
       setUser(newSession?.user ?? null);
+
+      // Link RevenueCat user ID to Supabase user on sign in
+      if (event === "SIGNED_IN" && newSession?.user?.id) {
+        console.log("[Auth] Linking RevenueCat user:", newSession.user.id);
+        setUserId(newSession.user.id).catch((err) => {
+          console.log("[Auth] Failed to link RevenueCat user:", err);
+        });
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -261,6 +270,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearCache();
     // Reset quota counters so new user starts fresh
     useQuotaStore.getState().resetQuotas();
+    // Logout from RevenueCat to unlink user
+    await logoutUser().catch((err) => {
+      console.log("[Auth] Failed to logout from RevenueCat:", err);
+    });
     await supabase.auth.signOut();
   };
 

@@ -45,9 +45,9 @@ const HELP_SECTIONS: HelpSection[] = [
     topics: [
       {
         id: "how-it-works",
-        question: "How does SnapToMatch work?",
+        question: "How does Scan & Match work?",
         answer:
-          "SnapToMatch helps you make better shopping decisions by matching items you find in stores to your existing wardrobe. Simply scan an item with your camera, and we'll show you how well it works with clothes you already own.",
+          "Scan & Match helps you make better shopping decisions by matching items you find in stores to your existing wardrobe. Simply scan an item with your camera, and we'll show you how well it works with clothes you already own.",
       },
       {
         id: "setup-preferences",
@@ -109,7 +109,7 @@ const HELP_SECTIONS: HelpSection[] = [
         id: "categories",
         question: "What categories are available?",
         answer:
-          "SnapToMatch supports 8 categories: Tops, Bottoms, Skirts, Dresses, Outerwear, Shoes, Bags, and Accessories. Categorizing your items correctly helps improve match accuracy.",
+          "Scan & Match supports 8 categories: Tops, Bottoms, Skirts, Dresses, Outerwear, Shoes, Bags, and Accessories. Categorizing your items correctly helps improve match accuracy.",
       },
       {
         id: "goes-with-everything",
@@ -152,7 +152,7 @@ const HELP_SECTIONS: HelpSection[] = [
         id: "outfit-sections",
         question: "How are the Outfits sections built?",
         answer:
-          "The Outfits sections on both 'Wear now' and 'Worth trying' tabs show complete outfit combinations built from your wardrobe items that work with the scanned item. SnapToMatch analyzes your wardrobe and automatically creates outfit pairings based on color harmony, style compatibility, and how well pieces work together. Each outfit shows the essential items plus any optional add-ons that enhance the look.",
+          "The Outfits sections on both 'Wear now' and 'Worth trying' tabs show complete outfit combinations built from your wardrobe items that work with the scanned item. Scan & Match analyzes your wardrobe and automatically creates outfit pairings based on color harmony, style compatibility, and how well pieces work together. Each outfit shows the essential items plus any optional add-ons that enhance the look.",
       },
       {
         id: "suggestions",
@@ -189,7 +189,7 @@ const HELP_SECTIONS: HelpSection[] = [
         id: "auto-cleanup",
         question: "What happens to unsaved scans?",
         answer:
-          "To keep your scan history manageable, SnapToMatch automatically cleans up unsaved scans in two ways: 1) We keep only your 20 most recent unsaved scans - older ones are removed when you add new scans. 2) Unsaved scans older than 14 days are automatically deleted. Saved scans are never automatically removed and don't count toward the 20-scan limit.",
+          "To keep your scan history manageable, Scan & Match automatically cleans up unsaved scans in two ways: 1) We keep only your 20 most recent unsaved scans - older ones are removed when you add new scans. 2) Unsaved scans older than 14 days are automatically deleted. Saved scans are never automatically removed and don't count toward the 20-scan limit.",
       },
       {
         id: "all-scans-limits",
@@ -421,7 +421,7 @@ export default function HelpCenterScreen() {
                 color: colors.text.secondary,
               }}
             >
-              Find answers to common questions about using SnapToMatch. Tap on any topic to learn more.
+              Find answers to common questions about using Scan & Match. Tap on any topic to learn more.
             </Text>
           </Animated.View>
 
@@ -451,7 +451,7 @@ export default function HelpCenterScreen() {
             <Pressable
               onPress={async () => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                const mailtoUrl = "mailto:snaptomatch@gmail.com?subject=SnapToMatch Support";
+                const mailtoUrl = "mailto:snaptomatch@gmail.com?subject=Scan & Match Support";
                 const canOpen = await Linking.canOpenURL(mailtoUrl);
                 if (canOpen) {
                   await Linking.openURL(mailtoUrl);

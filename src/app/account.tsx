@@ -340,7 +340,7 @@ export default function AccountScreen() {
             />
             <SettingsRow
               icon={<Star size={18} color={colors.text.secondary} />}
-              title="Rate SnapToMatch"
+              title="Rate Scan & Match"
               subtitle="Help us improve with a review"
               onPress={async () => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -393,7 +393,7 @@ export default function AccountScreen() {
                 color: colors.text.tertiary,
               }}
             >
-              SnapToMatch v1.0
+              Scan & Match v1.0
             </Text>
           </Animated.View>
         </ScrollView>

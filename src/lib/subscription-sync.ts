@@ -141,9 +141,31 @@ export async function updateSubscriptionInDb(
 /**
  * Check if user is Pro from database
  * Falls back to false if no record exists
+ * 
+ * Validates expires_at to ensure subscription hasn't expired
+ * (protects against stale data when used as fallback)
  */
 export async function isProFromDb(userId: string): Promise<boolean> {
   const subscription = await getSubscriptionFromDb(userId);
-  return subscription?.is_pro ?? false;
+  
+  if (!subscription?.is_pro) {
+    return false;
+  }
+
+  // If no expiration date, trust is_pro flag (could be manual override/lifetime)
+  if (!subscription.expires_at) {
+    return true;
+  }
+
+  // Check if subscription has expired
+  const expiresAt = new Date(subscription.expires_at);
+  const now = new Date();
+  
+  if (expiresAt < now) {
+    console.log("[Subscription] DB subscription expired:", subscription.expires_at);
+    return false;
+  }
+
+  return true;
 }
 

@@ -1,4 +1,4 @@
-// SnapToMatch Types
+// Scan & Match Types
 
 export type StyleVibe =
   | "casual"

@@ -263,7 +263,7 @@ export default function ReportProblemScreen() {
 ${pad("Report ID:")}${d.reportId}
 ${pad("Timestamp (local):")}${d.localTime}
 ${pad("Timestamp (UTC):")}${d.utcTime}
-${pad("App:")}SnapToMatch ${d.appVersion} (${d.buildNumber})  Env: ${d.env}
+${pad("App:")}Scan & Match ${d.appVersion} (${d.buildNumber})  Env: ${d.env}
 ${pad("Device:")}${d.deviceModel}
 ${pad("OS:")}${d.osName} ${d.osVersion}
 ${pad("Locale:")}${d.locale}
@@ -328,7 +328,7 @@ Thank you!`;
     const buildNumber = Constants.expoConfig?.ios?.buildNumber || Constants.expoConfig?.android?.versionCode || "?";
     const screenName = currentPath.replace(/^\//g, "").replace(/-/g, " ") || "home";
     
-    return `[SnapToMatch v${appVersion}(${buildNumber})] ${categoryLabel} — ${screenName} — Problem Report`;
+    return `[Scan & Match v${appVersion}(${buildNumber})] ${categoryLabel} — ${screenName} — Problem Report`;
   };
 
   const handleCopyReport = async () => {

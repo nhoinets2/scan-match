@@ -43,7 +43,7 @@ import {
   useRemoveRecentCheck,
 } from "@/lib/database";
 import { useAuth } from "@/lib/auth-context";
-import { useSnapToMatchStore } from "@/lib/store";
+import { useScan & MatchStore } from "@/lib/store";
 import { colors, spacing, typography, components, button, borderRadius, shadows, cards } from "@/lib/design-tokens";
 import { getTextStyle } from "@/lib/typography-helpers";
 import { OutcomeState, RecentCheck, WardrobeItem, CATEGORIES } from "@/lib/types";
@@ -952,7 +952,7 @@ export default function HomeScreen() {
                     letterSpacing: 0.3,
                   }}
                 >
-                  SnapToMatch
+                  Scan & Match
                 </Text>
               </View>
               <Pressable

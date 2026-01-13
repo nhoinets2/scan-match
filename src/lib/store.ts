@@ -1,4 +1,4 @@
-// SnapToMatch Store - Zustand state management (ephemeral state only)
+// Scan & Match Store - Zustand state management (ephemeral state only)
 // Persistent data (wardrobe, preferences, checks, looks) is stored in Supabase
 // See src/lib/database.ts for database hooks
 

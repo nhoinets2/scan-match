@@ -653,7 +653,7 @@ export default function ScanScreen() {
             marginBottom: spacing.xl,
           }}
         >
-          SnapToMatch needs camera access to{"\n"}scan items while you shop
+          Scan & Match needs camera access to{"\n"}scan items while you shop
         </Text>
         <ButtonPrimary
           label="Allow Camera"

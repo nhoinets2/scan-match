@@ -944,7 +944,7 @@ export default function AuthFlow(props: AuthFlowProps) {
                         letterSpacing: 0.5,
                       }}
                     >
-                      SnapToMatch
+                      Scan & Match
                   </Text>
                 </Animated.View>
         </SafeAreaView>

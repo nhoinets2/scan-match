@@ -1,5 +1,5 @@
 /**
- * Centralized copy/text constants for the SnapToMatch app
+ * Centralized copy/text constants for the Scan & Match app
  * 
  * This file contains all user-facing text strings to make it easier to:
  * - Update copy across the app
