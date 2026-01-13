@@ -326,7 +326,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
   };
 
   const title = titleConfig[reason];
-  const subtitle = "Upgrade to Pro for unlimited in-store checks and wardrobe adds";
+  const subtitle = "Upgrade to Pro for unlimited in-store checks and wardrobe adds.";
 
   return (
     <Modal
