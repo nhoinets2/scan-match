@@ -744,7 +744,7 @@ export default function AllChecksScreen() {
   // Confirm delete action
   const handleConfirmDelete = () => {
     if (!itemToDelete) return;
-    removeRecentCheckMutation.mutate(itemToDelete.id);
+    removeRecentCheckMutation.mutate({ id: itemToDelete.id, imageUri: itemToDelete.imageUri });
     setItemToDelete(null);
     setShowToast(true);
   };

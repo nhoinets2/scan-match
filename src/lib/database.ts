@@ -12,6 +12,7 @@ import {
   FitPreference,
 } from "./types";
 import { shouldSaveDebugData, shouldShowDebugUI } from "./debug-config";
+import { cleanupWardrobeItemStorage, cleanupScanStorage } from "./storage";
 
 // ============================================
 // SCAN RETENTION CONFIG
@@ -120,14 +121,103 @@ export const useAddWardrobeItem = () => {
   });
 };
 
+/**
+ * Guarded update of image URI (used by background upload)
+ * 
+ * Only updates if current image_uri matches expectedImageUri.
+ * This prevents stale upload jobs from overwriting newer images.
+ * 
+ * Returns the number of rows updated (0 if item deleted or image changed).
+ */
+export async function updateWardrobeItemImageUriGuarded(params: {
+  itemId: string;
+  remoteUrl: string;
+  expectedImageUri: string; // must match current DB value to update
+}): Promise<number> {
+  console.log('[Database] Guarded update for item:', params.itemId);
+  console.log('[Database] Expected URI:', params.expectedImageUri);
+  console.log('[Database] New remote URL:', params.remoteUrl);
+  
+  const { data, error } = await supabase
+    .from("wardrobe_items")
+    .update({ image_uri: params.remoteUrl })
+    .eq("id", params.itemId)
+    .eq("image_uri", params.expectedImageUri)
+    .select("id");
+
+  if (error) {
+    console.error('[Database] Failed to update image URI:', error);
+    throw error;
+  }
+  
+  const updatedCount = data?.length ?? 0;
+  
+  if (updatedCount === 0) {
+    console.log('[Database] No rows updated (item deleted or image changed since enqueue)');
+  } else {
+    console.log('[Database] Image URI updated successfully');
+  }
+  
+  return updatedCount;
+}
+
+/**
+ * Guarded update of image URI for scans (used by background upload)
+ * 
+ * Only updates if:
+ * 1. Current image_uri matches expectedImageUri
+ * 2. Outcome is 'saved_to_revisit' (user still wants this saved)
+ * 
+ * This prevents stale upload jobs from overwriting and ensures
+ * we don't upload for unsaved scans.
+ * 
+ * Returns the number of rows updated (0 if check deleted, image changed, or unsaved).
+ */
+export async function updateRecentCheckImageUriGuarded(params: {
+  checkId: string;
+  remoteUrl: string;
+  expectedImageUri: string; // must match current DB value to update
+}): Promise<number> {
+  console.log('[Database] Guarded update for scan:', params.checkId);
+  console.log('[Database] Expected URI:', params.expectedImageUri);
+  console.log('[Database] New remote URL:', params.remoteUrl);
+  
+  const { data, error } = await supabase
+    .from("recent_checks")
+    .update({ image_uri: params.remoteUrl })
+    .eq("id", params.checkId)
+    .eq("image_uri", params.expectedImageUri)
+    .eq("outcome", "saved_to_revisit") // Only update saved scans
+    .select("id");
+
+  if (error) {
+    console.error('[Database] Failed to update scan image URI:', error);
+    throw error;
+  }
+  
+  const updatedCount = data?.length ?? 0;
+  
+  if (updatedCount === 0) {
+    console.log('[Database] No rows updated (scan deleted, image changed, or unsaved)');
+  } else {
+    console.log('[Database] Scan image URI updated successfully');
+  }
+  
+  return updatedCount;
+}
+
 export const useRemoveWardrobeItem = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, imageUri }: { id: string; imageUri?: string }) => {
       if (!user?.id) throw new Error("Not authenticated");
 
+      // 1) Clean up storage (cancel pending uploads, delete local file)
+      await cleanupWardrobeItemStorage(id, imageUri);
+
+      // 2) Delete DB record
       const { error } = await supabase
         .from("wardrobe_items")
         .delete()
@@ -137,7 +227,7 @@ export const useRemoveWardrobeItem = () => {
       if (error) throw error;
     },
     // Optimistic update: immediately remove from cache
-    onMutate: async (id: string) => {
+    onMutate: async ({ id }: { id: string; imageUri?: string }) => {
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ["wardrobe", user?.id] });
 
@@ -156,7 +246,7 @@ export const useRemoveWardrobeItem = () => {
       return { previousWardrobe };
     },
     // If mutation fails, rollback
-    onError: (err, id, context) => {
+    onError: (err, { id }, context) => {
       if (context?.previousWardrobe) {
         queryClient.setQueryData(["wardrobe", user?.id], context.previousWardrobe);
       }
@@ -305,6 +395,12 @@ export const useWardrobeCount = () => {
   return wardrobe?.length ?? 0;
 };
 
+// Helper hook for recent checks count (for quota enforcement)
+export const useRecentChecksCount = () => {
+  const { data: checks } = useRecentChecks();
+  return checks?.length ?? 0;
+};
+
 // ============================================
 // RECENT CHECKS
 // ============================================
@@ -409,9 +505,13 @@ export const useRemoveRecentCheck = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, imageUri }: { id: string; imageUri?: string }) => {
       if (!user?.id) throw new Error("Not authenticated");
 
+      // 1) Clean up storage (cancel pending uploads, delete local file)
+      await cleanupScanStorage(id, imageUri);
+
+      // 2) Delete DB record
       const { error } = await supabase
         .from("recent_checks")
         .delete()
@@ -421,7 +521,7 @@ export const useRemoveRecentCheck = () => {
       if (error) throw error;
     },
     // Optimistic update: immediately remove from cache
-    onMutate: async (id: string) => {
+    onMutate: async ({ id }) => {
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ["recentChecks", user?.id] });
 
@@ -440,7 +540,7 @@ export const useRemoveRecentCheck = () => {
       return { previousChecks };
     },
     // If mutation fails, rollback
-    onError: (err, id, context) => {
+    onError: (err, { id }, context) => {
       if (context?.previousChecks) {
         queryClient.setQueryData(["recentChecks", user?.id], context.previousChecks);
       }
@@ -497,21 +597,34 @@ export const useUpdateRecentCheckOutcome = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, outcome }: { id: string; outcome: RecentCheck["outcome"] }) => {
+    mutationFn: async ({ 
+      id, 
+      outcome,
+      imageUri, // Optional: update image URI when saving (for local storage)
+    }: { 
+      id: string; 
+      outcome: RecentCheck["outcome"];
+      imageUri?: string;
+    }) => {
       if (!user?.id) throw new Error("Not authenticated");
+
+      const updateData: Record<string, unknown> = { outcome };
+      if (imageUri) {
+        updateData.image_uri = imageUri;
+      }
 
       const { error } = await supabase
         .from("recent_checks")
-        .update({ outcome })
+        .update(updateData)
         .eq("id", id)
         .eq("user_id", user.id);
 
       if (error) throw error;
       
-      return { id, outcome };
+      return { id, outcome, imageUri };
     },
     // Optimistic update - update cache immediately without waiting for server
-    onMutate: async ({ id, outcome }) => {
+    onMutate: async ({ id, outcome, imageUri }) => {
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ["recentChecks", user?.id] });
 
@@ -523,7 +636,9 @@ export const useUpdateRecentCheckOutcome = () => {
         queryClient.setQueryData<RecentCheck[]>(
           ["recentChecks", user?.id],
           previousChecks.map((check) =>
-            check.id === id ? { ...check, outcome } : check
+            check.id === id 
+              ? { ...check, outcome, ...(imageUri && { imageUri }) } 
+              : check
           )
         );
       }
@@ -547,5 +662,249 @@ export const useUpdateRecentCheckOutcome = () => {
       }, 0);
     },
   });
+};
+
+// ============================================
+// USAGE-BASED QUOTA TRACKING
+// ============================================
+
+/**
+ * Usage quota limits for free users.
+ * These are LIFETIME limits (not capacity) - usage never decreases.
+ * NOTE: These are also enforced server-side in SQL functions.
+ */
+export const USAGE_LIMITS = {
+  FREE_SCANS: 5,
+  FREE_WARDROBE_ADDS: 15,
+} as const;
+
+interface UsageCounts {
+  scansUsed: number;
+  wardrobeAddsUsed: number;
+  isPro: boolean;
+}
+
+/**
+ * Reason codes returned by consume_*_credit functions.
+ * Useful for analytics and debugging conversion triggers.
+ */
+export type ConsumeReason = 
+  | 'consumed'          // Credit was successfully consumed
+  | 'idempotent_replay' // Same idempotency key - no new charge
+  | 'pro_unlimited'     // Pro user - unlimited access
+  | 'quota_exceeded';   // At/over limit - blocked
+
+interface ConsumeResult {
+  allowed: boolean;
+  used: number;
+  limit: number;
+  remaining: number;
+  alreadyConsumed: boolean;
+  reason: ConsumeReason;
+}
+
+/**
+ * Generate a unique idempotency key for a NEW request attempt.
+ * 
+ * IMPORTANT: Client-side idempotency key management rules:
+ * 1. Generate a new key at the START of a scan/add flow
+ * 2. Store it in state while that attempt is running
+ * 3. REUSE the same key for retries of the same attempt
+ * 4. Generate a NEW key only for a brand-new attempt
+ * 
+ * This ensures "timeout + retry" behavior stays consistent.
+ */
+export function generateIdempotencyKey(): string {
+  return `${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+}
+
+/**
+ * Hook to get current usage counts from database.
+ * Returns lifetime usage (never decreases, even if items are deleted).
+ * Use this for UI display only - NOT for quota enforcement.
+ */
+export const useUsageCounts = () => {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ["usageCounts", user?.id],
+    queryFn: async (): Promise<UsageCounts> => {
+      if (!user?.id) return { scansUsed: 0, wardrobeAddsUsed: 0, isPro: false };
+
+      // No user_id parameter - function uses auth.uid() internally for security
+      const { data, error } = await supabase.rpc('get_usage_counts');
+
+      if (error) {
+        console.error('[Usage] Failed to get usage counts:', error);
+        // Return zeros on error - fail open for UX, but log for monitoring
+        return { scansUsed: 0, wardrobeAddsUsed: 0, isPro: false };
+      }
+
+      // RPC returns array with single row
+      const row = data?.[0];
+      return {
+        scansUsed: row?.scans_used ?? 0,
+        wardrobeAddsUsed: row?.wardrobe_adds_used ?? 0,
+        isPro: row?.is_pro ?? false,
+      };
+    },
+    enabled: !!user?.id,
+    staleTime: 30000, // Cache for 30s to reduce DB calls
+  });
+};
+
+/**
+ * Hook to atomically consume a scan credit BEFORE making an AI call.
+ * 
+ * CRITICAL: Call this BEFORE the AI call, not after!
+ * This prevents race conditions and ensures you never pay for over-quota calls.
+ * 
+ * Features:
+ * - Uses auth.uid() server-side (no user_id spoofing possible)
+ * - Idempotent (double-tap won't consume twice with same key)
+ * - Returns remaining credits and reason for UI/analytics
+ * 
+ * @param idempotencyKey - Optional. Pass the SAME key for retries of the same attempt.
+ *                         If omitted, a new key is generated (new attempt).
+ * 
+ * Returns { allowed, used, limit, remaining, alreadyConsumed, reason }
+ * - If allowed=false, show paywall and DO NOT make the AI call
+ * - If allowed=true, proceed with AI call (credit already consumed)
+ * - alreadyConsumed=true means this was a retry of the same request
+ * - reason: 'consumed' | 'idempotent_replay' | 'pro_unlimited' | 'quota_exceeded'
+ */
+export const useConsumeScanCredit = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (idempotencyKey?: string): Promise<ConsumeResult> => {
+      if (!user?.id) throw new Error("Not authenticated");
+
+      // Use provided key for retries, or generate new key for new attempts
+      const key = idempotencyKey ?? generateIdempotencyKey();
+      
+      // No user_id parameter - function uses auth.uid() internally for security
+      const { data, error } = await supabase
+        .rpc('consume_scan_credit', { p_idempotency_key: key });
+
+      if (error) {
+        console.error('[Usage] Failed to consume scan credit:', error);
+        throw error;
+      }
+
+      // RPC returns array with single row
+      const row = data?.[0];
+      const result: ConsumeResult = {
+        allowed: row?.allowed ?? false,
+        used: row?.used ?? 0,
+        limit: row?.credit_limit ?? USAGE_LIMITS.FREE_SCANS,
+        remaining: row?.remaining ?? 0,
+        alreadyConsumed: row?.already_consumed ?? false,
+        reason: (row?.reason as ConsumeReason) ?? 'quota_exceeded',
+      };
+      
+      // Log reason for analytics/debugging
+      console.log('[Usage] Scan credit consume result:', result.reason, result);
+      
+      return result;
+    },
+    onSuccess: (result) => {
+      // Update cache immediately
+      queryClient.setQueryData<UsageCounts>(
+        ["usageCounts", user?.id],
+        (old) => old 
+          ? { ...old, scansUsed: result.used } 
+          : { scansUsed: result.used, wardrobeAddsUsed: 0, isPro: false }
+      );
+    },
+  });
+};
+
+/**
+ * Hook to atomically consume a wardrobe add credit BEFORE making an AI call.
+ * 
+ * CRITICAL: Call this BEFORE the AI call, not after!
+ * This prevents race conditions and ensures you never pay for over-quota calls.
+ * 
+ * Features:
+ * - Uses auth.uid() server-side (no user_id spoofing possible)
+ * - Idempotent (double-tap won't consume twice with same key)
+ * - Returns remaining credits and reason for UI/analytics
+ * 
+ * @param idempotencyKey - Optional. Pass the SAME key for retries of the same attempt.
+ *                         If omitted, a new key is generated (new attempt).
+ * 
+ * Returns { allowed, used, limit, remaining, alreadyConsumed, reason }
+ * - If allowed=false, show paywall and DO NOT make the AI call
+ * - If allowed=true, proceed with AI call (credit already consumed)
+ * - reason: 'consumed' | 'idempotent_replay' | 'pro_unlimited' | 'quota_exceeded'
+ */
+export const useConsumeWardrobeAddCredit = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (idempotencyKey?: string): Promise<ConsumeResult> => {
+      if (!user?.id) throw new Error("Not authenticated");
+
+      // Use provided key for retries, or generate new key for new attempts
+      const key = idempotencyKey ?? generateIdempotencyKey();
+      
+      // No user_id parameter - function uses auth.uid() internally for security
+      const { data, error } = await supabase
+        .rpc('consume_wardrobe_add_credit', { p_idempotency_key: key });
+
+      if (error) {
+        console.error('[Usage] Failed to consume wardrobe add credit:', error);
+        throw error;
+      }
+
+      // RPC returns array with single row
+      const row = data?.[0];
+      const result: ConsumeResult = {
+        allowed: row?.allowed ?? false,
+        used: row?.used ?? 0,
+        limit: row?.credit_limit ?? USAGE_LIMITS.FREE_WARDROBE_ADDS,
+        remaining: row?.remaining ?? 0,
+        alreadyConsumed: row?.already_consumed ?? false,
+        reason: (row?.reason as ConsumeReason) ?? 'quota_exceeded',
+      };
+      
+      // Log reason for analytics/debugging
+      console.log('[Usage] Wardrobe add credit consume result:', result.reason, result);
+      
+      return result;
+    },
+    onSuccess: (result) => {
+      // Update cache immediately
+      queryClient.setQueryData<UsageCounts>(
+        ["usageCounts", user?.id],
+        (old) => old 
+          ? { ...old, wardrobeAddsUsed: result.used } 
+          : { scansUsed: 0, wardrobeAddsUsed: result.used, isPro: false }
+      );
+    },
+  });
+};
+
+/**
+ * Convenience hook that combines usage counts with quota checks.
+ * Use this for UI display (showing remaining credits, pre-emptive paywall).
+ * For actual consumption, use useConsumeScanCredit / useConsumeWardrobeAddCredit.
+ */
+export const useUsageQuota = () => {
+  const { data: counts, isLoading } = useUsageCounts();
+  
+  return {
+    scansUsed: counts?.scansUsed ?? 0,
+    wardrobeAddsUsed: counts?.wardrobeAddsUsed ?? 0,
+    isPro: counts?.isPro ?? false,
+    hasScansRemaining: (counts?.isPro) || (counts?.scansUsed ?? 0) < USAGE_LIMITS.FREE_SCANS,
+    hasWardrobeAddsRemaining: (counts?.isPro) || (counts?.wardrobeAddsUsed ?? 0) < USAGE_LIMITS.FREE_WARDROBE_ADDS,
+    remainingScans: Math.max(0, USAGE_LIMITS.FREE_SCANS - (counts?.scansUsed ?? 0)),
+    remainingWardrobeAdds: Math.max(0, USAGE_LIMITS.FREE_WARDROBE_ADDS - (counts?.wardrobeAddsUsed ?? 0)),
+    isLoading,
+  };
 };
 

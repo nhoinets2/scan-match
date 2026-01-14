@@ -56,11 +56,11 @@ import { getTextStyle } from "@/lib/typography-helpers";
 import { ButtonPrimary } from "@/components/ButtonPrimary";
 import { ButtonTertiary } from "@/components/ButtonTertiary";
 import { capitalizeFirst, capitalizeItems } from "@/lib/text-utils";
-import { useQuotaStore } from "@/lib/quota-store";
 import { useProStatus } from "@/lib/useProStatus";
 import { useAuth } from "@/lib/auth-context";
-import { uploadWardrobeImage } from "@/lib/storage";
+import { saveImageLocally, queueBackgroundUpload } from "@/lib/storage";
 import { Paywall } from "@/components/Paywall";
+import { useUsageQuota, useConsumeWardrobeAddCredit, generateIdempotencyKey } from "@/lib/database";
 
 type ScreenState = "ready" | "processing" | "analyzed";
 
@@ -711,27 +711,31 @@ export default function AddItemScreen() {
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [isSaving, setIsSaving] = useState(false); // Loading state for Add to Wardrobe button
+  // Idempotency key for current attempt - reused if AI fails and user retries
+  const [currentIdempotencyKey, setCurrentIdempotencyKey] = useState<string | null>(null);
 
-  // Quota and Pro status
+  // Quota and Pro status (usage-based, synced across devices)
   const { isPro, refetch: refetchProStatus } = useProStatus();
-  const hasAddsRemaining = useQuotaStore((s) => s.hasWardrobeAddsRemaining);
-  const incrementAdds = useQuotaStore((s) => s.incrementWardrobeAdds);
-  const wardrobeAddsUsed = useQuotaStore((s) => s.wardrobeAddsUsed);
+  const { wardrobeAddsUsed, hasWardrobeAddsRemaining, isLoading: isLoadingQuota } = useUsageQuota();
+  const consumeWardrobeAddCredit = useConsumeWardrobeAddCredit();
 
   const captureScale = useSharedValue(1);
 
   // Debug: Log quota state on mount and changes
   useEffect(() => {
-    console.log("[Quota Debug] Add Item Screen - isPro:", isPro, "wardrobeAddsUsed:", wardrobeAddsUsed, "hasAddsRemaining:", hasAddsRemaining());
-  }, [isPro, wardrobeAddsUsed, hasAddsRemaining]);
+    console.log("[Quota Debug] Add Item Screen - isPro:", isPro, "wardrobeAddsUsed:", wardrobeAddsUsed, "hasWardrobeAddsRemaining:", hasWardrobeAddsRemaining);
+  }, [isPro, wardrobeAddsUsed, hasWardrobeAddsRemaining]);
 
-  // Check quota on mount - show paywall if exceeded and not Pro
+  // Check quota on mount and when usage changes - show paywall if exceeded and not Pro
   useEffect(() => {
-    if (!isPro && !hasAddsRemaining()) {
+    // Wait for quota to load before checking
+    if (isLoadingQuota) return;
+    if (!isPro && !hasWardrobeAddsRemaining) {
       console.log("[Quota Debug] Showing paywall - quota exceeded");
       setShowPaywall(true);
     }
-  }, [isPro, hasAddsRemaining]);
+  }, [isPro, hasWardrobeAddsRemaining, isLoadingQuota]);
 
   // Rotate tips every 4 seconds (same as Scan)
   useEffect(() => {
@@ -758,12 +762,12 @@ export default function AddItemScreen() {
 
   // Check quota before allowing capture
   const checkQuotaAndProceed = (): boolean => {
-    console.log("[Quota Debug] checkQuotaAndProceed - isPro:", isPro, "hasAddsRemaining:", hasAddsRemaining(), "wardrobeAddsUsed:", wardrobeAddsUsed);
+    console.log("[Quota Debug] checkQuotaAndProceed - isPro:", isPro, "hasWardrobeAddsRemaining:", hasWardrobeAddsRemaining, "wardrobeAddsUsed:", wardrobeAddsUsed);
     if (isPro) {
       console.log("[Quota Debug] User is Pro - bypassing quota");
       return true;
     }
-    if (hasAddsRemaining()) {
+    if (hasWardrobeAddsRemaining) {
       console.log("[Quota Debug] Free user has adds remaining");
       return true;
     }
@@ -792,13 +796,38 @@ export default function AddItemScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  const processImage = async (uri: string) => {
+  const processImage = async (uri: string, retryKey?: string) => {
     setImageUri(uri);
     setScreenState("processing");
     setAnalysisFailed(false);
     setAnalysis(null);
 
+    // For new attempts, generate new idempotency key
+    // For retries, reuse the existing key to prevent double-charging
+    const idempotencyKey = retryKey ?? generateIdempotencyKey();
+    if (!retryKey) {
+      setCurrentIdempotencyKey(idempotencyKey);
+    }
+
     try {
+      // CRITICAL: Consume credit BEFORE AI call to prevent over-quota usage
+      // This is atomic and server-side enforced
+      // Pass idempotency key - same key for retries prevents double-charge
+      console.log("[Quota] Attempting to consume wardrobe add credit with key:", idempotencyKey);
+      const consumeResult = await consumeWardrobeAddCredit.mutateAsync(idempotencyKey);
+      console.log("[Quota] Consume result:", consumeResult.reason, consumeResult);
+      
+      if (!consumeResult.allowed) {
+        // Credit denied - show paywall, DO NOT make AI call
+        console.log("[Quota] Credit denied (reason:", consumeResult.reason, "), showing paywall");
+        setScreenState("ready");
+        setShowPaywall(true);
+        return;
+      }
+      
+      // Credit consumed (or idempotent replay) - now safe to make AI call
+      console.log("[Quota] Credit allowed (reason:", consumeResult.reason, "), proceeding with AI call");
+      
       const result = await analyzeClothingImage(uri);
       setAnalysis(result);
       setCategory(result.category);
@@ -879,34 +908,21 @@ export default function AddItemScreen() {
   const canAdd = imageUri && category && selectedStyles.length > 0 && screenState === "analyzed";
 
   const handleAddToWardrobe = async () => {
-    if (!canAdd || !imageUri || !category || selectedStyles.length === 0 || !user?.id) return;
+    if (!canAdd || !imageUri || !category || selectedStyles.length === 0 || !user?.id || isSaving) return;
 
     try {
-      // Show uploading state
-      setScreenState("processing");
-
+      // Show loading state on button (brief - just for local save)
+      setIsSaving(true);
+      
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      // Increment quota usage for free users
-      if (!isPro) {
-        console.log("[Quota Debug] Incrementing wardrobeAddsUsed from:", wardrobeAddsUsed);
-        incrementAdds();
-      } else {
-        console.log("[Quota Debug] User is Pro - not incrementing quota");
-      }
+      // Note: Quota was already consumed in processImage() before the AI call
+      // No need to increment here
 
-      // Try to upload image to Supabase Storage
-      let finalImageUri = imageUri; // Default to local URI
-      try {
-        console.log("[Storage] Attempting to upload wardrobe image...");
-        const cloudImageUrl = await uploadWardrobeImage(imageUri, user.id);
-        console.log("[Storage] Image uploaded successfully:", cloudImageUrl);
-        finalImageUri = cloudImageUrl; // Use cloud URL if upload succeeded
-      } catch (uploadError) {
-        console.error("[Storage] Upload failed, using local URI as fallback:", uploadError);
-        console.warn("[Storage] Item will be saved with local URI (won't work across devices)");
-        // Continue with local URI - at least the user can use the app
-      }
+      // PHASE 1: Save image locally (instant!)
+      console.log("[Storage] Saving image locally for instant access...");
+      const localImageUri = await saveImageLocally(imageUri, user.id);
+      console.log("[Storage] Image saved locally:", localImageUri);
 
       const attributes = analysis?.itemSignals
         ? {
@@ -917,21 +933,27 @@ export default function AddItemScreen() {
           }
         : undefined;
 
-      addWardrobeItemMutation.mutate({
-        imageUri: finalImageUri,
+      // Save to database with local URI (instant!)
+      const savedItem = await addWardrobeItemMutation.mutateAsync({
+        imageUri: localImageUri,
         category,
         detectedLabel: analysis?.descriptiveLabel,
         attributes,
         colors: editedColors.length > 0 ? editedColors : (analysis?.colors || []),
         styleNotes: analysis?.styleNotes,
         brand: brand || undefined,
-        userStyleTags: selectedStyles, // Now always required
+        userStyleTags: selectedStyles,
       });
 
-      router.back();
+      // Queue background upload (non-blocking, fire-and-forget)
+      console.log("[Storage] Queuing background upload for:", savedItem.id);
+      void queueBackgroundUpload(savedItem.id, localImageUri, user.id);
+
+      // Navigate to wardrobe tab immediately (no waiting for upload!)
+      router.replace("/(tabs)/wardrobe");
     } catch (error) {
       console.error("[Storage] Failed to add item:", error);
-      setScreenState("analyzed"); // Reset to analyzed state
+      setIsSaving(false); // Reset loading state
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       // Could show an error toast here
     }
@@ -1023,16 +1045,16 @@ export default function AddItemScreen() {
         }}
       >
         <Text style={{ color: "#FFD700", fontWeight: "bold", fontSize: 14, marginBottom: 4 }}>
-          🔧 DEBUG: Quota Status
+          🔧 DEBUG: Quota Status (Usage-based)
         </Text>
         <Text style={{ color: "#FFF", fontSize: 12 }}>
           isPro: {isPro ? "✅ YES" : "❌ NO"}
         </Text>
         <Text style={{ color: "#FFF", fontSize: 12 }}>
-          wardrobeAddsUsed: {wardrobeAddsUsed} / 15
+          wardrobeAddsUsed: {wardrobeAddsUsed} / 15 (from DB)
         </Text>
         <Text style={{ color: "#FFF", fontSize: 12 }}>
-          hasAddsRemaining: {hasAddsRemaining() ? "✅ YES" : "❌ NO"}
+          hasWardrobeAddsRemaining: {hasWardrobeAddsRemaining ? "✅ YES" : "❌ NO"}
         </Text>
         <Text style={{ color: remaining > 0 ? "#4ADE80" : "#F87171", fontSize: 12, fontWeight: "bold", marginTop: 4 }}>
           {remaining > 0 ? `${remaining} adds left` : "⚠️ SHOULD SHOW PAYWALL"}
@@ -1399,6 +1421,7 @@ export default function AddItemScreen() {
             label="Add to wardrobe"
             onPress={handleAddToWardrobe}
             disabled={!canAdd}
+            loading={isSaving}
           />
         </View>
       </KeyboardAvoidingView>

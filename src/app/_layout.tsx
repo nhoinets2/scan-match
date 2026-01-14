@@ -21,6 +21,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { AuthGuard } from "@/components/AuthGuard";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { colors } from "@/lib/design-tokens";
+import { initializeBackgroundUploads } from "@/lib/storage";
 
 export const unstable_settings = {
   initialRouteName: "login",
@@ -166,6 +167,12 @@ export default function RootLayout() {
     BodoniModa_600SemiBold,
     BodoniModa_700Bold,
   });
+
+  // Initialize background upload queue (runs once on app start)
+  useEffect(() => {
+    console.log("[BackgroundUpload] Initializing upload queue...");
+    void initializeBackgroundUploads();
+  }, []);
 
   // Hide splash screen when fonts are loaded
   useEffect(() => {

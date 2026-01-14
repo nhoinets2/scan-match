@@ -118,6 +118,24 @@ const HELP_SECTIONS: HelpSection[] = [
         answer:
           "Items marked as 'goes with everything' are versatile basics that work with most outfits - like a white t-shirt or classic jeans. These items will appear more frequently in match suggestions.",
       },
+      {
+        id: "cloud-sync",
+        question: "How does wardrobe syncing work?",
+        answer:
+          "Uploads happen while Scan & Match is open. If needed, we'll finish syncing next time you open it. Your wardrobe items are saved locally first for instant access, then synced to the cloud in the background so they're available on all your devices.",
+      },
+      {
+        id: "sync-status",
+        question: "What do the sync status badges mean?",
+        answer:
+          "You may see small badges on your wardrobe items indicating sync status:\n\n• \"Syncing\" – The item is saved locally and uploading to the cloud. This happens automatically in the background.\n\n• \"Retry\" – The upload failed after multiple attempts. Tap the badge to try again. This can happen with poor network connection.\n\n• \"Retrying…\" – A retry is in progress.\n\nOnce synced, the badge disappears and your item is safely backed up to the cloud.",
+      },
+      {
+        id: "sync-failed",
+        question: "What if syncing fails?",
+        answer:
+          "If you see a red \"Retry\" badge on an item, the upload failed - usually due to network issues. Simply tap the badge to retry. Your item is still safely saved on your device and will work normally for matching. Syncing only affects whether the item appears on other devices logged into your account.",
+      },
     ],
   },
   {
@@ -198,6 +216,18 @@ const HELP_SECTIONS: HelpSection[] = [
         answer:
           "The All scans page shows both your saved scans (unlimited, never auto-deleted) and up to 20 unsaved scans. Once you have 20 unsaved scans, adding a new scan will automatically remove your oldest unsaved scan. To keep a scan permanently, tap 'Save for later' on the results screen.",
       },
+      {
+        id: "saved-scan-sync",
+        question: "How does syncing work for saved scans?",
+        answer:
+          "When you save a scan, the image is stored locally on your device for instant access. In the background, we upload it to the cloud so it's available on all your devices. Syncing happens while the app is open. If needed, we'll finish syncing next time you open Scan & Match.",
+      },
+      {
+        id: "saved-scan-badges",
+        question: "What do the badges on my saved scans mean?",
+        answer:
+          "You may see small badges on your saved scans indicating sync status:\n\n• \"Syncing\" – The scan is saved locally and uploading to the cloud.\n\n• \"Retry\" – The upload failed after multiple attempts. Tap the badge to try again.\n\n• \"Retrying…\" – A retry is in progress.\n\nOnce synced, the badge disappears and your scan is backed up to the cloud.",
+      },
     ],
   },
   {
@@ -210,6 +240,36 @@ const HELP_SECTIONS: HelpSection[] = [
         question: "What subscription plans are available?",
         answer:
           "Scan & Match offers two Pro plans: Monthly ($5.99/month) and Annual ($39.99/year, save 44%). The free plan includes 15 wardrobe adds and 5 in-store scans. Pro members get unlimited access to all features with no restrictions.",
+      },
+      {
+        id: "how-credits-work",
+        question: "How do scan and wardrobe add credits work?",
+        answer:
+          "On the free plan, you have 5 scan credits and 15 wardrobe add credits. A credit is used when you start a scan or wardrobe add – specifically when the AI analysis begins, not when you save the result. This means if your scan doesn't complete (due to network issues or app closing), the credit is still used. Pro members have unlimited scans and adds with no credit limits.",
+      },
+      {
+        id: "see-remaining-credits",
+        question: "Where can I see my remaining credits?",
+        answer:
+          "You can see your remaining credits on your Profile page, right below your email. It shows how many wardrobe adds and scans you have left (e.g., \"12/15 wardrobe adds • 3/5 scans\"). Tap the ℹ️ icon next to the credits for more information about how they work.",
+      },
+      {
+        id: "credits-across-devices",
+        question: "Do my credits sync across devices?",
+        answer:
+          "Yes! Your credits are tied to your account, not your device. If you log in on a different phone or tablet, you'll see the same remaining credits. This also means you can't get extra free credits by reinstalling the app or using a different device.",
+      },
+      {
+        id: "credit-not-restored",
+        question: "Why wasn't my credit restored when I deleted an item?",
+        answer:
+          "Credits are used when you start a scan or wardrobe add, not when you save the item. Since the AI analysis has already run (which is what costs us), deleting the item afterwards doesn't restore the credit. Think of it like taking a photo – even if you delete the photo, the camera still took the shot.",
+      },
+      {
+        id: "get-more-credits",
+        question: "Can I get more free credits?",
+        answer:
+          "Free credits are a one-time allowance to try the app. Once you've used them, you'll need to upgrade to Pro for unlimited scans and wardrobe adds. Pro membership also includes all future features at no extra cost.",
       },
       {
         id: "free-trial",

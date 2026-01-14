@@ -38,8 +38,7 @@ import { colors, typography, spacing, components } from "@/lib/design-tokens";
 import { ButtonTertiary } from "@/components/ButtonTertiary";
 import { IconButton } from "@/components/IconButton";
 import { ButtonPrimary } from "@/components/ButtonPrimary";
-import { useWardrobe, usePreferences } from "@/lib/database";
-import { useQuotaStore } from "@/lib/quota-store";
+import { useWardrobe, usePreferences, useUsageQuota, useConsumeScanCredit, generateIdempotencyKey } from "@/lib/database";
 import { useProStatus } from "@/lib/useProStatus";
 import { Paywall } from "@/components/Paywall";
 
@@ -385,16 +384,18 @@ export default function ScanScreen() {
   const [lastImageUri, setLastImageUri] = useState<string | null>(null);
   const [lastImageSource, setLastImageSource] = useState<'camera' | 'gallery'>('camera');
   const [showPaywall, setShowPaywall] = useState(false);
+  // Idempotency key for current attempt - reused on retries to prevent double-charging
+  const [currentIdempotencyKey, setCurrentIdempotencyKey] = useState<string | null>(null);
 
   const setScannedItem = useSnapToMatchStore((s) => s.setScannedItem);
   const clearScan = useSnapToMatchStore((s) => s.clearScan);
   const setCachedWardrobe = useSnapToMatchStore((s) => s.setCachedWardrobe);
   const setCachedPreferences = useSnapToMatchStore((s) => s.setCachedPreferences);
 
-  // Quota and Pro status
+  // Quota and Pro status (usage-based, synced across devices)
   const { isPro, refetch: refetchProStatus } = useProStatus();
-  const hasScansRemaining = useQuotaStore((s) => s.hasInStoreScansRemaining);
-  const incrementScans = useQuotaStore((s) => s.incrementInStoreScans);
+  const { scansUsed, hasScansRemaining, isLoading: isLoadingQuota } = useUsageQuota();
+  const consumeScanCredit = useConsumeScanCredit();
 
   // Fetch wardrobe and preferences to cache for Confidence Engine
   const { data: wardrobe = [] } = useWardrobe();
@@ -402,12 +403,14 @@ export default function ScanScreen() {
 
   const captureScale = useSharedValue(1);
 
-  // Check quota on mount - show paywall if exceeded and not Pro
+  // Check quota on mount and when usage changes - show paywall if exceeded and not Pro
   useEffect(() => {
-    if (!isPro && !hasScansRemaining()) {
+    // Wait for quota to load before checking
+    if (isLoadingQuota) return;
+    if (!isPro && !hasScansRemaining) {
       setShowPaywall(true);
     }
-  }, [isPro, hasScansRemaining]);
+  }, [isPro, hasScansRemaining, isLoadingQuota]);
 
   // Clear any previous scan when entering this screen
   useEffect(() => {
@@ -434,7 +437,7 @@ export default function ScanScreen() {
   // Check quota before allowing capture
   const checkQuotaAndProceed = (): boolean => {
     if (isPro) return true; // Pro users have unlimited scans
-    if (hasScansRemaining()) return true; // Free user with scans remaining
+    if (hasScansRemaining) return true; // Free user with scans remaining
 
     // Show paywall
     setShowPaywall(true);
@@ -504,7 +507,7 @@ export default function ScanScreen() {
     });
   };
 
-  const processImage = async (imageUri: string, source: 'camera' | 'gallery' = 'camera') => {
+  const processImage = async (imageUri: string, source: 'camera' | 'gallery' = 'camera', retryKey?: string) => {
     setIsProcessing(true);
     setIsCapturing(false);
     setScanError(null);
@@ -512,7 +515,32 @@ export default function ScanScreen() {
     setLastImageSource(source);
     console.log("processImage called with imageUri:", imageUri?.slice(0, 50));
 
+    // For new attempts, generate new idempotency key
+    // For retries, reuse the existing key to prevent double-charging
+    const idempotencyKey = retryKey ?? generateIdempotencyKey();
+    if (!retryKey) {
+      setCurrentIdempotencyKey(idempotencyKey);
+    }
+
     try {
+      // CRITICAL: Consume credit BEFORE AI call to prevent over-quota usage
+      // This is atomic and server-side enforced
+      // Pass idempotency key - same key for retries prevents double-charge
+      console.log("[Quota] Attempting to consume scan credit with key:", idempotencyKey);
+      const consumeResult = await consumeScanCredit.mutateAsync(idempotencyKey);
+      console.log("[Quota] Consume result:", consumeResult.reason, consumeResult);
+      
+      if (!consumeResult.allowed) {
+        // Credit denied - show paywall, DO NOT make AI call
+        console.log("[Quota] Credit denied (reason:", consumeResult.reason, "), showing paywall");
+        setIsProcessing(false);
+        setShowPaywall(true);
+        return;
+      }
+      
+      // Credit consumed (or idempotent replay) - now safe to make AI call
+      console.log("[Quota] Credit allowed (reason:", consumeResult.reason, "), proceeding with AI call");
+      
       // Get image dimensions for telemetry
       const dimensions = await getImageDimensions(imageUri);
       
@@ -542,11 +570,6 @@ export default function ScanScreen() {
       setScannedItem(scannedItem);
       console.log("Scanned item set");
 
-      // Increment quota usage for free users
-      if (!isPro) {
-        incrementScans();
-      }
-
       // Sync wardrobe and preferences to store for Confidence Engine
       setCachedWardrobe(wardrobe);
       if (preferences) {
@@ -575,7 +598,9 @@ export default function ScanScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setScanError(null);
     if (lastImageUri) {
-      processImage(lastImageUri, lastImageSource);
+      // IMPORTANT: Reuse the same idempotency key for retries
+      // This prevents double-charging if the credit was consumed but AI failed
+      processImage(lastImageUri, lastImageSource, currentIdempotencyKey ?? undefined);
     }
   };
 

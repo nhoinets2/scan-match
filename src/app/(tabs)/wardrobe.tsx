@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import Animated, {
   FadeOut,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import { Shirt, Camera } from "lucide-react-native";
+import { Shirt, Camera, CloudUpload, RefreshCw } from "lucide-react-native";
 
 import { useWardrobe, useRemoveWardrobeItem } from "@/lib/database";
 import { colors, spacing, typography, borderRadius, cards, shadows, button } from "@/lib/design-tokens";
@@ -27,6 +27,7 @@ import { getTextStyle } from "@/lib/typography-helpers";
 import { WardrobeItem, CATEGORIES, Category } from "@/lib/types";
 import { ButtonSecondary } from "@/components/ButtonSecondary";
 import { capitalizeFirst } from "@/lib/text-utils";
+import { sweepOrphanedLocalImages, isUploadFailed, retryFailedUpload } from "@/lib/storage";
 
 const WARDROBE_FILTER_KEY = "wardrobe_filter_selection";
 
@@ -127,6 +128,60 @@ function WardrobeGridItem({
           >
             <Shirt size={48} color={colors.accent.terracotta} strokeWidth={1.5} />
           </View>
+        )}
+
+        {/* Upload status indicator - shows when image is local (not yet uploaded to cloud) */}
+        {item.imageUri?.startsWith('file://') && (
+          <Pressable
+            onPress={async (e) => {
+              e.stopPropagation();
+              // If upload failed, allow manual retry
+              if (isUploadFailed(item.id)) {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                await retryFailedUpload(item.id);
+              }
+            }}
+            style={{
+              position: "absolute",
+              top: spacing.sm,
+              right: spacing.sm,
+              backgroundColor: isUploadFailed(item.id) ? colors.status.error : colors.overlay.dark,
+              borderRadius: borderRadius.pill,
+              paddingVertical: spacing.xs,
+              paddingHorizontal: isUploadFailed(item.id) ? spacing.sm : spacing.xs,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing.xs / 2,
+            }}
+          >
+            {isUploadFailed(item.id) ? (
+              <>
+                <RefreshCw size={12} color={colors.text.inverse} strokeWidth={2} />
+                <Text 
+                  style={{ 
+                    ...typography.ui.caption,
+                    color: colors.text.inverse, 
+                    fontFamily: typography.fontFamily.medium,
+                  }}
+                >
+                  Retry
+                </Text>
+              </>
+            ) : (
+              <>
+                <CloudUpload size={12} color={colors.text.inverse} strokeWidth={2} />
+                <Text 
+                  style={{ 
+                    ...typography.ui.caption,
+                    color: colors.text.inverse, 
+                    fontFamily: typography.fontFamily.medium,
+                  }}
+                >
+                  Syncing
+                </Text>
+              </>
+            )}
+          </Pressable>
         )}
 
         {/* Gradient overlay */}
@@ -528,6 +583,27 @@ export default function WardrobeScreen() {
     saveFilter();
   }, [selectedFilters]);
 
+  // Track if orphan sweep has run this session
+  const hasRunOrphanSweep = useRef(false);
+  
+  // Orphan file sweep - run once per cold start when wardrobe data is available
+  useEffect(() => {
+    if (hasRunOrphanSweep.current) return; // Only run once per session
+    if (wardrobe.length === 0) return; // Wait for wardrobe to load
+    
+    hasRunOrphanSweep.current = true;
+    
+    // Collect all local URIs from wardrobe items
+    const validLocalUris = new Set(
+      wardrobe
+        .filter(item => item.imageUri?.startsWith('file://'))
+        .map(item => item.imageUri)
+    );
+    
+    // Run sweep in background (fire and forget)
+    void sweepOrphanedLocalImages(validLocalUris);
+  }, [wardrobe]);
+
   // Reset filters to "all" when wardrobe becomes empty
   // This prevents the bug where a newly added first item is filtered out by stale filters
   useEffect(() => {
@@ -557,7 +633,7 @@ export default function WardrobeScreen() {
   // Confirm delete action
   const handleConfirmDelete = () => {
     if (!itemToDelete) return;
-    removeWardrobeItemMutation.mutate(itemToDelete.id);
+    removeWardrobeItemMutation.mutate({ id: itemToDelete.id, imageUri: itemToDelete.imageUri });
     setItemToDelete(null);
     setShowToast(true);
   };

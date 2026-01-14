@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import Animated, {
   FadeOut,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import { Shirt, Bookmark } from "lucide-react-native";
+import { Shirt, Bookmark, Cloud, RefreshCw } from "lucide-react-native";
 
 import { useRecentChecks, useRemoveRecentCheck, useWardrobe } from "@/lib/database";
 import { colors, spacing, typography, borderRadius, cards, shadows, button } from "@/lib/design-tokens";
@@ -26,6 +26,13 @@ import { getTextStyle } from "@/lib/typography-helpers";
 import { RecentCheck } from "@/lib/types";
 import { ButtonSecondary } from "@/components/ButtonSecondary";
 import { useMatchCount } from "@/lib/useMatchCount";
+import { 
+  sweepOrphanedLocalImages, 
+  isLocalUri, 
+  isUploadFailed, 
+  retryFailedUpload,
+  hasPendingUpload,
+} from "@/lib/storage";
 
 // Grid tile for saved checks (matches Recent Scans / Wardrobe grid style)
 function SavedCheckGridItem({
@@ -34,26 +41,38 @@ function SavedCheckGridItem({
   onPress,
   onLongPress,
   tileSize,
+  syncStatus,
+  onRetry,
 }: {
   check: RecentCheck;
   index: number;
   onPress: (check: RecentCheck) => void;
   onLongPress: (check: RecentCheck) => void;
   tileSize: number;
+  syncStatus: 'synced' | 'syncing' | 'failed' | 'retrying';
+  onRetry?: (check: RecentCheck) => void;
 }) {
   // Get current wardrobe and calculate match count
   const { data: wardrobe = [] } = useWardrobe();
   const matchCount = useMatchCount(check, wardrobe);
+  
+  // Handle tap - if failed, retry; otherwise open
+  const handlePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (syncStatus === 'failed' && onRetry) {
+      onRetry(check);
+    } else {
+      onPress(check);
+    }
+  };
+  
   return (
     <Animated.View
       entering={FadeInDown.delay(300 + index * 50).springify()}
       exiting={FadeOut.duration(150)}
     >
       <Pressable
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          onPress(check);
-        }}
+        onPress={handlePress}
         onLongPress={() => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
           onLongPress(check);
@@ -103,6 +122,50 @@ function SavedCheckGridItem({
             height: "50%",
           }}
         />
+
+        {/* Sync status badge - top right */}
+        {syncStatus === 'syncing' && (
+          <View
+            style={{
+              position: "absolute",
+              top: spacing.sm,
+              right: spacing.sm,
+              backgroundColor: colors.bg.overlay,
+              paddingHorizontal: spacing.sm,
+              paddingVertical: spacing.xs / 2,
+              borderRadius: borderRadius.full,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing.xs / 2,
+            }}
+          >
+            <Cloud size={10} color={colors.text.inverse} strokeWidth={2} />
+            <Text style={{ ...typography.ui.caption, color: colors.text.inverse, fontSize: 10 }}>
+              Syncing
+            </Text>
+          </View>
+        )}
+        {(syncStatus === 'failed' || syncStatus === 'retrying') && (
+          <View
+            style={{
+              position: "absolute",
+              top: spacing.sm,
+              right: spacing.sm,
+              backgroundColor: syncStatus === 'retrying' ? colors.bg.overlay : colors.semantic.error,
+              paddingHorizontal: spacing.sm,
+              paddingVertical: spacing.xs / 2,
+              borderRadius: borderRadius.full,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing.xs / 2,
+            }}
+          >
+            <RefreshCw size={10} color={colors.text.inverse} strokeWidth={2} />
+            <Text style={{ ...typography.ui.caption, color: colors.text.inverse, fontSize: 10 }}>
+              {syncStatus === 'retrying' ? 'Retrying…' : 'Retry'}
+            </Text>
+          </View>
+        )}
 
         {/* Content overlay */}
         <View
@@ -341,6 +404,8 @@ export default function SavedChecksScreen() {
   const removeRecentCheckMutation = useRemoveRecentCheck();
   const [itemToDelete, setItemToDelete] = useState<RecentCheck | null>(null);
   const [showToast, setShowToast] = useState(false);
+  const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
+  const hasSweepedRef = useRef(false);
 
   // Auto-hide toast after 2 seconds
   useEffect(() => {
@@ -356,6 +421,77 @@ export default function SavedChecksScreen() {
   const savedChecks = recentChecks.filter(
     (check: RecentCheck) => check.outcome === "saved_to_revisit"
   );
+  
+  // Run orphan sweep once per session after saved checks load
+  // Delay slightly to avoid racing with in-flight saves that haven't updated cache yet
+  useEffect(() => {
+    if (hasSweepedRef.current || savedChecks.length === 0) return;
+    hasSweepedRef.current = true;
+    
+    // Small delay to let any pending cache updates settle
+    const timer = setTimeout(() => {
+      // Collect all local URIs that are in use
+      const validLocalUris = new Set<string>(
+        savedChecks
+          .map((c) => c.imageUri)
+          .filter((uri): uri is string => !!uri && uri.startsWith('file://'))
+      );
+      
+      // Run sweep in background (fire and forget)
+      void sweepOrphanedLocalImages(validLocalUris, 'scan');
+    }, 2000); // 2 second delay for cache stability
+    
+    return () => clearTimeout(timer);
+  }, [savedChecks]);
+  
+  // Get sync status for a check
+  const getSyncStatus = (check: RecentCheck): 'synced' | 'syncing' | 'failed' | 'retrying' => {
+    // "Retrying" = user tapped retry AND job is now in queue (not failed anymore)
+    if (retryingIds.has(check.id) && hasPendingUpload(check.id) && !isUploadFailed(check.id)) {
+      return 'retrying';
+    }
+    if (!check.imageUri) return 'synced'; // No image
+    if (!isLocalUri(check.imageUri)) return 'synced'; // Already cloud URL
+    if (isUploadFailed(check.id)) return 'failed';
+    if (hasPendingUpload(check.id)) return 'syncing';
+    // Local file with no pending job = job hasn't been created yet (save in progress)
+    return 'syncing';
+  };
+  
+  // Handle retry for failed uploads
+  const handleRetry = async (check: RecentCheck) => {
+    setRetryingIds((prev) => new Set(prev).add(check.id));
+    
+    try {
+      const success = await retryFailedUpload(check.id);
+      if (!success) {
+        // Job not found or not failed - clear retrying state immediately
+        setRetryingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(check.id);
+          return next;
+        });
+        return;
+      }
+    } catch (error) {
+      console.error('[Looks] Retry failed:', error);
+      setRetryingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(check.id);
+        return next;
+      });
+      return;
+    }
+    
+    // Clear retrying state after delay to let UI update based on actual queue state
+    setTimeout(() => {
+      setRetryingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(check.id);
+        return next;
+      });
+    }, 5000); // 5s - enough time to see "Retrying..." then transition
+  };
 
   // Show delete confirmation modal
   const handleDeleteRequest = (check: RecentCheck) => {
@@ -365,7 +501,7 @@ export default function SavedChecksScreen() {
   // Confirm delete action
   const handleConfirmDelete = () => {
     if (!itemToDelete) return;
-    removeRecentCheckMutation.mutate(itemToDelete.id);
+    removeRecentCheckMutation.mutate({ id: itemToDelete.id, imageUri: itemToDelete.imageUri });
     setItemToDelete(null);
     setShowToast(true);
   };
@@ -426,6 +562,8 @@ export default function SavedChecksScreen() {
                   index={index}
                   onPress={handleCheckPress}
                   onLongPress={handleDeleteRequest}
+                  syncStatus={getSyncStatus(check)}
+                  onRetry={handleRetry}
                   tileSize={tileSize}
                 />
               );

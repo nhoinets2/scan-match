@@ -82,6 +82,8 @@ import { ItemSignalsResult } from "@/lib/openai";
 import { capitalizeFirst, capitalizeItems, capitalizeSentences } from "@/lib/text-utils";
 import { recordPositiveAction, requestReviewIfAppropriate } from "@/lib/useStoreReview";
 import { useConfidenceEngine, tierToVerdictState, tierToLabel } from "@/lib/useConfidenceEngine";
+import { prepareScanForSave, completeScanSave, isLocalUri } from "@/lib/storage";
+import { useAuth } from "@/lib/auth-context";
 import { useComboAssembler, runShadowModeComparison } from "@/lib/useComboAssembler";
 import type { AssembledCombo } from "@/lib/combo-assembler";
 import { useResultsTabs, type ResultsTab } from "@/lib/useResultsTabs";
@@ -745,6 +747,7 @@ export default function ResultsScreen() {
   const { data: preferences } = usePreferences();
   const clearScan = useSnapToMatchStore((s) => s.clearScan);
   const currentScan = useSnapToMatchStore((s) => s.currentScan);
+  const { user } = useAuth();
   const addRecentCheckMutation = useAddRecentCheck();
   const updateRecentCheckOutcomeMutation = useUpdateRecentCheckOutcome();
 
@@ -1709,34 +1712,55 @@ export default function ResultsScreen() {
       // Save
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
+      // Helper to perform save with local storage + cloud upload
+      const performSave = async (id: string, currentImageUri: string) => {
+        if (!user?.id) {
+          console.error('[Save] No user ID, cannot save');
+          isSavingRef.current = false;
+          return;
+        }
+        
+        try {
+          // 1. Prepare: copy image to local storage with deterministic name
+          const localUri = await prepareScanForSave(id, currentImageUri, user.id);
+          
+          // 2. Update DB with outcome AND new local imageUri
+          updateRecentCheckOutcomeMutation.mutate(
+            { 
+              id, 
+              outcome: "saved_to_revisit",
+              imageUri: localUri !== currentImageUri ? localUri : undefined, // Only update if changed
+            },
+            { 
+              onSuccess: async () => {
+                // 3. Queue background upload (fire and forget)
+                try {
+                  await completeScanSave(id, localUri, user.id);
+                } catch (uploadError) {
+                  console.error('[Save] Failed to queue upload:', uploadError);
+                  // Non-fatal: scan is saved locally, upload will retry
+                }
+              },
+              onSettled: () => { 
+                isSavingRef.current = false; 
+              }
+            }
+          );
+          
+          setIsSaved(true);
+          setShowScanSavedToast(true);
+          setTimeout(() => setShowScanSavedToast(false), 2000);
+        } catch (error) {
+          console.error('[Save] Failed to save scan:', error);
+          isSavingRef.current = false;
+          // Could show error toast here
+        }
+      };
+      
       if (currentScan && !isViewingSavedCheck && currentCheckId) {
-        updateRecentCheckOutcomeMutation.mutate(
-          { id: currentCheckId, outcome: "saved_to_revisit" },
-          { 
-            onSettled: () => { 
-              isSavingRef.current = false; 
-            }
-          }
-        );
-        setIsSaved(true);
-        
-        // Show success toast
-        setShowScanSavedToast(true);
-        setTimeout(() => setShowScanSavedToast(false), 2000);
-      } else if (isViewingSavedCheck && checkId) {
-        updateRecentCheckOutcomeMutation.mutate(
-          { id: checkId, outcome: "saved_to_revisit" },
-          { 
-            onSettled: () => { 
-              isSavingRef.current = false; 
-            }
-          }
-        );
-        setIsSaved(true);
-        
-        // Show success toast
-        setShowScanSavedToast(true);
-        setTimeout(() => setShowScanSavedToast(false), 2000);
+        void performSave(currentCheckId, currentScan.imageUri);
+      } else if (isViewingSavedCheck && checkId && savedCheck) {
+        void performSave(checkId, savedCheck.imageUri);
       } else {
         isSavingRef.current = false;
       }

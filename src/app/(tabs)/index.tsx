@@ -31,6 +31,7 @@ import {
   Copy,
   Sparkles,
   Puzzle,
+  CloudUpload,
 } from "lucide-react-native";
 import Clipboard from "@react-native-clipboard/clipboard";
 
@@ -869,7 +870,7 @@ export default function HomeScreen() {
 
   const handleWardrobeConfirmDelete = () => {
     if (!wardrobeItemToDelete) return;
-    removeWardrobeItemMutation.mutate(wardrobeItemToDelete.id);
+    removeWardrobeItemMutation.mutate({ id: wardrobeItemToDelete.id, imageUri: wardrobeItemToDelete.imageUri });
     setWardrobeItemToDelete(null);
     setShowWardrobeToast(true);
   };
@@ -900,7 +901,7 @@ export default function HomeScreen() {
 
   const handleScanConfirmDelete = () => {
     if (!scanItemToDelete) return;
-    removeRecentCheckMutation.mutate(scanItemToDelete.id);
+    removeRecentCheckMutation.mutate({ id: scanItemToDelete.id, imageUri: scanItemToDelete.imageUri });
     setScanItemToDelete(null);
     setShowScanToast(true);
   };
@@ -1139,6 +1140,21 @@ export default function HomeScreen() {
                     ) : (
                       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg.secondary }}>
                         <Shirt size={48} color={colors.text.tertiary} />
+                      </View>
+                    )}
+                    {/* Sync pending indicator */}
+                    {item.imageUri?.startsWith('file://') && (
+                      <View
+                        style={{
+                          position: "absolute",
+                          top: spacing.xs,
+                          right: spacing.xs,
+                          backgroundColor: colors.overlay.dark,
+                          borderRadius: borderRadius.pill,
+                          padding: spacing.xs / 2,
+                        }}
+                      >
+                        <CloudUpload size={10} color={colors.text.inverse} strokeWidth={2} />
                       </View>
                     )}
                   </Pressable>

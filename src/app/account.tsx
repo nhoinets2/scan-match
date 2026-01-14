@@ -8,15 +8,17 @@ import {
   ScrollView,
   Alert,
   Platform,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import Animated, { FadeInDown } from "react-native-reanimated";
-import { ChevronLeft, ChevronRight, KeyRound, FileText, Shield, Mail, LogOut, Settings, HelpCircle, AlertCircle, Star, Crown } from "lucide-react-native";
+import Animated, { FadeIn, FadeInDown, FadeOut } from "react-native-reanimated";
+import { ChevronLeft, ChevronRight, KeyRound, FileText, Shield, Mail, LogOut, Settings, HelpCircle, AlertCircle, Star, Crown, Info, X } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 
 import { useAuth } from "@/lib/auth-context";
 import { useProStatus } from "@/lib/useProStatus";
+import { useUsageQuota, USAGE_LIMITS } from "@/lib/database";
 import { colors, spacing, typography, borderRadius, cards, button } from "@/lib/design-tokens";
 import { forceRequestReview } from "@/lib/useStoreReview";
 import { Paywall } from "@/components/Paywall";
@@ -130,11 +132,181 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
+// Quota info popup component
+function QuotaInfoPopup({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  if (!visible) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      accessibilityViewIsModal
+    >
+      <Pressable
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.5)",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: spacing.lg,
+        }}
+        onPress={onClose}
+        accessibilityLabel="Close popup"
+        accessibilityRole="button"
+      >
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(150)}
+          style={{
+            backgroundColor: colors.bg.primary,
+            borderRadius: borderRadius.card,
+            padding: spacing.lg,
+            maxWidth: 320,
+            width: "100%",
+            // Shadow for elevation
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.15,
+            shadowRadius: 12,
+            elevation: 8,
+          }}
+          // Prevent tap-through to backdrop
+          onStartShouldSetResponder={() => true}
+        >
+          {/* Header */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: spacing.md,
+            }}
+          >
+            <Text
+              style={{
+                ...typography.ui.sectionTitle,
+                color: colors.text.primary,
+              }}
+              accessibilityRole="header"
+            >
+              How credits work
+            </Text>
+            <Pressable
+              onPress={onClose}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 14,
+                backgroundColor: colors.surface.icon,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
+              <X size={14} color={colors.text.secondary} strokeWidth={2} />
+            </Pressable>
+          </View>
+
+          {/* Info items */}
+          <View style={{ gap: spacing.md }}>
+            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: colors.accent.terracotta,
+                  marginTop: 7,
+                  marginRight: spacing.sm,
+                }}
+                accessibilityElementsHidden
+              />
+              <Text
+                style={{
+                  ...typography.ui.body,
+                  color: colors.text.secondary,
+                  flex: 1,
+                }}
+              >
+                Each scan or wardrobe add uses 1 credit when you start.
+              </Text>
+            </View>
+
+            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: colors.accent.terracotta,
+                  marginTop: 7,
+                  marginRight: spacing.sm,
+                }}
+                accessibilityElementsHidden
+              />
+              <Text
+                style={{
+                  ...typography.ui.body,
+                  color: colors.text.secondary,
+                  flex: 1,
+                }}
+              >
+                Deleting items doesn't restore credits.
+              </Text>
+            </View>
+
+            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: colors.accent.terracotta,
+                  marginTop: 7,
+                  marginRight: spacing.sm,
+                }}
+                accessibilityElementsHidden
+              />
+              <Text
+                style={{
+                  ...typography.ui.body,
+                  color: colors.text.secondary,
+                  flex: 1,
+                }}
+              >
+                Credits are tied to your account across devices.
+              </Text>
+            </View>
+          </View>
+        </Animated.View>
+      </Pressable>
+    </Modal>
+  );
+}
+
 export default function AccountScreen() {
   const { user, signOut } = useAuth();
   const { isPro, isLoading: isLoadingPro, refetch: refetchProStatus } = useProStatus();
+  const { 
+    scansUsed, 
+    wardrobeAddsUsed, 
+    remainingScans, 
+    remainingWardrobeAdds,
+    isLoading: isLoadingQuota,
+  } = useUsageQuota();
   const [loading, setLoading] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [showQuotaInfo, setShowQuotaInfo] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -294,15 +466,45 @@ export default function AccountScreen() {
                     >
                       {isLoadingPro ? "Loading..." : isPro ? "Pro Member" : "Free Plan"}
                     </Text>
-                    <Text
-                      style={{
-                        ...typography.ui.caption,
-                        color: isPro ? "#E86A33" : colors.text.secondary,
-                        marginTop: 2,
-                      }}
-                    >
-                      {isPro ? "Unlimited access" : "15 wardrobe adds • 5 scans"}
-                    </Text>
+                    {isPro ? (
+                      // Pro users: show "Unlimited access" only, no counter
+                      <Text
+                        style={{
+                          ...typography.ui.caption,
+                          color: "#E86A33",
+                          marginTop: 2,
+                        }}
+                      >
+                        Unlimited access
+                      </Text>
+                    ) : (
+                      // Free users: show remaining credits with info icon
+                      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
+                        <Text
+                          style={{
+                            ...typography.ui.caption,
+                            color: colors.text.secondary,
+                          }}
+                        >
+                          {isLoadingQuota 
+                            ? `—/${USAGE_LIMITS.FREE_WARDROBE_ADDS} wardrobe adds • —/${USAGE_LIMITS.FREE_SCANS} scans`
+                            : `${remainingWardrobeAdds}/${USAGE_LIMITS.FREE_WARDROBE_ADDS} wardrobe adds • ${remainingScans}/${USAGE_LIMITS.FREE_SCANS} scans`
+                          }
+                        </Text>
+                        <Pressable
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            setShowQuotaInfo(true);
+                          }}
+                          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                          style={{ marginLeft: spacing.xs }}
+                          accessibilityRole="button"
+                          accessibilityLabel="How credits work"
+                        >
+                          <Info size={14} color={colors.text.tertiary} strokeWidth={2} />
+                        </Pressable>
+                      </View>
+                    )}
                   </View>
                 </View>
               </Pressable>
@@ -418,6 +620,12 @@ export default function AccountScreen() {
           refetchProStatus();
         }}
         reason="wardrobe_limit"
+      />
+
+      {/* Quota Info Popup */}
+      <QuotaInfoPopup
+        visible={showQuotaInfo}
+        onClose={() => setShowQuotaInfo(false)}
       />
     </View>
   );

@@ -321,7 +321,7 @@ export default function WardrobeItemScreen() {
     if (!item) return;
     
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    removeWardrobeItemMutation.mutate(item.id);
+    removeWardrobeItemMutation.mutate({ id: item.id, imageUri: item.imageUri });
     setShowDeleteConfirmation(false);
     
     // Navigate back to wardrobe list
