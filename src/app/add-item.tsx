@@ -58,6 +58,8 @@ import { ButtonTertiary } from "@/components/ButtonTertiary";
 import { capitalizeFirst, capitalizeItems } from "@/lib/text-utils";
 import { useQuotaStore } from "@/lib/quota-store";
 import { useProStatus } from "@/lib/useProStatus";
+import { useAuth } from "@/lib/auth-context";
+import { uploadWardrobeImage } from "@/lib/storage";
 import { Paywall } from "@/components/Paywall";
 
 type ScreenState = "ready" | "processing" | "analyzed";
@@ -694,6 +696,7 @@ export default function AddItemScreen() {
   const optionalDetailsY = useRef<number>(0); // scroll target for optional details
   const [permission, requestPermission] = useCameraPermissions();
   const addWardrobeItemMutation = useAddWardrobeItem();
+  const { user } = useAuth();
 
   // State
   const [screenState, setScreenState] = useState<ScreenState>("ready");
@@ -875,40 +878,63 @@ export default function AddItemScreen() {
   // Require category AND at least one style tag
   const canAdd = imageUri && category && selectedStyles.length > 0 && screenState === "analyzed";
 
-  const handleAddToWardrobe = () => {
-    if (!canAdd || !imageUri || !category || selectedStyles.length === 0) return;
+  const handleAddToWardrobe = async () => {
+    if (!canAdd || !imageUri || !category || selectedStyles.length === 0 || !user?.id) return;
 
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try {
+      // Show uploading state
+      setScreenState("processing");
 
-    // Increment quota usage for free users
-    if (!isPro) {
-      console.log("[Quota Debug] Incrementing wardrobeAddsUsed from:", wardrobeAddsUsed);
-      incrementAdds();
-    } else {
-      console.log("[Quota Debug] User is Pro - not incrementing quota");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      // Increment quota usage for free users
+      if (!isPro) {
+        console.log("[Quota Debug] Incrementing wardrobeAddsUsed from:", wardrobeAddsUsed);
+        incrementAdds();
+      } else {
+        console.log("[Quota Debug] User is Pro - not incrementing quota");
+      }
+
+      // Try to upload image to Supabase Storage
+      let finalImageUri = imageUri; // Default to local URI
+      try {
+        console.log("[Storage] Attempting to upload wardrobe image...");
+        const cloudImageUrl = await uploadWardrobeImage(imageUri, user.id);
+        console.log("[Storage] Image uploaded successfully:", cloudImageUrl);
+        finalImageUri = cloudImageUrl; // Use cloud URL if upload succeeded
+      } catch (uploadError) {
+        console.error("[Storage] Upload failed, using local URI as fallback:", uploadError);
+        console.warn("[Storage] Item will be saved with local URI (won't work across devices)");
+        // Continue with local URI - at least the user can use the app
+      }
+
+      const attributes = analysis?.itemSignals
+        ? {
+            silhouette: analysis.itemSignals.silhouetteVolume || analysis.itemSignals.dressSilhouette,
+            length: analysis.itemSignals.lengthCategory as "cropped" | "regular" | "long" | "unknown" | undefined,
+            structure: analysis.itemSignals.structure as "soft" | "structured" | "unknown" | undefined,
+            layering: analysis.itemSignals.layeringFriendly,
+          }
+        : undefined;
+
+      addWardrobeItemMutation.mutate({
+        imageUri: finalImageUri,
+        category,
+        detectedLabel: analysis?.descriptiveLabel,
+        attributes,
+        colors: editedColors.length > 0 ? editedColors : (analysis?.colors || []),
+        styleNotes: analysis?.styleNotes,
+        brand: brand || undefined,
+        userStyleTags: selectedStyles, // Now always required
+      });
+
+      router.back();
+    } catch (error) {
+      console.error("[Storage] Failed to add item:", error);
+      setScreenState("analyzed"); // Reset to analyzed state
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      // Could show an error toast here
     }
-
-    const attributes = analysis?.itemSignals
-      ? {
-          silhouette: analysis.itemSignals.silhouetteVolume || analysis.itemSignals.dressSilhouette,
-          length: analysis.itemSignals.lengthCategory as "cropped" | "regular" | "long" | "unknown" | undefined,
-          structure: analysis.itemSignals.structure as "soft" | "structured" | "unknown" | undefined,
-          layering: analysis.itemSignals.layeringFriendly,
-        }
-      : undefined;
-
-    addWardrobeItemMutation.mutate({
-      imageUri,
-      category,
-      detectedLabel: analysis?.descriptiveLabel,
-      attributes,
-      colors: editedColors.length > 0 ? editedColors : (analysis?.colors || []),
-      styleNotes: analysis?.styleNotes,
-      brand: brand || undefined,
-      userStyleTags: selectedStyles, // Now always required
-    });
-
-    router.back();
   };
 
   // Permission handling

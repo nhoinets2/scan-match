@@ -15,7 +15,7 @@ import { spacing, typography, colors, borderRadius, cards, button } from "@/lib/
 import { useAuth } from "@/lib/auth-context";
 import { FavoriteStoresModal } from "@/components/FavoriteStoresModal";
 import { ButtonPrimary } from "@/components/ButtonPrimary";
-import { useStorePreference, useUpdateStorePreference } from "@/lib/store-preferences";
+import { useStorePreference, useUpdateStorePreference, getStoreLabel } from "@/lib/store-preferences";
 import { trackStorePrefDismissed, trackStorePrefSaved } from "@/lib/analytics";
 import { usePreferences } from "@/lib/database";
 
@@ -268,17 +268,37 @@ export default function PreferencesScreen() {
   // Format style preferences preview
   const getStylePreview = () => {
     if (!preferences?.styleVibes || preferences.styleVibes.length === 0) return undefined;
-    return preferences.styleVibes.slice(0, 2).map((vibe: string) => 
+    const vibes = preferences.styleVibes.map((vibe: string) => 
       vibe.charAt(0).toUpperCase() + vibe.slice(1)
-    ).join(" • ");
+    );
+    if (vibes.length === 1) return vibes[0];
+    if (vibes.length === 2) return `${vibes[0]} • ${vibes[1]}`;
+    return `${vibes[0]} • ${vibes[1]} +${vibes.length - 2}`;
   };
 
   // Format color preferences preview
   const getColorPreview = () => {
     if (!preferences?.wardrobeColors || preferences.wardrobeColors.length === 0) return undefined;
-    return preferences.wardrobeColors.slice(0, 2).map((color: any) => 
-      color.name.charAt(0).toUpperCase() + color.name.slice(1)
-    ).join(" • ");
+    
+    // Determine which color groups are represented
+    const colorGroups = [
+      { id: "black", label: "Mostly black", hexes: ["#000000", "#1C1917"] },
+      { id: "neutrals", label: "Neutrals", hexes: ["#FFFFFF", "#D6D3D1", "#F5F5DC", "#FFFDD0"] },
+      { id: "denim", label: "Denim & blues", hexes: ["#000080", "#4169E1", "#87CEEB"] },
+      { id: "earth", label: "Earth tones", hexes: ["#8B4513", "#D2B48C", "#800000"] },
+      { id: "warm", label: "Warm brights", hexes: ["#DC143C", "#FFA500", "#FFD700"] },
+      { id: "cool", label: "Cool brights", hexes: ["#800080", "#E6E6FA", "#FFB6C1"] },
+    ];
+    
+    const selectedHexes = preferences.wardrobeColors.map((c: any) => c.hex);
+    const matchedGroups = colorGroups.filter(group => 
+      group.hexes.some(hex => selectedHexes.includes(hex))
+    );
+    
+    if (matchedGroups.length === 0) return undefined;
+    if (matchedGroups.length === 1) return matchedGroups[0].label;
+    if (matchedGroups.length === 2) return `${matchedGroups[0].label} • ${matchedGroups[1].label}`;
+    return `${matchedGroups[0].label} • ${matchedGroups[1].label} +${matchedGroups.length - 2}`;
   };
 
   // Format fit preference preview
@@ -290,7 +310,7 @@ export default function PreferencesScreen() {
   // Format store preferences preview
   const getStorePreview = () => {
     if (!storePreference?.favoriteStores || storePreference.favoriteStores.length === 0) return undefined;
-    const stores = storePreference.favoriteStores;
+    const stores = storePreference.favoriteStores.map(id => getStoreLabel(id));
     if (stores.length === 1) return stores[0];
     if (stores.length === 2) return `${stores[0]} • ${stores[1]}`;
     return `${stores[0]} • ${stores[1]} +${stores.length - 2}`;
