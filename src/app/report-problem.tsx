@@ -29,13 +29,13 @@ import * as Haptics from "expo-haptics";
 import * as Device from "expo-device";
 import * as Network from "expo-network";
 import * as Clipboard from "expo-clipboard";
-import Constants from "expo-constants";
 import * as MailComposer from "expo-mail-composer";
 
 import { useAuth } from "@/lib/auth-context";
 import { colors, spacing, button, borderRadius, typography } from "@/lib/design-tokens";
 import { getBreadcrumbsString, getScanContext, formatScanContext } from "@/lib/breadcrumbs";
 import { getSessionId } from "@/lib/inspiration/tipsheetTelemetry";
+import { getAppVersion, getBuildNumber, COMMIT_HASH } from "@/lib/version";
 
 // Problem categories
 const PROBLEM_CATEGORIES = [
@@ -209,8 +209,9 @@ export default function ReportProblemScreen() {
   // Gather diagnostic information
   const getDiagnostics = () => {
     const now = new Date();
-    const appVersion = Constants.expoConfig?.version || "Unknown";
-    const buildNumber = Constants.expoConfig?.ios?.buildNumber || Constants.expoConfig?.android?.versionCode || "Unknown";
+    const appVersion = getAppVersion();
+    const buildNumber = getBuildNumber();
+    const commitHash = COMMIT_HASH;
     const deviceModel = Device.modelName || "Unknown";
     const osVersion = Device.osVersion || "Unknown";
     const osName = Device.osName || "Unknown";
@@ -236,6 +237,7 @@ export default function ReportProblemScreen() {
       // App info
       appVersion,
       buildNumber,
+      commitHash,
       env: __DEV__ ? "dev" : "prod",
       // Device info
       deviceModel,
@@ -263,7 +265,7 @@ export default function ReportProblemScreen() {
 ${pad("Report ID:")}${d.reportId}
 ${pad("Timestamp (local):")}${d.localTime}
 ${pad("Timestamp (UTC):")}${d.utcTime}
-${pad("App:")}Scan & Match ${d.appVersion} (${d.buildNumber})  Env: ${d.env}
+${pad("App:")}Scan & Match ${d.appVersion} (${d.buildNumber}) #${d.commitHash}  Env: ${d.env}
 ${pad("Device:")}${d.deviceModel}
 ${pad("OS:")}${d.osName} ${d.osVersion}
 ${pad("Locale:")}${d.locale}
@@ -324,11 +326,11 @@ Thank you!`;
 
   const buildEmailSubject = () => {
     const categoryLabel = PROBLEM_CATEGORIES.find((c) => c.id === category)?.label || "Issue";
-    const appVersion = Constants.expoConfig?.version || "?";
-    const buildNumber = Constants.expoConfig?.ios?.buildNumber || Constants.expoConfig?.android?.versionCode || "?";
+    const appVersion = getAppVersion();
+    const buildNumber = getBuildNumber();
     const screenName = currentPath.replace(/^\//g, "").replace(/-/g, " ") || "home";
-    
-    return `[Scan & Match v${appVersion}(${buildNumber})] ${categoryLabel} — ${screenName} — Problem Report`;
+
+    return `[Scan & Match v${appVersion}(${buildNumber})#${COMMIT_HASH}] ${categoryLabel} — ${screenName} — Problem Report`;
   };
 
   const handleCopyReport = async () => {
