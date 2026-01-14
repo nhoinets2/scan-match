@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -27,7 +27,7 @@ import { getTextStyle } from "@/lib/typography-helpers";
 import { WardrobeItem, CATEGORIES, Category } from "@/lib/types";
 import { ButtonSecondary } from "@/components/ButtonSecondary";
 import { capitalizeFirst } from "@/lib/text-utils";
-import { sweepOrphanedLocalImages, isUploadFailed, retryFailedUpload } from "@/lib/storage";
+import { sweepOrphanedLocalImages, isUploadFailed, retryFailedUpload, getPendingUploadLocalUris, hasAnyPendingUploads, getRecentlyCreatedUris, hasPendingUpload, onQueueIdle } from "@/lib/storage";
 
 const WARDROBE_FILTER_KEY = "wardrobe_filter_selection";
 
@@ -130,8 +130,9 @@ function WardrobeGridItem({
           </View>
         )}
 
-        {/* Upload status indicator - shows when image is local (not yet uploaded to cloud) */}
-        {item.imageUri?.startsWith('file://') && (
+        {/* Upload status indicator - based on queue state, not URI prefix */}
+        {/* Shows "Syncing" when upload is pending, "Retry" when failed */}
+        {(hasPendingUpload(item.id) || isUploadFailed(item.id)) && (
           <Pressable
             onPress={async (e) => {
               e.stopPropagation();
@@ -585,13 +586,33 @@ export default function WardrobeScreen() {
 
   // Track if orphan sweep has run this session
   const hasRunOrphanSweep = useRef(false);
+  // Debounce timer for idle-triggered sweep
+  const sweepDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  // Orphan file sweep - run once per cold start when wardrobe data is available
-  useEffect(() => {
-    if (hasRunOrphanSweep.current) return; // Only run once per session
-    if (wardrobe.length === 0) return; // Wait for wardrobe to load
+  /**
+   * ORPHAN SWEEP - Safe local file cleanup
+   * 
+   * INVARIANT: Only delete files that are:
+   * 1. NOT referenced by any wardrobe item in DB
+   * 2. NOT queued for upload (pending or retrying)
+   * 3. NOT recently created (within 60s TTL window)
+   * 4. NEVER sweep while uploads are in progress
+   * 
+   * This prevents race conditions where a newly-added item's image
+   * gets deleted before the DB/cache is updated.
+   */
+  const runOrphanSweep = useCallback(() => {
+    if (hasRunOrphanSweep.current) return;
+    if (wardrobe.length === 0) return;
+    
+    // Skip if uploads are still in progress
+    if (hasAnyPendingUploads('wardrobe')) {
+      console.log('[Wardrobe] Skipping orphan sweep - uploads in progress');
+      return;
+    }
     
     hasRunOrphanSweep.current = true;
+    console.log('[Wardrobe] Running orphan sweep');
     
     // Collect all local URIs from wardrobe items
     const validLocalUris = new Set(
@@ -600,9 +621,49 @@ export default function WardrobeScreen() {
         .map(item => item.imageUri)
     );
     
-    // Run sweep in background (fire and forget)
+    // Include pending uploads (belt and suspenders)
+    const pendingUris = getPendingUploadLocalUris('wardrobe');
+    for (const uri of pendingUris) {
+      validLocalUris.add(uri);
+    }
+    
+    // Include recently created URIs
+    const recentUris = getRecentlyCreatedUris();
+    for (const uri of recentUris) {
+      validLocalUris.add(uri);
+    }
+    
     void sweepOrphanedLocalImages(validLocalUris);
   }, [wardrobe]);
+  
+  // Orphan file sweep - run once per cold start when wardrobe data is available
+  useEffect(() => {
+    runOrphanSweep();
+  }, [runOrphanSweep]);
+  
+  // Also trigger sweep when queue becomes idle (uploads complete while screen is mounted)
+  // Debounced to avoid multiple triggers if several jobs complete in one pass
+  useEffect(() => {
+    const unsubscribe = onQueueIdle((kind) => {
+      if (kind === 'wardrobe') {
+        // Clear any pending debounce timer
+        if (sweepDebounceTimer.current) {
+          clearTimeout(sweepDebounceTimer.current);
+        }
+        // Debounce: wait 300ms before triggering (coalesces multiple idle events)
+        sweepDebounceTimer.current = setTimeout(() => {
+          console.log('[Wardrobe] Queue became idle, triggering sweep');
+          runOrphanSweep();
+        }, 300);
+      }
+    });
+    return () => {
+      unsubscribe();
+      if (sweepDebounceTimer.current) {
+        clearTimeout(sweepDebounceTimer.current);
+      }
+    };
+  }, [runOrphanSweep]);
 
   // Reset filters to "all" when wardrobe becomes empty
   // This prevents the bug where a newly added first item is filtered out by stale filters

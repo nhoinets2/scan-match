@@ -17,7 +17,51 @@ import { enqueueUpload, processQueue, UploadJob, initUploadQueue, cancelUpload, 
 import { updateWardrobeItemImageUriGuarded, updateRecentCheckImageUriGuarded } from './database';
 
 // Re-export queue functions for use in UI
-export { cancelUpload, isUploadFailed, getFailedUpload, retryFailedUpload, hasPendingUpload } from './uploadQueue';
+export { cancelUpload, isUploadFailed, getFailedUpload, retryFailedUpload, hasPendingUpload, getPendingUploadLocalUris, hasAnyPendingUploads, onQueueIdle } from './uploadQueue';
+
+// ============================================
+// RECENTLY CREATED URIs PROTECTION
+// ============================================
+
+// In-memory tracking of recently created local URIs
+// Protects files in the brief window between creation and queue enqueue
+const recentlyCreatedUris = new Map<string, number>(); // uri -> timestamp
+const RECENT_URI_TTL_MS = 60_000; // 60 seconds protection window
+
+/**
+ * Track a recently created local URI (called from saveImageLocally)
+ */
+function trackRecentUri(uri: string): void {
+  recentlyCreatedUris.set(uri, Date.now());
+  // Cleanup old entries
+  const cutoff = Date.now() - RECENT_URI_TTL_MS;
+  for (const [oldUri, timestamp] of recentlyCreatedUris) {
+    if (timestamp < cutoff) {
+      recentlyCreatedUris.delete(oldUri);
+    }
+  }
+}
+
+/**
+ * Get all recently created local URIs (within TTL window)
+ * Used by orphan sweep to protect files that may not be in queue yet
+ * Also prunes expired entries to prevent unbounded growth in long sessions
+ */
+export function getRecentlyCreatedUris(): Set<string> {
+  const cutoff = Date.now() - RECENT_URI_TTL_MS;
+  const result = new Set<string>();
+  
+  // Collect valid entries and prune expired ones in a single pass
+  for (const [uri, timestamp] of recentlyCreatedUris) {
+    if (timestamp >= cutoff) {
+      result.add(uri);
+    } else {
+      // Prune expired entry
+      recentlyCreatedUris.delete(uri);
+    }
+  }
+  return result;
+}
 
 // ============================================
 // CONSTANTS
@@ -116,6 +160,9 @@ export async function saveImageLocally(
       from: tempUri,
       to: permanentUri,
     });
+    
+    // Track as recently created (protects from orphan sweep race condition)
+    trackRecentUri(permanentUri);
     
     console.log('[Storage] Image saved locally:', permanentUri);
     return permanentUri;
@@ -621,10 +668,22 @@ export async function cleanupScanStorage(
 // ============================================
 
 /**
- * Sweep orphaned local image files not referenced in DB.
- * Call this once per cold start to prevent storage creep.
+ * ORPHAN SWEEP - Safe local file cleanup
  * 
- * @param validLocalUris - Set of local URIs currently in use
+ * Sweep orphaned local image files not referenced by any item.
+ * Call this once per cold start (or when queue becomes idle) to prevent storage creep.
+ * 
+ * SAFETY INVARIANT:
+ * Only delete files that are:
+ * 1. NOT in validLocalUris (items from DB query)
+ * 2. NOT in pending upload queue (caller must include getPendingUploadLocalUris)
+ * 3. NOT recently created (caller must include getRecentlyCreatedUris)
+ * 4. Caller should NEVER call this while uploads are in progress (use hasAnyPendingUploads check)
+ * 
+ * This multi-layer protection prevents race conditions where newly-added items'
+ * images get deleted before DB/cache updates propagate.
+ * 
+ * @param validLocalUris - Set of local URIs currently in use (MUST include pending + recent URIs!)
  * @param kind - 'wardrobe' or 'scan' to specify which directory to sweep
  * @returns Number of orphaned files deleted
  */
@@ -634,6 +693,7 @@ export async function sweepOrphanedLocalImages(
 ): Promise<number> {
   const dir = getLocalDir(kind);
   console.log(`[Storage] Starting ${kind} orphan sweep in:`, dir);
+  console.log(`[Storage] Protected URIs count:`, validLocalUris.size);
   
   try {
     // Ensure directory exists
@@ -652,7 +712,7 @@ export async function sweepOrphanedLocalImages(
     for (const filename of files) {
       const fullPath = `${dir}${filename}`;
       
-      // Check if this file is referenced in DB
+      // Check if this file is referenced/protected
       if (!validLocalUris.has(fullPath)) {
         try {
           await FileSystem.deleteAsync(fullPath, { idempotent: true });
@@ -669,6 +729,45 @@ export async function sweepOrphanedLocalImages(
   } catch (error) {
     console.error(`[Storage] ${kind} orphan sweep failed:`, error);
     return 0;
+  }
+}
+
+// ============================================
+// INTEGRITY CHECK HELPERS
+// ============================================
+
+/**
+ * Check if a local file exists. Use for debugging blank thumbnails.
+ * Logs a warning if a file is referenced but missing.
+ * 
+ * @param localUri - The local file URI to check
+ * @param context - Context for logging (e.g., 'wardrobe item abc123')
+ * @returns true if file exists or URI is not local, false if local file is missing
+ */
+export async function checkLocalFileIntegrity(
+  localUri: string | undefined,
+  context: string
+): Promise<boolean> {
+  // No URI or not a local file - nothing to check
+  if (!localUri || !localUri.startsWith('file://')) {
+    return true;
+  }
+  
+  try {
+    const info = await FileSystem.getInfoAsync(localUri);
+    if (!info.exists) {
+      // INTEGRITY CHECK: Log when a referenced file is missing
+      console.warn('[Storage] INTEGRITY: Local file missing', {
+        context,
+        localUri,
+        message: 'File referenced by DB but not found on disk',
+      });
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('[Storage] INTEGRITY: Failed to check file:', { context, localUri, error });
+    return false;
   }
 }
 

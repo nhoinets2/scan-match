@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -32,6 +32,10 @@ import {
   isUploadFailed, 
   retryFailedUpload,
   hasPendingUpload,
+  getPendingUploadLocalUris,
+  hasAnyPendingUploads,
+  getRecentlyCreatedUris,
+  onQueueIdle,
 } from "@/lib/storage";
 
 // Grid tile for saved checks (matches Recent Scans / Wardrobe grid style)
@@ -422,27 +426,90 @@ export default function SavedChecksScreen() {
     (check: RecentCheck) => check.outcome === "saved_to_revisit"
   );
   
+  // Debounce timer for idle-triggered sweep
+  const sweepDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  /**
+   * ORPHAN SWEEP - Safe local file cleanup
+   * 
+   * INVARIANT: Only delete files that are:
+   * 1. NOT referenced by any saved check in DB
+   * 2. NOT queued for upload (pending or retrying)
+   * 3. NOT recently created (within 60s TTL window)
+   * 4. NEVER sweep while uploads are in progress
+   * 
+   * This prevents race conditions where a newly-saved scan's image
+   * gets deleted before the DB/cache is updated.
+   */
+  const runOrphanSweep = useCallback(() => {
+    if (hasSweepedRef.current) return;
+    if (savedChecks.length === 0) return;
+    
+    // Skip if uploads are still in progress
+    if (hasAnyPendingUploads('scan')) {
+      console.log('[Looks] Skipping orphan sweep - uploads in progress');
+      return;
+    }
+    
+    hasSweepedRef.current = true;
+    console.log('[Looks] Running orphan sweep');
+    
+    // Collect all local URIs that are in use
+    const validLocalUris = new Set<string>(
+      savedChecks
+        .map((c) => c.imageUri)
+        .filter((uri): uri is string => !!uri && uri.startsWith('file://'))
+    );
+    
+    // Include pending uploads (belt and suspenders)
+    const pendingUris = getPendingUploadLocalUris('scan');
+    for (const uri of pendingUris) {
+      validLocalUris.add(uri);
+    }
+    
+    // Include recently created URIs
+    const recentUris = getRecentlyCreatedUris();
+    for (const uri of recentUris) {
+      validLocalUris.add(uri);
+    }
+    
+    void sweepOrphanedLocalImages(validLocalUris, 'scan');
+  }, [savedChecks]);
+  
   // Run orphan sweep once per session after saved checks load
   // Delay slightly to avoid racing with in-flight saves that haven't updated cache yet
   useEffect(() => {
-    if (hasSweepedRef.current || savedChecks.length === 0) return;
-    hasSweepedRef.current = true;
-    
     // Small delay to let any pending cache updates settle
     const timer = setTimeout(() => {
-      // Collect all local URIs that are in use
-      const validLocalUris = new Set<string>(
-        savedChecks
-          .map((c) => c.imageUri)
-          .filter((uri): uri is string => !!uri && uri.startsWith('file://'))
-      );
-      
-      // Run sweep in background (fire and forget)
-      void sweepOrphanedLocalImages(validLocalUris, 'scan');
+      runOrphanSweep();
     }, 2000); // 2 second delay for cache stability
     
     return () => clearTimeout(timer);
-  }, [savedChecks]);
+  }, [runOrphanSweep]);
+  
+  // Also trigger sweep when queue becomes idle (uploads complete while screen is mounted)
+  // Debounced to avoid multiple triggers if several jobs complete in one pass
+  useEffect(() => {
+    const unsubscribe = onQueueIdle((kind) => {
+      if (kind === 'scan') {
+        // Clear any pending debounce timer
+        if (sweepDebounceTimer.current) {
+          clearTimeout(sweepDebounceTimer.current);
+        }
+        // Debounce: wait 300ms before triggering (coalesces multiple idle events)
+        sweepDebounceTimer.current = setTimeout(() => {
+          console.log('[Looks] Queue became idle, triggering sweep');
+          runOrphanSweep();
+        }, 300);
+      }
+    });
+    return () => {
+      unsubscribe();
+      if (sweepDebounceTimer.current) {
+        clearTimeout(sweepDebounceTimer.current);
+      }
+    };
+  }, [runOrphanSweep]);
   
   // Get sync status for a check
   const getSyncStatus = (check: RecentCheck): 'synced' | 'syncing' | 'failed' | 'retrying' => {

@@ -71,6 +71,16 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null;
 // Track which jobs we've logged as "skipped" this session to avoid spam
 const loggedSkipsThisSession = new Set<string>();
 
+// Queue idle callbacks - called when queue transitions from "has jobs" to "empty" for a kind
+type QueueIdleCallback = (kind: UploadKind) => void;
+const queueIdleListeners = new Set<QueueIdleCallback>();
+
+// Track previous state to detect transitions
+let previousQueueStateByKind: Record<UploadKind, boolean> = {
+  wardrobe: false,
+  scan: false,
+};
+
 /**
  * Initialize the upload queue.
  * Call this once on app start after you have supabase + userId available.
@@ -228,7 +238,13 @@ export async function processQueue(processFn: (job: UploadJob) => Promise<void>)
       // Local file still exists?
       const info = await FileSystem.getInfoAsync(job.localUri);
       if (!info.exists) {
-        console.log('[UploadQueue] Local file no longer exists, dropping job:', jobId);
+        // INTEGRITY CHECK: This should not happen if sweep logic is correct
+        console.warn('[UploadQueue] INTEGRITY: Local file missing for queued job:', {
+          jobId,
+          kind: job.kind,
+          localUri: job.localUri,
+          message: 'File was deleted while job was queued - possible sweep race condition',
+        });
         // Drop the job; nothing to upload
         queue = queue.filter(j => getJobId(j) !== jobId);
         await persistQueue();
@@ -274,6 +290,9 @@ export async function processQueue(processFn: (job: UploadJob) => Promise<void>)
     isProcessing = false;
     console.log('[UploadQueue] Queue processing complete, remaining jobs:', queue.length);
     
+    // Check if any kind transitioned to idle and notify listeners
+    checkAndEmitIdleEvents();
+    
     // Schedule next processing if there are jobs waiting for backoff
     scheduleRetryTimer();
   }
@@ -311,6 +330,74 @@ export function getQueueStatus(): {
   ).length;
   
   return { pending, failed, ready };
+}
+
+/**
+ * Get all pending upload local URIs for a given kind.
+ * Used by orphan sweep to avoid deleting files that are still being uploaded.
+ * @param kind - 'wardrobe' or 'scan' (optional, returns all if not specified)
+ */
+export function getPendingUploadLocalUris(kind?: UploadKind): Set<string> {
+  const uris = new Set<string>();
+  for (const job of queue) {
+    if (!kind || job.kind === kind) {
+      uris.add(job.localUri);
+    }
+  }
+  return uris;
+}
+
+/**
+ * Check if there are any pending uploads for a given kind.
+ * Used to skip orphan sweep when uploads are in progress.
+ * @param kind - 'wardrobe' or 'scan' (optional, checks all if not specified)
+ */
+export function hasAnyPendingUploads(kind?: UploadKind): boolean {
+  if (!kind) return queue.length > 0;
+  return queue.some(j => j.kind === kind);
+}
+
+/**
+ * Register a callback for when queue transitions to idle for a kind.
+ * Called when queue goes from "has pending jobs" → "no jobs" for wardrobe or scan.
+ * Returns an unsubscribe function.
+ */
+export function onQueueIdle(callback: QueueIdleCallback): () => void {
+  queueIdleListeners.add(callback);
+  return () => {
+    queueIdleListeners.delete(callback);
+  };
+}
+
+/**
+ * Check queue state and emit idle events if transitioned.
+ * Should be called after any queue mutation (success, cancel, etc.)
+ */
+function checkAndEmitIdleEvents(): void {
+  const kinds: UploadKind[] = ['wardrobe', 'scan'];
+  
+  for (const kind of kinds) {
+    const hadJobs = previousQueueStateByKind[kind];
+    const hasJobs = queue.some(j => j.kind === kind);
+    
+    // Transition: had jobs → no jobs = queue became idle
+    if (hadJobs && !hasJobs) {
+      console.log(`[UploadQueue] Queue became idle for: ${kind}`);
+      // Notify all listeners (debounced via setTimeout to avoid blocking)
+      setTimeout(() => {
+        for (const listener of queueIdleListeners) {
+          try {
+            listener(kind);
+          } catch (e) {
+            console.error('[UploadQueue] Idle listener error:', e);
+          }
+        }
+      }, 100); // Small debounce
+    }
+    
+    // Update state for next check
+    previousQueueStateByKind[kind] = hasJobs;
+  }
 }
 
 /**
@@ -388,6 +475,12 @@ async function loadQueue(): Promise<void> {
     const raw = await AsyncStorage.getItem(QUEUE_KEY);
     queue = raw ? safeParse<UploadJob[]>(raw, []) : [];
     isLoaded = true;
+    
+    // Initialize previous state to match current queue (prevents spurious idle events on load)
+    previousQueueStateByKind = {
+      wardrobe: queue.some(j => j.kind === 'wardrobe'),
+      scan: queue.some(j => j.kind === 'scan'),
+    };
   } catch (error) {
     console.error('[UploadQueue] Failed to load queue:', error);
     queue = [];

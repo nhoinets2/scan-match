@@ -48,6 +48,7 @@ import { colors, spacing, typography, components, button, borderRadius, shadows,
 import { getTextStyle } from "@/lib/typography-helpers";
 import { OutcomeState, RecentCheck, WardrobeItem, CATEGORIES } from "@/lib/types";
 import { useMatchCount } from "@/lib/useMatchCount";
+import { hasPendingUpload, isUploadFailed } from "@/lib/storage";
 
 // Screen dimensions
 
@@ -1142,14 +1143,14 @@ export default function HomeScreen() {
                         <Shirt size={48} color={colors.text.tertiary} />
                       </View>
                     )}
-                    {/* Sync pending indicator */}
-                    {item.imageUri?.startsWith('file://') && (
+                    {/* Sync pending indicator - based on queue state */}
+                    {(hasPendingUpload(item.id) || isUploadFailed(item.id)) && (
                       <View
                         style={{
                           position: "absolute",
                           top: spacing.xs,
                           right: spacing.xs,
-                          backgroundColor: colors.overlay.dark,
+                          backgroundColor: isUploadFailed(item.id) ? colors.status.error : colors.overlay.dark,
                           borderRadius: borderRadius.pill,
                           padding: spacing.xs / 2,
                         }}
