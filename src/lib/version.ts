@@ -9,10 +9,10 @@ import Constants from 'expo-constants';
 
 // Git commit hash (7 characters) - update this before building
 // Run: git rev-parse --short=7 HEAD
-export const COMMIT_HASH = 'c58d494';
+export const COMMIT_HASH = 'ecf2862';
 
 // Build timestamp (for tracking when the build was created)
-export const BUILD_TIMESTAMP = '2025-01-14T00:00:00Z';
+export const BUILD_TIMESTAMP = '2025-01-14T12:00:00Z';
 
 /**
  * Get the full version string including commit hash
