@@ -48,7 +48,7 @@ import {
   ChevronDown,
   Lock,
 } from "lucide-react-native";
-import { ThumbnailPlaceholderImage } from "@/components/PlaceholderImage";
+import { ThumbnailPlaceholderImage, ThumbnailWithFallback } from "@/components/PlaceholderImage";
 
 import { useSnapToMatchStore } from "@/lib/store";
 import { filterModeABullets } from "@/lib/mode-a-bullet-filter";

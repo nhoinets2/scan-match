@@ -21,7 +21,7 @@ import Animated, {
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { Camera, CloudUpload, RefreshCw } from "lucide-react-native";
-import { GridPlaceholderImage } from "@/components/PlaceholderImage";
+import { ImageWithFallback } from "@/components/PlaceholderImage";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useWardrobe, useRemoveWardrobeItem } from "@/lib/database";
@@ -114,15 +114,7 @@ function WardrobeGridItem({
         }}
       >
         {/* Image */}
-        {item.imageUri ? (
-          <Image
-            source={{ uri: item.imageUri }}
-            style={{ width: "100%", height: "100%" }}
-            contentFit="cover"
-          />
-        ) : (
-          <GridPlaceholderImage />
-        )}
+        <ImageWithFallback uri={item.imageUri} />
 
         {/* Upload status indicator - based on queue state, not URI prefix */}
         {/* Shows "Syncing" when upload is pending, "Retry" when failed */}

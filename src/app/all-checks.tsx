@@ -13,7 +13,7 @@ import Animated, {
 import * as Haptics from "expo-haptics";
 import Clipboard from "@react-native-clipboard/clipboard";
 import { ArrowLeft, Clock, Copy, X, CloudUpload, RefreshCw } from "lucide-react-native";
-import { GridPlaceholderImage } from "@/components/PlaceholderImage";
+import { ImageWithFallback } from "@/components/PlaceholderImage";
 
 import { useRecentChecks, useRemoveRecentCheck, SCAN_RETENTION, useWardrobe } from "@/lib/database";
 import { hasPendingUpload, isUploadFailed } from "@/lib/storage";
@@ -81,15 +81,7 @@ function CheckGridItem({
         }}
       >
         {/* Image */}
-        {check.imageUri ? (
-          <Image
-            source={{ uri: check.imageUri }}
-            style={{ width: "100%", height: "100%" }}
-            contentFit="cover"
-          />
-        ) : (
-          <GridPlaceholderImage />
-        )}
+        <ImageWithFallback uri={check.imageUri} />
 
         {/* Sync status indicator - based on queue state */}
         {(hasPendingUpload(check.id) || isUploadFailed(check.id)) && (

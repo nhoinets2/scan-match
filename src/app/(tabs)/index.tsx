@@ -34,7 +34,7 @@ import {
   CloudUpload,
   RefreshCw,
 } from "lucide-react-native";
-import { GridPlaceholderImage } from "@/components/PlaceholderImage";
+import { ImageWithFallback } from "@/components/PlaceholderImage";
 import Clipboard from "@react-native-clipboard/clipboard";
 
 import {
@@ -680,15 +680,7 @@ function RecentCheckListItem({
         }}
       >
         {/* Image */}
-        {check.imageUri ? (
-          <Image
-            source={{ uri: check.imageUri }}
-            style={{ width: "100%", height: "100%" }}
-            contentFit="cover"
-          />
-        ) : (
-          <GridPlaceholderImage />
-        )}
+        <ImageWithFallback uri={check.imageUri} />
 
         {/* Sync status indicator - based on queue state */}
         {(hasPendingUpload(check.id) || isUploadFailed(check.id)) && (
@@ -1158,15 +1150,7 @@ export default function HomeScreen() {
                       overflow: "hidden",
                     }}
                   >
-                    {item.imageUri ? (
-                      <Image
-                        source={{ uri: item.imageUri }}
-                        style={{ width: "100%", height: "100%" }}
-                        contentFit="cover"
-                      />
-                    ) : (
-                      <GridPlaceholderImage />
-                    )}
+                    <ImageWithFallback uri={item.imageUri} />
                     {/* Sync status indicator - based on queue state */}
                     {(hasPendingUpload(item.id) || isUploadFailed(item.id)) && (
                       <View

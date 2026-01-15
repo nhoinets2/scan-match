@@ -20,7 +20,7 @@ import Animated, {
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { Bookmark, CloudUpload, RefreshCw } from "lucide-react-native";
-import { GridPlaceholderImage } from "@/components/PlaceholderImage";
+import { ImageWithFallback } from "@/components/PlaceholderImage";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useRecentChecks, useRemoveRecentCheck, useWardrobe } from "@/lib/database";
@@ -99,15 +99,7 @@ function SavedCheckGridItem({
         }}
       >
         {/* Image */}
-        {check.imageUri ? (
-          <Image
-            source={{ uri: check.imageUri }}
-            style={{ width: "100%", height: "100%" }}
-            contentFit="cover"
-          />
-        ) : (
-          <GridPlaceholderImage />
-        )}
+        <ImageWithFallback uri={check.imageUri} />
 
         {/* Gradient overlay */}
         <LinearGradient

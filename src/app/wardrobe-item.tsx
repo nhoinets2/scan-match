@@ -195,6 +195,9 @@ export default function WardrobeItemScreen() {
     return wardrobe.find((w: WardrobeItem) => w.id === itemId) ?? null;
   }, [itemId, wardrobe]);
 
+  // Image error state
+  const [imageError, setImageError] = useState(false);
+  
   // Edit mode state
   const [isEditMode, setIsEditMode] = useState(false);
   const [editCategory, setEditCategory] = useState<Category>(
@@ -524,7 +527,7 @@ export default function WardrobeItemScreen() {
                 }}
               >
                 {/* Thumbnail - tappable to open photo viewer */}
-                {item.imageUri ? (
+                {item.imageUri && !imageError ? (
                   <Pressable
                     onPress={(e) => {
                       e.stopPropagation();
@@ -536,6 +539,7 @@ export default function WardrobeItemScreen() {
                       source={{ uri: item.imageUri }}
                       style={{ width: spacing.xxl + spacing.md - 4, height: spacing.xxl + spacing.md - 4, borderRadius: borderRadius.image }}
                       contentFit="cover"
+                      onError={() => setImageError(true)}
                     />
                   </Pressable>
                 ) : (

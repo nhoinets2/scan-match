@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, StyleSheet, ViewStyle } from "react-native";
+import { Image, ImageStyle } from "expo-image";
 import { ImageOff } from "lucide-react-native";
 import { colors, borderRadius } from "@/lib/design-tokens";
 
@@ -160,6 +161,78 @@ export function ThumbnailPlaceholderImage({
         strokeWidth={1.5}
       />
     </View>
+  );
+}
+
+/**
+ * Image component with automatic fallback to placeholder on error
+ * Use this instead of raw Image + GridPlaceholderImage pattern
+ */
+export function ImageWithFallback({
+  uri,
+  style,
+  contentFit = "cover",
+}: {
+  uri: string | null | undefined;
+  style?: ImageStyle;
+  contentFit?: "cover" | "contain" | "fill" | "none" | "scale-down";
+}) {
+  const [hasError, setHasError] = useState(false);
+
+  if (!uri || hasError) {
+    return <GridPlaceholderImage />;
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={[{ width: "100%", height: "100%" }, style]}
+      contentFit={contentFit}
+      onError={() => setHasError(true)}
+    />
+  );
+}
+
+/**
+ * Thumbnail image with automatic fallback to placeholder on error
+ */
+export function ThumbnailWithFallback({
+  uri,
+  size,
+  borderRadius: customBorderRadius,
+  style,
+}: {
+  uri: string | null | undefined;
+  size: number;
+  borderRadius?: number;
+  style?: ViewStyle;
+}) {
+  const [hasError, setHasError] = useState(false);
+
+  if (!uri || hasError) {
+    return (
+      <ThumbnailPlaceholderImage 
+        size={size} 
+        borderRadius={customBorderRadius}
+        style={style}
+      />
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={[
+        { 
+          width: size, 
+          height: size, 
+          borderRadius: customBorderRadius ?? borderRadius.image,
+        },
+        style,
+      ]}
+      contentFit="cover"
+      onError={() => setHasError(true)}
+    />
   );
 }
 
