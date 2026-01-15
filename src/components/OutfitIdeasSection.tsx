@@ -12,7 +12,7 @@ import React, { useState, useRef } from "react";
 import { View, Text, Pressable, ScrollView, Modal, Dimensions } from "react-native";
 import { Image } from "expo-image";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { Plus, Check, Info } from "lucide-react-native";
+import { Plus, Check, Info, ImageOff } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 
 import type { WardrobeItem, Category } from "@/lib/types";
@@ -129,6 +129,45 @@ function OutfitTile({
   showMediumBadge,
   onPress,
 }: OutfitTileProps) {
+  const [imageError, setImageError] = useState(false);
+  
+  // Render placeholder with diagonal stripes
+  const renderPlaceholder = () => (
+    <View
+      style={{
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: colors.bg.elevated,
+        overflow: "hidden",
+      }}
+    >
+      {/* Diagonal stripes */}
+      <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, overflow: "hidden" }}>
+        {Array.from({ length: 20 }).map((_, i) => (
+          <View
+            key={i}
+            style={{
+              position: "absolute",
+              width: 1,
+              height: 200,
+              backgroundColor: colors.border.subtle,
+              left: i * 8,
+              top: -50,
+              transform: [{ rotate: "45deg" }],
+              opacity: 0.4,
+            }}
+          />
+        ))}
+      </View>
+      <ImageOff
+        size={24}
+        color={colors.text.tertiary}
+        strokeWidth={1.5}
+      />
+    </View>
+  );
+
   return (
     <View style={{ position: "relative" }}>
       <Pressable
@@ -147,7 +186,7 @@ function OutfitTile({
           borderColor: colors.border.hairline,
         }}
       >
-        {imageUri ? (
+        {imageUri && !imageError ? (
           <Image
             source={{ uri: imageUri }}
             style={{ 
@@ -155,25 +194,10 @@ function OutfitTile({
               height: TILE_SIZE,
             }}
             contentFit="cover"
+            onError={() => setImageError(true)}
           />
         ) : (
-          <View
-            style={{
-              flex: 1,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 10,
-                color: colors.text.tertiary,
-                textAlign: "center",
-              }}
-            >
-              {slot}
-            </Text>
-          </View>
+          renderPlaceholder()
         )}
       </Pressable>
 
