@@ -1,11 +1,13 @@
+/* eslint-disable import/no-unresolved */
+// @ts-nocheck - This is a Deno/Supabase Edge Function, not a Node.js file
 /**
  * RevenueCat Webhook Handler
- * 
+ *
  * This Supabase Edge Function handles webhook events from RevenueCat.
  * It updates the user_subscriptions table when subscription events occur.
- * 
+ *
  * Deploy: supabase functions deploy revenuecat-webhook
- * 
+ *
  * RevenueCat Dashboard Setup:
  * 1. Go to RevenueCat Dashboard → Project Settings → Integrations → Webhooks
  * 2. Add webhook URL: https://<project-ref>.supabase.co/functions/v1/revenuecat-webhook

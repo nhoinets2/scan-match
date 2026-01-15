@@ -1188,7 +1188,7 @@ export default function AddItemScreen() {
         <Paywall
           visible={showPaywall}
           onClose={handlePaywallClose}
-          onSuccess={handlePaywallSuccess}
+          onPurchaseComplete={handlePaywallSuccess}
           reason="wardrobe_limit"
         />
       </View>

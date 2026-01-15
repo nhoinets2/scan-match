@@ -814,7 +814,7 @@ export default function ScanScreen() {
       <Paywall
         visible={showPaywall}
         onClose={handlePaywallClose}
-        onSuccess={handlePaywallSuccess}
+        onPurchaseComplete={handlePaywallSuccess}
         reason="in_store_limit"
       />
     </View>

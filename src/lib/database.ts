@@ -565,7 +565,7 @@ export const useDebugSnapshot = (checkId: string | null) => {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["debugSnapshot", checkId],
+    queryKey: ["debugSnapshot", checkId, user?.id],
     queryFn: async () => {
       if (!user?.id || !checkId) return null;
 

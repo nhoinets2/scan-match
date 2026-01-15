@@ -449,7 +449,7 @@ export async function retryFailedUpload(id: string): Promise<boolean> {
   };
   
   // Clear from logged skips so we see fresh logs
-  loggedSkipsThisSession.delete(itemId);
+  loggedSkipsThisSession.delete(id);
   
   await persistQueue();
   

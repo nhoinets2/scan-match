@@ -26,6 +26,7 @@ module.exports = defineConfig([
       "eslint.config.js",
       "nativewind-env.d.ts",
       "rootStore.example.ts",
+      "**/supabase/functions/**",
     ],
     settings: {
       "import/resolver": {
