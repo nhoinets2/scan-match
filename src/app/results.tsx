@@ -46,6 +46,7 @@ import {
   ChevronRight,
   ChevronDown,
   Lock,
+  Shirt,
 } from "lucide-react-native";
 import { ThumbnailPlaceholderImage } from "@/components/PlaceholderImage";
 
