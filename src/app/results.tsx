@@ -856,6 +856,7 @@ export default function ResultsScreen() {
   const [isWardrobeSectionCollapsed, setIsWardrobeSectionCollapsed] = useState(true);
   // Expandable scanned item card state (for empty state)
   const [isScannedItemExpanded, setIsScannedItemExpanded] = useState(false);
+  const [scannedItemImageError, setScannedItemImageError] = useState(false);
 
   // Analytics tracking refs
   const hasTrackedScan = useRef(false);
@@ -864,6 +865,16 @@ export default function ResultsScreen() {
 
   // Extract scannedItem from either source
   const scannedItem = currentScan ?? savedCheck?.scannedItem ?? null;
+  
+  // IMPORTANT: Use the top-level imageUri from savedCheck if available
+  // The scannedItem.imageUri is stored in JSONB and never gets updated after upload
+  // savedCheck.imageUri is what gets updated to the remote URL after successful upload
+  const resolvedImageUri = savedCheck?.imageUri ?? scannedItem?.imageUri;
+
+  // Reset image error state when image URI changes
+  useEffect(() => {
+    setScannedItemImageError(false);
+  }, [resolvedImageUri]);
 
   // Confidence Engine evaluation - primary matching system
   const confidenceResult = useConfidenceEngine(scannedItem, wardrobe);
@@ -1960,16 +1971,34 @@ export default function ResultsScreen() {
                 {/* Thumbnail - tappable to open photo viewer */}
                 <Pressable
                   onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setPhotoViewerSource('main');
-                    setPhotoViewerUri(scannedItem.imageUri);
+                    if (!scannedItemImageError && resolvedImageUri) {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setPhotoViewerSource('main');
+                      setPhotoViewerUri(resolvedImageUri);
+                    }
                   }}
                 >
-                  <Image
-                    source={{ uri: scannedItem.imageUri }}
-                    style={{ width: spacing.xxl + spacing.md - 4, height: spacing.xxl + spacing.md - 4, borderRadius: borderRadius.image }}
-                    contentFit="cover"
-                  />
+                  {scannedItemImageError ? (
+                    <View
+                      style={{
+                        width: spacing.xxl + spacing.md - 4,
+                        height: spacing.xxl + spacing.md - 4,
+                        borderRadius: borderRadius.image,
+                        backgroundColor: colors.bg.elevated,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Shirt size={24} color={colors.text.tertiary} />
+                    </View>
+                  ) : (
+                    <Image
+                      source={{ uri: resolvedImageUri }}
+                      style={{ width: spacing.xxl + spacing.md - 4, height: spacing.xxl + spacing.md - 4, borderRadius: borderRadius.image }}
+                      contentFit="cover"
+                      onError={() => setScannedItemImageError(true)}
+                    />
+                  )}
                 </Pressable>
                 {/* Title */}
                 <View style={{ flex: 1, marginLeft: spacing.md - spacing.xs }}>
@@ -2043,15 +2072,33 @@ export default function ResultsScreen() {
             >
               <Pressable
                 onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setPhotoViewerUri(scannedItem.imageUri);
+                  if (!scannedItemImageError && resolvedImageUri) {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setPhotoViewerUri(resolvedImageUri);
+                  }
                 }}
               >
-                <Image
-                  source={{ uri: scannedItem.imageUri }}
-                  style={{ width: spacing.xxl * 2 - spacing.xs, height: spacing.xxl * 2 + spacing.lg + spacing.xs / 2, borderRadius: borderRadius.image }}
-                  contentFit="cover"
-                />
+                {scannedItemImageError ? (
+                  <View
+                    style={{
+                      width: spacing.xxl * 2 - spacing.xs,
+                      height: spacing.xxl * 2 + spacing.lg + spacing.xs / 2,
+                      borderRadius: borderRadius.image,
+                      backgroundColor: colors.bg.elevated,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Shirt size={32} color={colors.text.tertiary} />
+                  </View>
+                ) : (
+                  <Image
+                    source={{ uri: resolvedImageUri }}
+                    style={{ width: spacing.xxl * 2 - spacing.xs, height: spacing.xxl * 2 + spacing.lg + spacing.xs / 2, borderRadius: borderRadius.image }}
+                    contentFit="cover"
+                    onError={() => setScannedItemImageError(true)}
+                  />
+                )}
               </Pressable>
               <View style={{ flex: 1, marginLeft: 16, justifyContent: "center" }}>
                 <Text
@@ -2370,16 +2417,34 @@ width: spacing.xs / 2,
                 {/* Thumbnail - tappable to open photo viewer */}
                 <Pressable
                   onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setPhotoViewerSource('main');
-                    setPhotoViewerUri(scannedItem.imageUri);
+                    if (!scannedItemImageError && resolvedImageUri) {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setPhotoViewerSource('main');
+                      setPhotoViewerUri(resolvedImageUri);
+                    }
                   }}
                 >
-                  <Image
-                    source={{ uri: scannedItem.imageUri }}
-                    style={{ width: spacing.xxl + spacing.md - 4, height: spacing.xxl + spacing.md - 4, borderRadius: borderRadius.image }}
-                    contentFit="cover"
-                  />
+                  {scannedItemImageError ? (
+                    <View
+                      style={{
+                        width: spacing.xxl + spacing.md - 4,
+                        height: spacing.xxl + spacing.md - 4,
+                        borderRadius: borderRadius.image,
+                        backgroundColor: colors.bg.elevated,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Shirt size={24} color={colors.text.tertiary} />
+                    </View>
+                  ) : (
+                    <Image
+                      source={{ uri: resolvedImageUri }}
+                      style={{ width: spacing.xxl + spacing.md - 4, height: spacing.xxl + spacing.md - 4, borderRadius: borderRadius.image }}
+                      contentFit="cover"
+                      onError={() => setScannedItemImageError(true)}
+                    />
+                  )}
                 </Pressable>
                 {/* Title */}
                 <View style={{ flex: 1, marginLeft: spacing.md - spacing.xs }}>
