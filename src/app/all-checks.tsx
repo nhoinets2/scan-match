@@ -12,7 +12,8 @@ import Animated, {
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import Clipboard from "@react-native-clipboard/clipboard";
-import { ArrowLeft, Shirt, Clock, Copy, X, CloudUpload, RefreshCw } from "lucide-react-native";
+import { ArrowLeft, Clock, Copy, X, CloudUpload, RefreshCw } from "lucide-react-native";
+import { GridPlaceholderImage } from "@/components/PlaceholderImage";
 
 import { useRecentChecks, useRemoveRecentCheck, SCAN_RETENTION, useWardrobe } from "@/lib/database";
 import { hasPendingUpload, isUploadFailed } from "@/lib/storage";
@@ -87,17 +88,7 @@ function CheckGridItem({
             contentFit="cover"
           />
         ) : (
-          <View
-            style={{
-              width: "100%",
-              height: "100%",
-              backgroundColor: colors.accent.terracottaLight,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Shirt size={48} color={colors.accent.terracotta} strokeWidth={1.5} />
-          </View>
+          <GridPlaceholderImage />
         )}
 
         {/* Sync status indicator - based on queue state */}

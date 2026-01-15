@@ -24,7 +24,6 @@ import {
   Plus,
   ChevronRight,
   Clock,
-  Shirt,
   User,
   Check,
   X,
@@ -34,6 +33,7 @@ import {
   CloudUpload,
   RefreshCw,
 } from "lucide-react-native";
+import { GridPlaceholderImage } from "@/components/PlaceholderImage";
 import Clipboard from "@react-native-clipboard/clipboard";
 
 import {
@@ -686,17 +686,7 @@ function RecentCheckListItem({
             contentFit="cover"
           />
         ) : (
-          <View
-            style={{
-              width: "100%",
-              height: "100%",
-              backgroundColor: colors.accent.terracottaLight,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Shirt size={48} color={colors.accent.terracotta} strokeWidth={1.5} />
-          </View>
+          <GridPlaceholderImage />
         )}
 
         {/* Sync status indicator - based on queue state */}
@@ -1174,9 +1164,7 @@ export default function HomeScreen() {
                         contentFit="cover"
                       />
                     ) : (
-                      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg.secondary }}>
-                        <Shirt size={48} color={colors.text.tertiary} />
-                      </View>
+                      <GridPlaceholderImage />
                     )}
                     {/* Sync status indicator - based on queue state */}
                     {(hasPendingUpload(item.id) || isUploadFailed(item.id)) && (

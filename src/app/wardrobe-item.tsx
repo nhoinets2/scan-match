@@ -23,6 +23,7 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react-native";
+import { ThumbnailPlaceholderImage } from "@/components/PlaceholderImage";
 
 import { useWardrobe, useRemoveWardrobeItem, useUpdateWardrobeItem } from "@/lib/database";
 import { colors, typography, spacing, components, borderRadius, cards, shadows, button } from "@/lib/design-tokens";
@@ -523,7 +524,7 @@ export default function WardrobeItemScreen() {
                 }}
               >
                 {/* Thumbnail - tappable to open photo viewer */}
-                {item.imageUri && (
+                {item.imageUri ? (
                   <Pressable
                     onPress={(e) => {
                       e.stopPropagation();
@@ -537,6 +538,8 @@ export default function WardrobeItemScreen() {
                       contentFit="cover"
                     />
                   </Pressable>
+                ) : (
+                  <ThumbnailPlaceholderImage size={spacing.xxl + spacing.md - 4} />
                 )}
                 {/* Title */}
                 <View style={{ flex: 1, marginLeft: 12 }}>

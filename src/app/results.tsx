@@ -29,7 +29,6 @@ import {
   Bookmark,
   BookmarkCheck,
   Lightbulb,
-  Shirt,
   Layers,
   Package,
   ShoppingBag,
@@ -48,6 +47,7 @@ import {
   ChevronDown,
   Lock,
 } from "lucide-react-native";
+import { ThumbnailPlaceholderImage } from "@/components/PlaceholderImage";
 
 import { useSnapToMatchStore } from "@/lib/store";
 import { filterModeABullets } from "@/lib/mode-a-bullet-filter";
@@ -556,19 +556,10 @@ function MatchesBottomSheet({
                       />
                     </Pressable>
                   ) : (
-                    <View
-                      style={{
-                        width: spacing.xl - 4,
-                        height: spacing.xl - 4,
-                        borderRadius: borderRadius.image,
-                        backgroundColor: colors.accent.terracottaLight,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        marginRight: spacing.sm,
-                      }}
-                    >
-                      <Shirt size={18} color={colors.accent.terracotta} strokeWidth={1.75} />
-                    </View>
+                    <ThumbnailPlaceholderImage
+                      size={spacing.xl - 4}
+                      style={{ marginRight: spacing.sm }}
+                    />
                   )}
                   <View style={{ flex: 1 }}>
                     <Text
@@ -642,19 +633,10 @@ function MatchesBottomSheet({
                             />
                           </Pressable>
                         ) : (
-                          <View
-                            style={{
-                              width: spacing.xl - 4,
-                              height: spacing.xl - 4,
-                              borderRadius: borderRadius.image,
-                              backgroundColor: colors.accent.terracottaLight,
-                              alignItems: "center",
-                              justifyContent: "center",
-                              marginRight: spacing.sm,
-                            }}
-                          >
-                            <Shirt size={spacing.md + 2} color={colors.accent.terracotta} strokeWidth={1.75} />
-                          </View>
+                          <ThumbnailPlaceholderImage
+                            size={spacing.xl - 4}
+                            style={{ marginRight: spacing.sm }}
+                          />
                         )}
 
                         {/* Title and subtitle - separate pressable */}
@@ -2253,18 +2235,7 @@ export default function ResultsScreen() {
                   }}
                 >
                   {scannedItemImageError ? (
-                    <View
-                      style={{
-                        width: spacing.xxl + spacing.md - 4,
-                        height: spacing.xxl + spacing.md - 4,
-                        borderRadius: borderRadius.image,
-                        backgroundColor: colors.bg.elevated,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Shirt size={24} color={colors.text.tertiary} />
-                    </View>
+                    <ThumbnailPlaceholderImage size={spacing.xxl + spacing.md - 4} />
                   ) : (
                     <Image
                       source={{ uri: resolvedImageUri }}
@@ -2353,18 +2324,10 @@ export default function ResultsScreen() {
                 }}
               >
                 {scannedItemImageError ? (
-                  <View
-                    style={{
-                      width: spacing.xxl * 2 - spacing.xs,
-                      height: spacing.xxl * 2 + spacing.lg + spacing.xs / 2,
-                      borderRadius: borderRadius.image,
-                      backgroundColor: colors.bg.elevated,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Shirt size={32} color={colors.text.tertiary} />
-                  </View>
+                  <ThumbnailPlaceholderImage 
+                    size={spacing.xxl * 2 - spacing.xs}
+                    style={{ height: spacing.xxl * 2 + spacing.lg + spacing.xs / 2 }}
+                  />
                 ) : (
                   <Image
                     source={{ uri: resolvedImageUri }}
@@ -2699,18 +2662,7 @@ width: spacing.xs / 2,
                   }}
                 >
                   {scannedItemImageError ? (
-                    <View
-                      style={{
-                        width: spacing.xxl + spacing.md - 4,
-                        height: spacing.xxl + spacing.md - 4,
-                        borderRadius: borderRadius.image,
-                        backgroundColor: colors.bg.elevated,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Shirt size={24} color={colors.text.tertiary} />
-                    </View>
+                    <ThumbnailPlaceholderImage size={spacing.xxl + spacing.md - 4} />
                   ) : (
                     <Image
                       source={{ uri: resolvedImageUri }}

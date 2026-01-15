@@ -19,7 +19,8 @@ import Animated, {
   FadeOut,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import { Shirt, Bookmark, CloudUpload, RefreshCw } from "lucide-react-native";
+import { Bookmark, CloudUpload, RefreshCw } from "lucide-react-native";
+import { GridPlaceholderImage } from "@/components/PlaceholderImage";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useRecentChecks, useRemoveRecentCheck, useWardrobe } from "@/lib/database";
@@ -105,17 +106,7 @@ function SavedCheckGridItem({
             contentFit="cover"
           />
         ) : (
-          <View
-            style={{
-              width: "100%",
-              height: "100%",
-              backgroundColor: colors.accent.terracottaLight,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Shirt size={48} color={colors.accent.terracotta} strokeWidth={1.5} />
-          </View>
+          <GridPlaceholderImage />
         )}
 
         {/* Gradient overlay */}
