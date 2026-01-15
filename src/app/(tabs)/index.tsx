@@ -32,6 +32,7 @@ import {
   Sparkles,
   Puzzle,
   CloudUpload,
+  RefreshCw,
 } from "lucide-react-native";
 import Clipboard from "@react-native-clipboard/clipboard";
 
@@ -698,6 +699,40 @@ function RecentCheckListItem({
           </View>
         )}
 
+        {/* Sync status indicator - based on queue state */}
+        {(hasPendingUpload(check.id) || isUploadFailed(check.id)) && (
+          <View
+            style={{
+              position: "absolute",
+              top: spacing.sm,
+              right: spacing.sm,
+              backgroundColor: isUploadFailed(check.id) ? colors.status.error : colors.overlay.dark,
+              borderRadius: borderRadius.pill,
+              paddingVertical: spacing.xs,
+              paddingHorizontal: spacing.sm,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing.xs / 2,
+            }}
+          >
+            {isUploadFailed(check.id) ? (
+              <>
+                <RefreshCw size={12} color={colors.text.inverse} strokeWidth={2} />
+                <Text style={{ ...typography.ui.caption, color: colors.text.inverse, fontFamily: typography.fontFamily.medium }}>
+                  Retry
+                </Text>
+              </>
+            ) : (
+              <>
+                <CloudUpload size={12} color={colors.text.inverse} strokeWidth={2} />
+                <Text style={{ ...typography.ui.caption, color: colors.text.inverse, fontFamily: typography.fontFamily.medium }}>
+                  Syncing
+                </Text>
+              </>
+            )}
+          </View>
+        )}
+
         {/* Gradient overlay */}
         <LinearGradient
           colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.7)"]}
@@ -1143,19 +1178,37 @@ export default function HomeScreen() {
                         <Shirt size={48} color={colors.text.tertiary} />
                       </View>
                     )}
-                    {/* Sync pending indicator - based on queue state */}
+                    {/* Sync status indicator - based on queue state */}
                     {(hasPendingUpload(item.id) || isUploadFailed(item.id)) && (
                       <View
                         style={{
                           position: "absolute",
-                          top: spacing.xs,
-                          right: spacing.xs,
+                          top: spacing.sm,
+                          right: spacing.sm,
                           backgroundColor: isUploadFailed(item.id) ? colors.status.error : colors.overlay.dark,
                           borderRadius: borderRadius.pill,
-                          padding: spacing.xs / 2,
+                          paddingVertical: spacing.xs,
+                          paddingHorizontal: spacing.sm,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: spacing.xs / 2,
                         }}
                       >
-                        <CloudUpload size={10} color={colors.text.inverse} strokeWidth={2} />
+                        {isUploadFailed(item.id) ? (
+                          <>
+                            <RefreshCw size={12} color={colors.text.inverse} strokeWidth={2} />
+                            <Text style={{ ...typography.ui.caption, color: colors.text.inverse, fontFamily: typography.fontFamily.medium }}>
+                              Retry
+                            </Text>
+                          </>
+                        ) : (
+                          <>
+                            <CloudUpload size={12} color={colors.text.inverse} strokeWidth={2} />
+                            <Text style={{ ...typography.ui.caption, color: colors.text.inverse, fontFamily: typography.fontFamily.medium }}>
+                              Syncing
+                            </Text>
+                          </>
+                        )}
                       </View>
                     )}
                   </Pressable>

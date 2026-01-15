@@ -12,9 +12,10 @@ import Animated, {
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import Clipboard from "@react-native-clipboard/clipboard";
-import { ArrowLeft, Shirt, Clock, Copy, X } from "lucide-react-native";
+import { ArrowLeft, Shirt, Clock, Copy, X, CloudUpload, RefreshCw } from "lucide-react-native";
 
 import { useRecentChecks, useRemoveRecentCheck, SCAN_RETENTION, useWardrobe } from "@/lib/database";
+import { hasPendingUpload, isUploadFailed } from "@/lib/storage";
 import { colors, typography, spacing, borderRadius, cards, shadows, button } from "@/lib/design-tokens";
 import { getTextStyle } from "@/lib/typography-helpers";
 import { OutcomeState, RecentCheck } from "@/lib/types";
@@ -96,6 +97,40 @@ function CheckGridItem({
             }}
           >
             <Shirt size={48} color={colors.accent.terracotta} strokeWidth={1.5} />
+          </View>
+        )}
+
+        {/* Sync status indicator - based on queue state */}
+        {(hasPendingUpload(check.id) || isUploadFailed(check.id)) && (
+          <View
+            style={{
+              position: "absolute",
+              top: spacing.sm,
+              right: spacing.sm,
+              backgroundColor: isUploadFailed(check.id) ? colors.status.error : colors.overlay.dark,
+              borderRadius: borderRadius.pill,
+              paddingVertical: spacing.xs,
+              paddingHorizontal: spacing.sm,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing.xs / 2,
+            }}
+          >
+            {isUploadFailed(check.id) ? (
+              <>
+                <RefreshCw size={12} color={colors.text.inverse} strokeWidth={2} />
+                <Text style={{ ...typography.ui.caption, color: colors.text.inverse, fontFamily: typography.fontFamily.medium }}>
+                  Retry
+                </Text>
+              </>
+            ) : (
+              <>
+                <CloudUpload size={12} color={colors.text.inverse} strokeWidth={2} />
+                <Text style={{ ...typography.ui.caption, color: colors.text.inverse, fontFamily: typography.fontFamily.medium }}>
+                  Syncing
+                </Text>
+              </>
+            )}
           </View>
         )}
 

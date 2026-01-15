@@ -11,6 +11,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Animated, {
   FadeIn,
@@ -536,6 +537,14 @@ export default function WardrobeScreen() {
       return () => clearTimeout(timeout);
     }
   }, [showToast]);
+
+  // Refetch data when tab gains focus (ensures fresh data after app restart)
+  useFocusEffect(
+    useCallback(() => {
+      // Invalidate to get fresh data with updated image URIs
+      queryClient.invalidateQueries({ queryKey: ["wardrobe", user?.id] });
+    }, [queryClient, user?.id])
+  );
 
   // Load saved filter selection on mount
   useEffect(() => {

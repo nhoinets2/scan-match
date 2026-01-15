@@ -192,7 +192,8 @@ export async function updateRecentCheckImageUriGuarded(params: {
     .select("id");
 
   if (error) {
-    console.error('[Database] Failed to update scan image URI:', error);
+    // Use warn to avoid triggering error overlay - RLS errors are expected in some cases
+    console.warn('[Database] Failed to update scan image URI:', error);
     throw error;
   }
   

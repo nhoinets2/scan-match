@@ -781,15 +781,7 @@ export default function ResultsScreen() {
   const [showStoreSheet, setShowStoreSheet] = useState(false);
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
-  const isSavingRef = useRef(false);
   const lastSaveTimestampRef = useRef(0);
-  
-  // Reset saving ref on unmount
-  useEffect(() => {
-    return () => {
-      isSavingRef.current = false;
-    };
-  }, []);
   
   // Get current outcome for syncing saved state
   const currentOutcome = useMemo(() => {
@@ -1670,60 +1662,44 @@ export default function ResultsScreen() {
   };
 
   const handleToggleSave = () => {
-    // Triple protection against rapid taps:
-    // 1. Timestamp-based debounce (300ms)
-    // 2. Ref flag
-    // 3. Mutation pending state
+    // Debounce rapid taps (300ms minimum between taps)
     const now = Date.now();
     if (now - lastSaveTimestampRef.current < 300) {
       return;
     }
     
-    if (isSavingRef.current || updateRecentCheckOutcomeMutation.isPending) {
-      return;
-    }
-    
     lastSaveTimestampRef.current = now;
-    isSavingRef.current = true;
     
-    // Toggle between saved and unsaved
+    // Toggle between saved and unsaved based on current visual state
     if (isSaved) {
       // Unsave: restore original outcome
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setIsSaved(false); // Immediate visual feedback
+      
       const originalOutcome = getOriginalOutcome();
       
       if (currentScan && !isViewingSavedCheck && currentCheckId) {
         updateRecentCheckOutcomeMutation.mutate(
-          { id: currentCheckId, outcome: originalOutcome },
-          { 
-            onSettled: () => { 
-              isSavingRef.current = false; 
-            }
-          }
+          { id: currentCheckId, outcome: originalOutcome }
         );
-        setIsSaved(false);
       } else if (isViewingSavedCheck && checkId) {
         updateRecentCheckOutcomeMutation.mutate(
-          { id: checkId, outcome: originalOutcome },
-          { 
-            onSettled: () => { 
-              isSavingRef.current = false; 
-            }
-          }
+          { id: checkId, outcome: originalOutcome }
         );
-        setIsSaved(false);
-      } else {
-        isSavingRef.current = false;
       }
     } else {
       // Save
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
-      // Helper to perform save with local storage + cloud upload
+      // Immediate visual feedback
+      setIsSaved(true);
+      setShowScanSavedToast(true);
+      setTimeout(() => setShowScanSavedToast(false), 2000);
+      
+      // Helper to perform save with local storage + cloud upload (runs in background)
       const performSave = async (id: string, currentImageUri: string) => {
         if (!user?.id) {
           console.error('[Save] No user ID, cannot save');
-          isSavingRef.current = false;
           return;
         }
         
@@ -1748,19 +1724,12 @@ export default function ResultsScreen() {
                   // Non-fatal: scan is saved locally, upload will retry
                 }
               },
-              onSettled: () => { 
-                isSavingRef.current = false; 
-              }
             }
           );
-          
-          setIsSaved(true);
-          setShowScanSavedToast(true);
-          setTimeout(() => setShowScanSavedToast(false), 2000);
         } catch (error) {
           console.error('[Save] Failed to save scan:', error);
-          isSavingRef.current = false;
-          // Could show error toast here
+          // Revert visual state on error
+          setIsSaved(false);
         }
       };
       
@@ -1768,8 +1737,6 @@ export default function ResultsScreen() {
         void performSave(currentCheckId, currentScan.imageUri);
       } else if (isViewingSavedCheck && checkId && savedCheck) {
         void performSave(checkId, savedCheck.imageUri);
-      } else {
-        isSavingRef.current = false;
       }
     }
   };

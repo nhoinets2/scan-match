@@ -17,11 +17,12 @@ import { useColorScheme } from "@/lib/useColorScheme";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
-import { AuthProvider } from "@/lib/auth-context";
+import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { AuthGuard } from "@/components/AuthGuard";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { colors } from "@/lib/design-tokens";
 import { initializeBackgroundUploads } from "@/lib/storage";
+import { useRef } from "react";
 
 export const unstable_settings = {
   initialRouteName: "login",
@@ -31,6 +32,30 @@ export const unstable_settings = {
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
+/**
+ * Initializes background uploads only after auth is ready.
+ * This prevents RLS errors when the app is killed and reopened
+ * (uploads would start before auth session is restored).
+ */
+function BackgroundUploadInitializer() {
+  const { user, isLoading } = useAuth();
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    // Wait for auth to finish loading
+    if (isLoading) return;
+    
+    // Only initialize once, and only if user is authenticated
+    if (!initialized.current && user) {
+      initialized.current = true;
+      console.log("[BackgroundUpload] Auth ready, initializing upload queue...");
+      void initializeBackgroundUploads();
+    }
+  }, [isLoading, user]);
+
+  return null; // This component renders nothing
+}
 
 // Custom light theme for Scan & Match - using design tokens
 const ScanMatchLightTheme = {
@@ -168,12 +193,6 @@ export default function RootLayout() {
     BodoniModa_700Bold,
   });
 
-  // Initialize background upload queue (runs once on app start)
-  useEffect(() => {
-    console.log("[BackgroundUpload] Initializing upload queue...");
-    void initializeBackgroundUploads();
-  }, []);
-
   // Hide splash screen when fonts are loaded
   useEffect(() => {
     if (fontsLoaded) {
@@ -200,6 +219,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <BackgroundUploadInitializer />
         <GestureHandlerRootView style={{ flex: 1 }}>
           <KeyboardProvider>
             <StatusBar style="dark" />

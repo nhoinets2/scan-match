@@ -11,6 +11,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -18,7 +19,7 @@ import Animated, {
   FadeOut,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import { Shirt, Bookmark, Cloud, RefreshCw } from "lucide-react-native";
+import { Shirt, Bookmark, CloudUpload, RefreshCw } from "lucide-react-native";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useRecentChecks, useRemoveRecentCheck, useWardrobe } from "@/lib/database";
@@ -137,16 +138,16 @@ function SavedCheckGridItem({
               top: spacing.sm,
               right: spacing.sm,
               backgroundColor: colors.overlay.dark,
+              paddingVertical: spacing.xs,
               paddingHorizontal: spacing.sm,
-              paddingVertical: spacing.xs / 2,
               borderRadius: borderRadius.pill,
               flexDirection: "row",
               alignItems: "center",
               gap: spacing.xs / 2,
             }}
           >
-            <Cloud size={10} color={colors.text.inverse} strokeWidth={2} />
-            <Text style={{ ...typography.ui.caption, color: colors.text.inverse, fontSize: 10 }}>
+            <CloudUpload size={12} color={colors.text.inverse} strokeWidth={2} />
+            <Text style={{ ...typography.ui.caption, color: colors.text.inverse, fontFamily: typography.fontFamily.medium }}>
               Syncing
             </Text>
           </View>
@@ -158,16 +159,16 @@ function SavedCheckGridItem({
               top: spacing.sm,
               right: spacing.sm,
               backgroundColor: syncStatus === 'retrying' ? colors.overlay.dark : colors.status.error,
+              paddingVertical: spacing.xs,
               paddingHorizontal: spacing.sm,
-              paddingVertical: spacing.xs / 2,
               borderRadius: borderRadius.pill,
               flexDirection: "row",
               alignItems: "center",
               gap: spacing.xs / 2,
             }}
           >
-            <RefreshCw size={10} color={colors.text.inverse} strokeWidth={2} />
-            <Text style={{ ...typography.ui.caption, color: colors.text.inverse, fontSize: 10 }}>
+            <RefreshCw size={12} color={colors.text.inverse} strokeWidth={2} />
+            <Text style={{ ...typography.ui.caption, color: colors.text.inverse, fontFamily: typography.fontFamily.medium }}>
               {syncStatus === 'retrying' ? 'Retrying…' : 'Retry'}
             </Text>
           </View>
@@ -424,6 +425,14 @@ export default function SavedChecksScreen() {
       return () => clearTimeout(timeout);
     }
   }, [showToast]);
+
+  // Refetch data when tab gains focus (ensures fresh data after app restart)
+  useFocusEffect(
+    useCallback(() => {
+      // Invalidate to get fresh data with updated image URIs
+      queryClient.invalidateQueries({ queryKey: ["recentChecks", user?.id] });
+    }, [queryClient, user?.id])
+  );
 
   // Filter to show only saved checks (outcome = "saved_to_revisit")
   const savedChecks = recentChecks.filter(
