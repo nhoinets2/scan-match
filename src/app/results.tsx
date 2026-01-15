@@ -29,6 +29,7 @@ import {
   Bookmark,
   BookmarkCheck,
   Lightbulb,
+  Shirt,
   Layers,
   Package,
   ShoppingBag,

@@ -24,6 +24,7 @@ import {
   Plus,
   ChevronRight,
   Clock,
+  Shirt,
   User,
   Check,
   X,
