@@ -1,35 +1,47 @@
 import React from "react";
 import { View, StyleSheet, ViewStyle } from "react-native";
 import { ImageOff } from "lucide-react-native";
-import Svg, { Line, Defs, Pattern, Rect } from "react-native-svg";
 import { colors, borderRadius } from "@/lib/design-tokens";
 
 /**
- * Diagonal stripe pattern background
+ * Diagonal stripe pattern background using View elements
+ * More reliable than SVG patterns in React Native
  */
-function DiagonalStripes({ color = colors.border.subtle }: { color?: string }) {
+function DiagonalStripes({ 
+  stripeColor = colors.border.subtle,
+  stripeWidth = 1,
+  spacing = 8,
+}: { 
+  stripeColor?: string;
+  stripeWidth?: number;
+  spacing?: number;
+}) {
+  // Create multiple stripe lines
+  const stripes = [];
+  const numStripes = 40; // Enough to cover typical card sizes
+  
+  for (let i = 0; i < numStripes; i++) {
+    stripes.push(
+      <View
+        key={i}
+        style={{
+          position: "absolute",
+          width: stripeWidth,
+          height: 500, // Long enough to cover diagonal
+          backgroundColor: stripeColor,
+          left: i * spacing,
+          top: -100,
+          transform: [{ rotate: "45deg" }],
+          opacity: 0.4,
+        }}
+      />
+    );
+  }
+
   return (
-    <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
-      <Defs>
-        <Pattern
-          id="diagonalStripes"
-          patternUnits="userSpaceOnUse"
-          width="8"
-          height="8"
-          patternTransform="rotate(45)"
-        >
-          <Line
-            x1="0"
-            y1="0"
-            x2="0"
-            y2="8"
-            stroke={color}
-            strokeWidth="1"
-          />
-        </Pattern>
-      </Defs>
-      <Rect width="100%" height="100%" fill="url(#diagonalStripes)" />
-    </Svg>
+    <View style={[StyleSheet.absoluteFill, { overflow: "hidden" }]}>
+      {stripes}
+    </View>
   );
 }
 
