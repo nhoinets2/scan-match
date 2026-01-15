@@ -20,7 +20,9 @@ import Animated, {
 import * as Haptics from "expo-haptics";
 import { Shirt, Bookmark, Cloud, RefreshCw } from "lucide-react-native";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useRecentChecks, useRemoveRecentCheck, useWardrobe } from "@/lib/database";
+import { useAuth } from "@/lib/auth-context";
 import { colors, spacing, typography, borderRadius, cards, shadows, button } from "@/lib/design-tokens";
 import { getTextStyle } from "@/lib/typography-helpers";
 import { RecentCheck } from "@/lib/types";
@@ -404,6 +406,8 @@ function EmptyState() {
 
 export default function SavedChecksScreen() {
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { data: recentChecks = [] } = useRecentChecks();
   const removeRecentCheckMutation = useRemoveRecentCheck();
   const [itemToDelete, setItemToDelete] = useState<RecentCheck | null>(null);
@@ -443,13 +447,15 @@ export default function SavedChecksScreen() {
    */
   const runOrphanSweep = useCallback(() => {
     if (hasSweepedRef.current) return;
-    if (savedChecks.length === 0) return;
     
     // Skip if uploads are still in progress
     if (hasAnyPendingUploads('scan')) {
       console.log('[Looks] Skipping orphan sweep - uploads in progress');
       return;
     }
+    
+    // Note: We run even if savedChecks.length === 0
+    // There could be orphan files from previously deleted scans
     
     hasSweepedRef.current = true;
     console.log('[Looks] Running orphan sweep');
@@ -498,7 +504,11 @@ export default function SavedChecksScreen() {
         }
         // Debounce: wait 300ms before triggering (coalesces multiple idle events)
         sweepDebounceTimer.current = setTimeout(() => {
-          console.log('[Looks] Queue became idle, triggering sweep');
+          console.log('[Looks] Queue became idle, triggering sweep + cache refresh');
+          
+          // Invalidate cache so UI gets fresh data with cloud URLs
+          void queryClient.invalidateQueries({ queryKey: ["recentChecks", user?.id] });
+          
           runOrphanSweep();
         }, 300);
       }
@@ -509,7 +519,7 @@ export default function SavedChecksScreen() {
         clearTimeout(sweepDebounceTimer.current);
       }
     };
-  }, [runOrphanSweep]);
+  }, [runOrphanSweep, queryClient, user?.id]);
   
   // Get sync status for a check
   const getSyncStatus = (check: RecentCheck): 'synced' | 'syncing' | 'failed' | 'retrying' => {

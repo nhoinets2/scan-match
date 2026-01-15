@@ -803,7 +803,13 @@ export default function ResultsScreen() {
   }, [isViewingSavedCheck, savedCheck, currentCheckId, recentChecks]);
   
   // Sync isSaved state with database outcome
+  // BUT: skip if we just initiated a save (prevents cache refetch from resetting state)
   useEffect(() => {
+    const timeSinceLastSave = Date.now() - lastSaveTimestampRef.current;
+    // Skip sync for 5 seconds after user-initiated save to prevent race with cache invalidation
+    if (lastSaveTimestampRef.current > 0 && timeSinceLastSave < 5000) {
+      return;
+    }
     setIsSaved(currentOutcome === "saved_to_revisit");
   }, [currentOutcome]);
   

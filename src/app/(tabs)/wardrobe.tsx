@@ -21,7 +21,9 @@ import Animated, {
 import * as Haptics from "expo-haptics";
 import { Shirt, Camera, CloudUpload, RefreshCw } from "lucide-react-native";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useWardrobe, useRemoveWardrobeItem } from "@/lib/database";
+import { useAuth } from "@/lib/auth-context";
 import { colors, spacing, typography, borderRadius, cards, shadows, button } from "@/lib/design-tokens";
 import { getTextStyle } from "@/lib/typography-helpers";
 import { WardrobeItem, CATEGORIES, Category } from "@/lib/types";
@@ -516,6 +518,8 @@ function SuccessToast({
 
 export default function WardrobeScreen() {
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { data: wardrobe = [] } = useWardrobe();
   const removeWardrobeItemMutation = useRemoveWardrobeItem();
   const [selectedFilters, setSelectedFilters] = useState<(Category | "all")[]>(["all"]); // multi-select filter state
@@ -603,7 +607,9 @@ export default function WardrobeScreen() {
    */
   const runOrphanSweep = useCallback(() => {
     if (hasRunOrphanSweep.current) return;
-    if (wardrobe.length === 0) return;
+    
+    // Note: We run even if wardrobe.length === 0
+    // There could be orphan files from previously deleted items
     
     // Skip if uploads are still in progress
     if (hasAnyPendingUploads('wardrobe')) {
@@ -652,7 +658,11 @@ export default function WardrobeScreen() {
         }
         // Debounce: wait 300ms before triggering (coalesces multiple idle events)
         sweepDebounceTimer.current = setTimeout(() => {
-          console.log('[Wardrobe] Queue became idle, triggering sweep');
+          console.log('[Wardrobe] Queue became idle, triggering sweep + cache refresh');
+          
+          // Invalidate cache so UI gets fresh data with cloud URLs
+          void queryClient.invalidateQueries({ queryKey: ["wardrobe", user?.id] });
+          
           runOrphanSweep();
         }, 300);
       }
@@ -663,7 +673,7 @@ export default function WardrobeScreen() {
         clearTimeout(sweepDebounceTimer.current);
       }
     };
-  }, [runOrphanSweep]);
+  }, [runOrphanSweep, queryClient, user?.id]);
 
   // Reset filters to "all" when wardrobe becomes empty
   // This prevents the bug where a newly added first item is filtered out by stale filters

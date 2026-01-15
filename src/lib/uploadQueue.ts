@@ -149,6 +149,10 @@ export async function enqueueUpload(job: Omit<UploadJob, 'attempts' | 'createdAt
   await persistQueue();
   console.log('[UploadQueue] Queue size:', queue.length);
   
+  // Update state tracking: we now have jobs for this kind
+  // This is needed so checkAndEmitIdleEvents can detect the transition to idle later
+  previousQueueStateByKind[job.kind] = true;
+  
   // Telemetry
   logUploadEvent('upload_enqueued', job.id, { kind: job.kind });
   
@@ -261,7 +265,8 @@ export async function processQueue(processFn: (job: UploadJob) => Promise<void>)
         await persistQueue();
       } catch (e: unknown) {
         const errorMessage = e instanceof Error ? e.message : String(e);
-        console.error('[UploadQueue] Upload failed for:', jobId, errorMessage);
+        // Use warn instead of error to avoid triggering error overlay in dev
+        console.warn('[UploadQueue] Upload failed for:', jobId, errorMessage);
         
         // Calculate next retry delay with exponential backoff
         const delayIndex = Math.min(job.attempts, RETRY_DELAYS_MS.length - 1);
