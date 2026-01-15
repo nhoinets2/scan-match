@@ -1941,7 +1941,7 @@ export default function ResultsScreen() {
 
           {/* Actions */}
           <ButtonPrimary
-            label="Scan Something Else"
+            label="Try Another Photo"
             onPress={() => {
               clearScan();
               router.replace("/scan");

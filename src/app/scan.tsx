@@ -565,6 +565,7 @@ export default function ScanScreen() {
         scannedAt: Date.now(),
         itemSignals: analysis.itemSignals,
         contextSufficient: analysis.contextSufficient,
+        isFashionItem: analysis.isFashionItem,
       };
 
       setScannedItem(scannedItem);

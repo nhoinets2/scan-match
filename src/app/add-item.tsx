@@ -37,6 +37,7 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
+  AlertTriangle,
   HelpCircle,
   Pencil,
 } from "lucide-react-native";
@@ -1290,7 +1291,7 @@ export default function AddItemScreen() {
               marginBottom: spacing.lg,
             }}
           >
-            <AlertCircle size={32} color={colors.accent.terracotta} strokeWidth={1.5} />
+            <AlertTriangle size={32} color={colors.accent.terracotta} strokeWidth={1.5} />
           </View>
 
           {/* Title */}
@@ -1314,7 +1315,7 @@ export default function AddItemScreen() {
               marginBottom: spacing.xl,
             }}
           >
-            This doesn't look like clothing, shoes, a bag, or an accessory. Try photographing something wearable.
+            This doesn't look like clothing, shoes, a bag, or an accessory. Try scanning something wearable.
           </Text>
 
           {/* Label (if available) */}
@@ -1343,7 +1344,7 @@ export default function AddItemScreen() {
             style={{ width: "100%", marginBottom: spacing.md }}
           />
           <ButtonTertiary
-            label="Cancel"
+            label="Go Back"
             onPress={handleClose}
           />
         </View>
@@ -1477,7 +1478,7 @@ export default function AddItemScreen() {
             style={{ width: "100%", marginBottom: spacing.md }}
           />
           <ButtonTertiary
-            label="Cancel"
+            label="Go Back"
             onPress={handleClose}
           />
         </View>
