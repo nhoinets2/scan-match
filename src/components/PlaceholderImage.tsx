@@ -1,10 +1,37 @@
 import React from "react";
 import { View, StyleSheet, ViewStyle } from "react-native";
-import { Image } from "expo-image";
+import { ImageOff } from "lucide-react-native";
+import Svg, { Line, Defs, Pattern, Rect } from "react-native-svg";
 import { colors, borderRadius } from "@/lib/design-tokens";
 
-// The placeholder image asset
-const PLACEHOLDER_IMAGE = require("../../assets/icons/empty_state_image/no_image_state.webp");
+/**
+ * Diagonal stripe pattern background
+ */
+function DiagonalStripes({ color = colors.border.subtle }: { color?: string }) {
+  return (
+    <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+      <Defs>
+        <Pattern
+          id="diagonalStripes"
+          patternUnits="userSpaceOnUse"
+          width="8"
+          height="8"
+          patternTransform="rotate(45)"
+        >
+          <Line
+            x1="0"
+            y1="0"
+            x2="0"
+            y2="8"
+            stroke={color}
+            strokeWidth="1"
+          />
+        </Pattern>
+      </Defs>
+      <Rect width="100%" height="100%" fill="url(#diagonalStripes)" />
+    </Svg>
+  );
+}
 
 interface PlaceholderImageProps {
   /**
@@ -30,8 +57,8 @@ interface PlaceholderImageProps {
 }
 
 /**
- * A reusable placeholder image component for when item images are not available.
- * Uses the no_image_state.webp asset.
+ * A reusable placeholder component for when item images are not available.
+ * Shows a diagonal stripe pattern with an ImageOff icon.
  */
 export function PlaceholderImage({
   width,
@@ -51,19 +78,15 @@ export function PlaceholderImage({
     ...style,
   };
 
-  // Calculate image size - slightly smaller than container for padding effect
-  const imageSize = typeof width === "number" ? Math.min(width * 0.5, 64) : 64;
+  const iconSize = typeof width === "number" ? Math.min(width * 0.3, 32) : 32;
 
   return (
     <View style={containerStyle}>
-      <Image
-        source={PLACEHOLDER_IMAGE}
-        style={{
-          width: imageSize,
-          height: imageSize,
-          opacity: 0.6,
-        }}
-        contentFit="contain"
+      <DiagonalStripes />
+      <ImageOff
+        size={iconSize}
+        color={colors.text.tertiary}
+        strokeWidth={1.5}
       />
     </View>
   );
@@ -79,10 +102,11 @@ export function GridPlaceholderImage({
 }) {
   return (
     <View style={[styles.gridContainer, style]}>
-      <Image
-        source={PLACEHOLDER_IMAGE}
-        style={styles.gridImage}
-        contentFit="contain"
+      <DiagonalStripes />
+      <ImageOff
+        size={40}
+        color={colors.text.tertiary}
+        strokeWidth={1.5}
       />
     </View>
   );
@@ -100,6 +124,8 @@ export function ThumbnailPlaceholderImage({
   borderRadius?: number;
   style?: ViewStyle;
 }) {
+  const iconSize = Math.max(size * 0.4, 16);
+  
   return (
     <View
       style={[
@@ -115,14 +141,11 @@ export function ThumbnailPlaceholderImage({
         style,
       ]}
     >
-      <Image
-        source={PLACEHOLDER_IMAGE}
-        style={{
-          width: size * 0.6,
-          height: size * 0.6,
-          opacity: 0.6,
-        }}
-        contentFit="contain"
+      <DiagonalStripes />
+      <ImageOff
+        size={iconSize}
+        color={colors.text.tertiary}
+        strokeWidth={1.5}
       />
     </View>
   );
@@ -136,11 +159,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  gridImage: {
-    width: 64,
-    height: 64,
-    opacity: 0.6,
-  },
 });
-
-export { PLACEHOLDER_IMAGE };
