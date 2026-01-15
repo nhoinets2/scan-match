@@ -402,6 +402,9 @@ function MatchesBottomSheet({
   const insets = useSafeAreaInsets();
   // Internal state for viewing images - no external modal needed
   const [viewingImageUri, setViewingImageUri] = useState<string | null>(null);
+  // Track image load errors
+  const [scannedImageError, setScannedImageError] = useState(false);
+  const [itemImageErrors, setItemImageErrors] = useState<Record<string, boolean>>({});
 
   const getCategoryLabel = (category: Category): string => {
     const categoryObj = CATEGORIES.find((c) => c.id === category);
@@ -413,10 +416,12 @@ function MatchesBottomSheet({
     return getMatchExplanation(itemId ?? "", wardrobeLabel, matchType);
   };
 
-  // Reset viewing image when modal closes
+  // Reset state when modal closes
   useEffect(() => {
     if (!visible) {
       setViewingImageUri(null);
+      setScannedImageError(false);
+      setItemImageErrors({});
     }
   }, [visible]);
 
@@ -535,7 +540,7 @@ function MatchesBottomSheet({
                     alignItems: "center",
                   }}
                 >
-                  {scannedItemImageUri ? (
+                  {scannedItemImageUri && !scannedImageError ? (
                     <Pressable
                       onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -554,6 +559,7 @@ function MatchesBottomSheet({
                         source={{ uri: scannedItemImageUri }}
                         style={{ width: spacing.xl - 4, height: spacing.xl - 4 }}
                         contentFit="cover"
+                        onError={() => setScannedImageError(true)}
                       />
                     </Pressable>
                   ) : (
@@ -609,7 +615,7 @@ function MatchesBottomSheet({
                         }}
                       >
                         {/* Thumbnail or icon - separate pressable */}
-                        {item.imageUri ? (
+                        {item.imageUri && !itemImageErrors[item.id] ? (
                           <Pressable
                             onPress={() => {
                               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -631,6 +637,7 @@ function MatchesBottomSheet({
                               source={{ uri: item.imageUri }}
                               style={{ width: spacing.xl - 4, height: spacing.xl - 4 }}
                               contentFit="cover"
+                              onError={() => setItemImageErrors(prev => ({ ...prev, [item.id]: true }))}
                             />
                           </Pressable>
                         ) : (
