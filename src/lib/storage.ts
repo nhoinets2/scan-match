@@ -631,12 +631,22 @@ async function cleanupItemStorage(
   
   // 2) Delete local file if it's local
   if (imageUri?.startsWith('file://')) {
-    try {
-      await FileSystem.deleteAsync(imageUri, { idempotent: true });
-      console.log('[Storage] Deleted local file:', imageUri);
-    } catch (error) {
-      console.error('[Storage] Failed to delete local file:', error);
-      // Don't throw - cleanup failure shouldn't block deletion
+    // Sanitize URI - reject if it contains path traversal or invalid characters
+    const hasPathTraversal = imageUri.includes('..') || imageUri.includes('/./');
+    const isValidFileUri = /^file:\/\/[^?#]+\.(jpg|jpeg|png|gif|webp|heic)$/i.test(imageUri);
+
+    if (hasPathTraversal) {
+      console.warn('[Storage] Skipping delete - URI contains path traversal:', imageUri);
+    } else if (!isValidFileUri) {
+      console.warn('[Storage] Skipping delete - Invalid file URI format:', imageUri);
+    } else {
+      try {
+        await FileSystem.deleteAsync(imageUri, { idempotent: true });
+        console.log('[Storage] Deleted local file:', imageUri);
+      } catch (error) {
+        console.error('[Storage] Failed to delete local file:', error);
+        // Don't throw - cleanup failure shouldn't block deletion
+      }
     }
   }
   
