@@ -172,6 +172,7 @@ export const LIBRARY_BY_CATEGORY: Record<Category, LibraryItemMeta[]> = {
   accessories: [],
   dresses: [],
   skirts: [],
+  unknown: [],
 };
 
 // Helper to get item by ID across all categories

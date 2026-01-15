@@ -49,6 +49,60 @@ import {
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_VIBECODE_OPENAI_API_KEY;
 
 // ============================================
+// NON-FASHION ITEM DETECTION (FALLBACK)
+// ============================================
+
+/**
+ * Keywords indicating the image is NOT a fashion item.
+ * Used as fallback when AI response is missing isFashionItem or when
+ * the model "guesses" fashion for an ambiguous image.
+ */
+const NON_FASHION_KEYWORDS = [
+  // Kitchenware
+  "mug", "cup", "glass", "plate", "bowl", "bottle", "jar", "pot", "pan",
+  // Electronics
+  "phone", "iphone", "android", "laptop", "keyboard", "mouse", "monitor", "screen",
+  "tv", "television", "remote", "camera", "tablet", "computer", "charger", "cable",
+  // Food & drinks
+  "food", "coffee", "tea", "drink", "meal", "snack", "fruit", "vegetable",
+  // Plants & nature
+  "plant", "flower", "tree", "leaf", "garden",
+  // Animals
+  "pet", "dog", "cat", "bird", "fish", "animal",
+  // Furniture
+  "chair", "table", "sofa", "couch", "bed", "desk", "lamp", "shelf",
+  // Vehicles
+  "car", "bike", "bicycle", "motorcycle", "vehicle",
+  // Other non-wearables
+  "book", "magazine", "paper", "toy", "game", "tool", "box", "package",
+];
+
+/**
+ * Fallback check for non-fashion items based on descriptive label.
+ * Use ONLY when AI response is missing isFashionItem (not as override).
+ * 
+ * Uses whole-word matching to avoid false positives:
+ * - "cat" won't match "catherine" or "catalog"
+ * - "mug" won't match "smuggle"
+ * 
+ * @param label - The descriptive label from AI analysis
+ * @returns true if likely a fashion item, false if clearly not
+ */
+export function fallbackIsFashionItem(label?: string): boolean {
+  if (!label) return true; // Be permissive if we truly don't know
+  
+  const lowerLabel = label.toLowerCase();
+  
+  // Use whole-word matching with word boundaries
+  // This prevents "cat" from matching "catalog" or "catherine"
+  return !NON_FASHION_KEYWORDS.some(keyword => {
+    // Create regex for whole word match
+    const wordBoundaryRegex = new RegExp(`\\b${keyword}\\b`, 'i');
+    return wordBoundaryRegex.test(lowerLabel);
+  });
+}
+
+// ============================================
 // IMAGE OPTIMIZATION CONSTANTS
 // ============================================
 
@@ -171,6 +225,8 @@ export interface ClothingAnalysisResult {
   contextSufficient: boolean;
   // Confidence engine signals (enhanced analysis)
   confidenceSignals?: ConfidenceSignals;
+  /** False if image is not wearable fashion (mug, electronics, food, etc.) */
+  isFashionItem: boolean;
 }
 
 // Unified item signals structure from AI
@@ -226,7 +282,7 @@ export async function analyzeClothingImage(
   console.log("analyzeClothingImage called, API key exists:", !!OPENAI_API_KEY);
 
   // Helper to log telemetry
-  const logTelemetry = (result: ClothingAnalysisResult, cacheHit: boolean, cacheKeyPrefix?: string) => {
+  const logTelemetry = (result: ClothingAnalysisResult, cacheHit: boolean, cacheKeyPrefix?: string, fallbackUsed?: boolean) => {
     const event = createAnalysisTelemetryEvent({
       scanSessionId: ctx?.scan_session_id,
       userId: ctx?.user_id,
@@ -241,6 +297,10 @@ export async function analyzeClothingImage(
       cacheKeyPrefix,
       styleTagsCount: result.styleTags?.length ?? 0,
       colorsCount: result.colors?.length ?? 0,
+      // Non-fashion detection telemetry
+      isFashionItem: result.isFashionItem,
+      isNonFashionFallbackUsed: fallbackUsed,
+      descriptiveLabel: result.isFashionItem === false ? result.descriptiveLabel : undefined,
     });
     logAnalysisTelemetry(event);
     updateLocalStats({ ...event, timestamp: new Date().toISOString() });
@@ -305,11 +365,12 @@ export async function analyzeClothingImage(
       console.log("[Perf] Skipping cache (no hash), calling OpenAI API directly");
     }
 
-    const prompt = `Analyze this clothing item image and respond ONLY with a valid JSON object (no markdown, no explanation).
+    const prompt = `Analyze this image and respond ONLY with a valid JSON object (no markdown, no explanation).
 
 The JSON must have exactly this structure:
 {
-  "category": "tops" | "bottoms" | "dresses" | "skirts" | "outerwear" | "shoes" | "bags" | "accessories",
+  "isFashionItem": true | false,
+  "category": "tops" | "bottoms" | "dresses" | "skirts" | "outerwear" | "shoes" | "bags" | "accessories" | "unknown",
   "descriptiveLabel": "a short 2-4 word description",
   "colors": [{"hex": "#hexcode", "name": "Color Name"}],
   "styleTags": ["style1", "style2"],
@@ -329,7 +390,12 @@ The JSON must have exactly this structure:
   }
 }
 
-Category rules:
+FIRST, determine if this is a wearable fashion item:
+- isFashionItem: true for clothing, shoes, bags, jewelry, scarves, belts, hats, watches
+- isFashionItem: false for mugs, cups, electronics, food, plants, pets, furniture, vehicles, etc.
+- If isFashionItem is false, set category to "unknown" and use empty arrays for styleTags/styleNotes/colors
+
+Category rules (only apply if isFashionItem is true):
 - tops: shirts, blouses, t-shirts, sweaters, tank tops
 - bottoms: pants, trousers, jeans, shorts
 - dresses: full dresses (not separates)
@@ -338,6 +404,7 @@ Category rules:
 - shoes: all footwear
 - bags: handbags, backpacks, totes
 - accessories: jewelry, scarves, belts, hats, watches
+- unknown: use ONLY when isFashionItem is false
 
 styleTags (REQUIRED - must include 1-3 tags from this list):
 - "casual": relaxed, everyday, comfortable
@@ -472,7 +539,7 @@ Respond with ONLY the JSON object.`;
     const analysis = JSON.parse(cleanedResponse) as ClothingAnalysisResult;
 
     // Validate and normalize the response
-    const validatedAnalysis = validateAnalysis(analysis);
+    const { analysis: validatedAnalysis, nonFashionFallbackUsed } = validateAnalysis(analysis);
 
     // ============================================
     // CACHE SET: Store successful analysis
@@ -493,7 +560,7 @@ Respond with ONLY the JSON object.`;
     }
 
     // Log telemetry for cache miss (API call made)
-    logTelemetry(validatedAnalysis, false, imageSha256?.slice(0, 8));
+    logTelemetry(validatedAnalysis, false, imageSha256?.slice(0, 8), nonFashionFallbackUsed);
 
     // Performance summary
     const totalDuration = Date.now() - startTime;
@@ -526,21 +593,77 @@ Respond with ONLY the JSON object.`;
   }
 }
 
+interface ValidatedAnalysisResult {
+  analysis: ClothingAnalysisResult;
+  nonFashionFallbackUsed: boolean; // True if keyword fallback determined non-fashion status
+}
+
 /**
  * Validate and normalize the AI analysis response
  */
-function validateAnalysis(analysis: ClothingAnalysisResult): ClothingAnalysisResult {
-  const validCategories: Category[] = ["tops", "bottoms", "dresses", "skirts", "outerwear", "shoes", "bags", "accessories"];
+function validateAnalysis(analysis: ClothingAnalysisResult): ValidatedAnalysisResult {
+  const validFashionCategories: Category[] = ["tops", "bottoms", "dresses", "skirts", "outerwear", "shoes", "bags", "accessories"];
   const validStyles: StyleVibe[] = ["casual", "minimal", "office", "street", "feminine", "sporty"];
 
-  // Validate category
-  let category: Category = "tops";
-  if (validCategories.includes(analysis.category as Category)) {
+  // Validate descriptive label first (needed for fallback)
+  const descriptiveLabel = analysis.descriptiveLabel || "";
+
+  // ============================================
+  // NORMALIZE isFashionItem (with fallback)
+  // ============================================
+  // 1. Use AI response if boolean
+  // 2. Fallback to keyword check ONLY if AI didn't provide isFashionItem
+  // 3. Keep isFashionItem and category INDEPENDENT:
+  //    - isFashionItem=false → definitely not fashion (mug, phone)
+  //    - isFashionItem=true, category=unknown → uncertain (blurry shirt)
+  const aiProvidedIsFashion = typeof analysis.isFashionItem === "boolean";
+  const isFashionItem = aiProvidedIsFashion
+    ? analysis.isFashionItem
+    : fallbackIsFashionItem(descriptiveLabel);
+  
+  // Track if keyword fallback was used to determine non-fashion status
+  // This is for telemetry to help tune the keyword list
+  const nonFashionFallbackUsed = !aiProvidedIsFashion && isFashionItem === false;
+
+  // ============================================
+  // VALIDATE CATEGORY
+  // ============================================
+  // Note: category="unknown" is valid for fashion items (uncertain/blurry)
+  let category: Category;
+  if (!isFashionItem) {
+    // Non-fashion: force "unknown" category
+    category = "unknown";
+  } else if (analysis.category === "unknown") {
+    // Fashion but uncertain category (blurry photo, ambiguous item)
+    category = "unknown";
+  } else if (validFashionCategories.includes(analysis.category as Category)) {
     category = analysis.category as Category;
+  } else {
+    // Invalid category string - default to "unknown" (let user pick)
+    category = "unknown";
   }
 
-  // Validate descriptive label
-  const descriptiveLabel = analysis.descriptiveLabel || getDefaultLabel(category);
+  // Use default label if empty
+  const finalLabel = descriptiveLabel || getDefaultLabel(category);
+
+  // ============================================
+  // EARLY RETURN FOR NON-FASHION ITEMS
+  // ============================================
+  if (!isFashionItem) {
+    return {
+      analysis: {
+        category: "unknown",
+        descriptiveLabel: finalLabel || "Non-fashion item",
+        colors: [],
+        styleTags: [],
+        styleNotes: [],
+        itemSignals: { stylingRisk: "low" },
+        contextSufficient: analysis.contextSufficient ?? false,
+        isFashionItem: false,
+      },
+      nonFashionFallbackUsed,
+    };
+  }
 
   // Validate colors
   const colors: ColorInfo[] = [];
@@ -610,14 +733,18 @@ function validateAnalysis(analysis: ClothingAnalysisResult): ClothingAnalysisRes
   );
 
   return {
-    category,
-    descriptiveLabel,
-    colors,
-    styleTags,
-    styleNotes,
-    itemSignals,
-    contextSufficient,
-    confidenceSignals,
+    analysis: {
+      category,
+      descriptiveLabel: finalLabel,
+      colors,
+      styleTags,
+      styleNotes,
+      itemSignals,
+      contextSufficient,
+      confidenceSignals,
+      isFashionItem: true,
+    },
+    nonFashionFallbackUsed: false,
   };
 }
 
@@ -864,6 +991,7 @@ function getDefaultLabel(category: Category): string {
     accessories: "Minimal accessory",
     dresses: "Classic dress",
     skirts: "Versatile skirt",
+    unknown: "Non-fashion item",
   };
   return labels[category];
 }
@@ -898,5 +1026,6 @@ function getFallbackAnalysis(): ClothingAnalysisResult {
       formality_level: 2,
       texture_type: 'soft',
     },
+    isFashionItem: true, // Fallback assumes fashion item
   };
 }

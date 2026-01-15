@@ -73,6 +73,7 @@ export const LENGTH_BY_CATEGORY: Record<Category, readonly string[]> = {
   shoes: [],
   bags: [],
   accessories: [],
+  unknown: [],
 } as const;
 
 /**
@@ -88,6 +89,7 @@ export const SHAPE_BY_CATEGORY: Record<Category, readonly string[]> = {
   outerwear: [], // future: outerwear_type as separate field
   bags: [],
   accessories: [],
+  unknown: [],
 } as const;
 
 // ============================================

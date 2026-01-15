@@ -138,6 +138,7 @@ const CATEGORY_TO_SLOT: Record<Category, OutfitSlot | null> = {
   skirts: 'BOTTOM',
   bags: null, // Not a slot (accessory)
   accessories: null, // Not a slot
+  unknown: null, // Non-fashion items
 };
 
 /**

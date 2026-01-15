@@ -226,6 +226,7 @@ describe('getFilteredSuggestions relaxation behavior', () => {
       skirts: [],
       bags: [],
       accessories: [],
+      unknown: [],
     };
 
     for (const item of fullItems) {

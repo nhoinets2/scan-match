@@ -82,7 +82,7 @@ import { ItemSignalsResult } from "@/lib/openai";
 import { capitalizeFirst, capitalizeItems, capitalizeSentences } from "@/lib/text-utils";
 import { recordPositiveAction, requestReviewIfAppropriate } from "@/lib/useStoreReview";
 import { useConfidenceEngine, tierToVerdictState, tierToLabel } from "@/lib/useConfidenceEngine";
-import { prepareScanForSave, completeScanSave, isLocalUri } from "@/lib/storage";
+import { prepareScanForSave, completeScanSave, isLocalUri, cancelUpload, cleanupScanStorage } from "@/lib/storage";
 import { useAuth } from "@/lib/auth-context";
 import { useComboAssembler, runShadowModeComparison } from "@/lib/useComboAssembler";
 import type { AssembledCombo } from "@/lib/combo-assembler";
@@ -809,6 +809,7 @@ export default function ResultsScreen() {
   const [showFavoriteStoresModal, setShowFavoriteStoresModal] = useState(false);
   const [showStoreSavedToast, setShowStoreSavedToast] = useState(false);
   const [showScanSavedToast, setShowScanSavedToast] = useState(false);
+  const [showSaveErrorToast, setShowSaveErrorToast] = useState(false);
   const { data: storePreference } = useStorePreference();
   const updateStorePreference = useUpdateStorePreference();
   const { data: tailorCardSeen } = useTailorCardSeen();
@@ -1688,14 +1689,26 @@ export default function ResultsScreen() {
       setIsSaved(false); // Immediate visual feedback
       
       const originalOutcome = getOriginalOutcome();
+      const idToUnsave = currentScan && !isViewingSavedCheck && currentCheckId 
+        ? currentCheckId 
+        : checkId;
+      const imageUriToCleanup = currentScan && !isViewingSavedCheck && currentCheckId
+        ? currentScan.imageUri
+        : savedCheck?.imageUri;
       
-      if (currentScan && !isViewingSavedCheck && currentCheckId) {
+      if (idToUnsave) {
+        // 1. Cancel any pending upload (prevents wasted bandwidth/storage)
+        void cancelUpload(idToUnsave);
+        
+        // 2. Clean up local storage (image copy in scan-images/)
+        // Only if it's a local file (not already synced to cloud)
+        if (imageUriToCleanup && isLocalUri(imageUriToCleanup)) {
+          void cleanupScanStorage(idToUnsave, imageUriToCleanup);
+        }
+        
+        // 3. Update DB outcome
         updateRecentCheckOutcomeMutation.mutate(
-          { id: currentCheckId, outcome: originalOutcome }
-        );
-      } else if (isViewingSavedCheck && checkId) {
-        updateRecentCheckOutcomeMutation.mutate(
-          { id: checkId, outcome: originalOutcome }
+          { id: idToUnsave, outcome: originalOutcome }
         );
       }
     } else {
@@ -1739,8 +1752,10 @@ export default function ResultsScreen() {
           );
         } catch (error) {
           console.error('[Save] Failed to save scan:', error);
-          // Revert visual state on error
+          // Revert visual state and show error toast
           setIsSaved(false);
+          setShowSaveErrorToast(true);
+          setTimeout(() => setShowSaveErrorToast(false), 3000);
         }
       };
       
@@ -1809,6 +1824,265 @@ export default function ResultsScreen() {
           onPress={handleBack}
           style={{ marginTop: spacing.md }}
         />
+      </View>
+    );
+  }
+
+  // ============================================
+  // NON-FASHION / UNCERTAIN ITEM GATES
+  // ============================================
+  // Two distinct states:
+  // 1. Non-fashion: isFashionItem === false (mug, phone, etc.)
+  // 2. Uncertain fashion: isFashionItem !== false && category === "unknown" (blurry shirt)
+  const isNonFashionItem = scannedItem.isFashionItem === false;
+  const isUncertainFashion = scannedItem.isFashionItem !== false && scannedItem.category === "unknown";
+  
+  // Gate 1: Non-fashion item (definitely not clothing)
+  if (isNonFashionItem) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
+        {/* Header */}
+        <View
+          style={{
+            paddingTop: insets.top + spacing.md,
+            paddingHorizontal: spacing.lg,
+            paddingBottom: spacing.md,
+          }}
+        >
+          <Pressable
+            onPress={handleBack}
+            style={{
+              width: spacing.xxl,
+              height: spacing.xxl,
+              borderRadius: borderRadius.pill,
+              backgroundColor: colors.surface.icon,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <X size={20} color={colors.text.primary} strokeWidth={2} />
+          </Pressable>
+        </View>
+
+        {/* Content */}
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xl }}>
+          {/* Image preview */}
+          {resolvedImageUri && (
+            <View
+              style={{
+                width: 120,
+                height: 120,
+                borderRadius: borderRadius.card,
+                overflow: "hidden",
+                marginBottom: spacing.xl,
+                ...shadows.md,
+              }}
+            >
+              <Image
+                source={{ uri: resolvedImageUri }}
+                style={{ width: "100%", height: "100%" }}
+                contentFit="cover"
+              />
+            </View>
+          )}
+
+          {/* Icon */}
+          <View
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: borderRadius.card,
+              backgroundColor: colors.accent.terracottaLight,
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: spacing.lg,
+            }}
+          >
+            <AlertTriangle size={32} color={colors.accent.terracotta} strokeWidth={1.5} />
+          </View>
+
+          {/* Title */}
+          <Text
+            style={{
+              ...typography.display.screenTitle,
+              color: colors.text.primary,
+              textAlign: "center",
+              marginBottom: spacing.sm,
+            }}
+          >
+            Not a fashion item
+          </Text>
+
+          {/* Description */}
+          <Text
+            style={{
+              ...typography.ui.body,
+              color: colors.text.secondary,
+              textAlign: "center",
+              marginBottom: spacing.xl,
+            }}
+          >
+            This doesn't look like clothing, shoes, a bag, or an accessory. Try scanning something wearable.
+          </Text>
+
+          {/* Label (if available) */}
+          {scannedItem.descriptiveLabel && (
+            <Text
+              style={{
+                ...typography.ui.caption,
+                color: colors.text.tertiary,
+                textAlign: "center",
+                marginBottom: spacing.xl,
+              }}
+            >
+              Detected: {scannedItem.descriptiveLabel}
+            </Text>
+          )}
+
+          {/* Actions */}
+          <ButtonPrimary
+            label="Scan Something Else"
+            onPress={() => {
+              clearScan();
+              router.replace("/scan");
+            }}
+            style={{ width: "100%", marginBottom: spacing.md }}
+          />
+          <ButtonTertiary
+            label="Go Back"
+            onPress={handleBack}
+          />
+        </View>
+      </View>
+    );
+  }
+
+  // Gate 2: Uncertain fashion item (fashion but couldn't identify category)
+  if (isUncertainFashion) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
+        {/* Header */}
+        <View
+          style={{
+            paddingTop: insets.top + spacing.md,
+            paddingHorizontal: spacing.lg,
+            paddingBottom: spacing.md,
+          }}
+        >
+          <Pressable
+            onPress={handleBack}
+            style={{
+              width: spacing.xxl,
+              height: spacing.xxl,
+              borderRadius: borderRadius.pill,
+              backgroundColor: colors.surface.icon,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <X size={20} color={colors.text.primary} strokeWidth={2} />
+          </Pressable>
+        </View>
+
+        {/* Content */}
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xl }}>
+          {/* Image preview */}
+          {resolvedImageUri && (
+            <View
+              style={{
+                width: 120,
+                height: 120,
+                borderRadius: borderRadius.card,
+                overflow: "hidden",
+                marginBottom: spacing.xl,
+                ...shadows.md,
+              }}
+            >
+              <Image
+                source={{ uri: resolvedImageUri }}
+                style={{ width: "100%", height: "100%" }}
+                contentFit="cover"
+              />
+            </View>
+          )}
+
+          {/* Icon */}
+          <View
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: borderRadius.card,
+              backgroundColor: colors.verdict.context.bg,
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: spacing.lg,
+            }}
+          >
+            <HelpCircle size={32} color={colors.verdict.context.text} strokeWidth={1.5} />
+          </View>
+
+          {/* Title */}
+          <Text
+            style={{
+              ...typography.display.screenTitle,
+              color: colors.text.primary,
+              textAlign: "center",
+              marginBottom: spacing.sm,
+            }}
+          >
+            Couldn't identify this item
+          </Text>
+
+          {/* Description */}
+          <Text
+            style={{
+              ...typography.ui.body,
+              color: colors.text.secondary,
+              textAlign: "center",
+              marginBottom: spacing.lg,
+            }}
+          >
+            We couldn't determine what type of clothing this is. Try a clearer photo with better lighting.
+          </Text>
+
+          {/* Tips */}
+          <View
+            style={{
+              backgroundColor: colors.bg.tertiary,
+              borderRadius: borderRadius.card,
+              padding: spacing.md,
+              marginBottom: spacing.xl,
+              width: "100%",
+            }}
+          >
+            <Text style={{ ...typography.ui.caption, color: colors.text.tertiary, marginBottom: spacing.sm }}>
+              Tips for better results:
+            </Text>
+            <Text style={{ ...typography.ui.body, color: colors.text.secondary, marginBottom: spacing.xs }}>
+              • Lay flat or hang the item up
+            </Text>
+            <Text style={{ ...typography.ui.body, color: colors.text.secondary, marginBottom: spacing.xs }}>
+              • Use good lighting
+            </Text>
+            <Text style={{ ...typography.ui.body, color: colors.text.secondary }}>
+              • Include the full item in frame
+            </Text>
+          </View>
+
+          {/* Actions */}
+          <ButtonPrimary
+            label="Try Another Photo"
+            onPress={() => {
+              clearScan();
+              router.replace("/scan");
+            }}
+            style={{ width: "100%", marginBottom: spacing.md }}
+          />
+          <ButtonTertiary
+            label="Go Back"
+            onPress={handleBack}
+          />
+        </View>
       </View>
     );
   }
@@ -3535,6 +3809,35 @@ width: spacing.xs / 2,
             }}
           >
             Scan saved
+          </Text>
+        </Animated.View>
+      )}
+
+      {/* Save error toast */}
+      {showSaveErrorToast && (
+        <Animated.View
+          entering={FadeInUp.duration(300)}
+          exiting={FadeOut.duration(200)}
+          style={{
+            position: "absolute",
+            bottom: insets.bottom + 100,
+            left: 24,
+            right: 24,
+            backgroundColor: colors.status.error,
+            borderRadius: borderRadius.image,
+            paddingVertical: 14,
+            paddingHorizontal: 20,
+            alignItems: "center",
+            zIndex: 1000,
+          }}
+        >
+          <Text
+            style={{
+              ...typography.ui.bodyMedium,
+              color: colors.text.inverse,
+            }}
+          >
+            Couldn't save scan. Please try again.
           </Text>
         </Animated.View>
       )}

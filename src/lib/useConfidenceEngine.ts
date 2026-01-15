@@ -111,11 +111,14 @@ export function useConfidenceEngine(
       return getEmptyResult();
     }
 
-    // Handle unknown/null category - return empty result with Mode A from 'default'
-    // The category should always exist in practice, but we handle this edge case
-    if (!scannedItem.category) {
+    // Handle unknown/null/non-fashion category - return empty result with Mode A from 'default'
+    // This gates expensive matching for:
+    // - Non-fashion items (isFashionItem === false, category === "unknown")
+    // - Uncertain fashion (isFashionItem !== false, category === "unknown")
+    // - Missing category (should not happen in practice)
+    if (!scannedItem.category || scannedItem.category === "unknown") {
       if (__DEV__) {
-        console.warn('[ConfidenceEngine] scannedItem.category is null/undefined');
+        console.warn('[ConfidenceEngine] scannedItem.category is null/undefined/unknown - skipping matching');
       }
       // Compute vibe for style-aware copy
       const uiVibeForCopy = resolveUiVibeForCopy({

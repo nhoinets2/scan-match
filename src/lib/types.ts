@@ -25,7 +25,8 @@ export type Category =
   | "bags"
   | "accessories"
   | "dresses"
-  | "skirts";
+  | "skirts"
+  | "unknown"; // Non-fashion items
 
 export type FitPreference = "oversized" | "regular" | "slim";
 
@@ -230,6 +231,8 @@ export interface ScannedItem {
     stylingRisk: StylingRisk;
   };
   contextSufficient?: boolean;
+  /** False if image is not wearable fashion (mug, electronics, food, etc.) */
+  isFashionItem?: boolean;
 }
 
 export interface OutfitCombo {

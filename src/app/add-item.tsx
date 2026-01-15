@@ -37,6 +37,7 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
+  HelpCircle,
   Pencil,
 } from "lucide-react-native";
 
@@ -703,6 +704,8 @@ export default function AddItemScreen() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [analysisFailed, setAnalysisFailed] = useState(false);
+  const [isNonFashionItem, setIsNonFashionItem] = useState(false);
+  const [isUncertainFashion, setIsUncertainFashion] = useState(false);
   const [analysis, setAnalysis] = useState<ClothingAnalysisResult | null>(null);
   const [category, setCategory] = useState<Category | null>(null);
   const [selectedStyles, setSelectedStyles] = useState<StyleVibe[]>([]);
@@ -800,6 +803,8 @@ export default function AddItemScreen() {
     setImageUri(uri);
     setScreenState("processing");
     setAnalysisFailed(false);
+    setIsNonFashionItem(false);
+    setIsUncertainFashion(false);
     setAnalysis(null);
 
     // For new attempts, generate new idempotency key
@@ -830,16 +835,43 @@ export default function AddItemScreen() {
       
       const result = await analyzeClothingImage(uri);
       setAnalysis(result);
-      setCategory(result.category);
-      // Pre-select style tags from AI analysis
-      if (result.styleTags && result.styleTags.length > 0) {
-        setSelectedStyles(result.styleTags);
+      
+      // Check if this is a non-fashion item (mug, phone, etc.)
+      if (result.isFashionItem === false) {
+        setIsNonFashionItem(true);
+        setIsUncertainFashion(false);
+        setCategory(null);
+        setSelectedStyles([]);
+        setEditedColors([]);
+        setAnalysisFailed(false);
+        setScreenState("analyzed");
+        return;
       }
-      if (result.colors) {
-        setEditedColors(result.colors); // Initialize edited colors with detected colors
+      
+      // Check if fashion but uncertain category (blurry photo)
+      if (result.category === "unknown") {
+        setIsUncertainFashion(true);
+        setIsNonFashionItem(false);
+        setCategory(null);
+        setSelectedStyles([]);
+        setEditedColors(result.colors || []);
+        setAnalysisFailed(false);
+        setScreenState("analyzed");
+        // Don't return - let user pick a category
+      } else {
+        setCategory(result.category);
+        // Pre-select style tags from AI analysis
+        if (result.styleTags && result.styleTags.length > 0) {
+          setSelectedStyles(result.styleTags);
+        }
+        if (result.colors) {
+          setEditedColors(result.colors); // Initialize edited colors with detected colors
+        }
+        setAnalysisFailed(false);
+        setIsNonFashionItem(false);
+        setIsUncertainFashion(false);
+        setScreenState("analyzed");
       }
-      setAnalysisFailed(false);
-      setScreenState("analyzed");
     } catch (error) {
       console.log("Analysis failed:", error);
       setAnalysisFailed(true);
@@ -904,8 +936,8 @@ export default function AddItemScreen() {
     );
   };
 
-  // Require category AND at least one style tag
-  const canAdd = imageUri && category && selectedStyles.length > 0 && screenState === "analyzed";
+  // Require category AND at least one style tag AND must be a fashion item (or uncertain with category selected)
+  const canAdd = imageUri && category && selectedStyles.length > 0 && screenState === "analyzed" && !isNonFashionItem;
 
   const handleAddToWardrobe = async () => {
     if (!canAdd || !imageUri || !category || selectedStyles.length === 0 || !user?.id || isSaving) return;
@@ -1191,6 +1223,264 @@ export default function AddItemScreen() {
           onPurchaseComplete={handlePaywallSuccess}
           reason="wardrobe_limit"
         />
+      </View>
+    );
+  }
+
+  // ============================================
+  // NON-FASHION ITEM GATE (full screen)
+  // ============================================
+  if (isNonFashionItem) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
+        {/* Header */}
+        <View
+          style={{
+            paddingTop: insets.top + spacing.md,
+            paddingHorizontal: spacing.lg,
+            paddingBottom: spacing.md,
+          }}
+        >
+          <Pressable
+            onPress={handleClose}
+            style={{
+              width: spacing.xxl,
+              height: spacing.xxl,
+              borderRadius: borderRadius.pill,
+              backgroundColor: colors.surface.icon,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <X size={20} color={colors.text.primary} strokeWidth={2} />
+          </Pressable>
+        </View>
+
+        {/* Content */}
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xl }}>
+          {/* Image preview */}
+          {imageUri && (
+            <View
+              style={{
+                width: 120,
+                height: 120,
+                borderRadius: borderRadius.card,
+                overflow: "hidden",
+                marginBottom: spacing.xl,
+                ...shadows.md,
+              }}
+            >
+              <Image
+                source={{ uri: imageUri }}
+                style={{ width: "100%", height: "100%" }}
+                contentFit="cover"
+              />
+            </View>
+          )}
+
+          {/* Icon */}
+          <View
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: borderRadius.card,
+              backgroundColor: colors.accent.terracottaLight,
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: spacing.lg,
+            }}
+          >
+            <AlertCircle size={32} color={colors.accent.terracotta} strokeWidth={1.5} />
+          </View>
+
+          {/* Title */}
+          <Text
+            style={{
+              ...typography.display.screenTitle,
+              color: colors.text.primary,
+              textAlign: "center",
+              marginBottom: spacing.sm,
+            }}
+          >
+            Not a fashion item
+          </Text>
+
+          {/* Description */}
+          <Text
+            style={{
+              ...typography.ui.body,
+              color: colors.text.secondary,
+              textAlign: "center",
+              marginBottom: spacing.xl,
+            }}
+          >
+            This doesn't look like clothing, shoes, a bag, or an accessory. Try photographing something wearable.
+          </Text>
+
+          {/* Label (if available) */}
+          {analysis?.descriptiveLabel && (
+            <Text
+              style={{
+                ...typography.ui.caption,
+                color: colors.text.tertiary,
+                textAlign: "center",
+                marginBottom: spacing.xl,
+              }}
+            >
+              Detected: {analysis.descriptiveLabel}
+            </Text>
+          )}
+
+          {/* Actions */}
+          <ButtonPrimary
+            label="Try Another Photo"
+            onPress={() => {
+              setImageUri(null);
+              setAnalysis(null);
+              setIsNonFashionItem(false);
+              setScreenState("ready");
+            }}
+            style={{ width: "100%", marginBottom: spacing.md }}
+          />
+          <ButtonTertiary
+            label="Cancel"
+            onPress={handleClose}
+          />
+        </View>
+      </View>
+    );
+  }
+
+  // ============================================
+  // UNCERTAIN FASHION GATE (full screen with tips)
+  // ============================================
+  if (isUncertainFashion) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
+        {/* Header */}
+        <View
+          style={{
+            paddingTop: insets.top + spacing.md,
+            paddingHorizontal: spacing.lg,
+            paddingBottom: spacing.md,
+          }}
+        >
+          <Pressable
+            onPress={handleClose}
+            style={{
+              width: spacing.xxl,
+              height: spacing.xxl,
+              borderRadius: borderRadius.pill,
+              backgroundColor: colors.surface.icon,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <X size={20} color={colors.text.primary} strokeWidth={2} />
+          </Pressable>
+        </View>
+
+        {/* Content */}
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xl }}>
+          {/* Image preview */}
+          {imageUri && (
+            <View
+              style={{
+                width: 120,
+                height: 120,
+                borderRadius: borderRadius.card,
+                overflow: "hidden",
+                marginBottom: spacing.xl,
+                ...shadows.md,
+              }}
+            >
+              <Image
+                source={{ uri: imageUri }}
+                style={{ width: "100%", height: "100%" }}
+                contentFit="cover"
+              />
+            </View>
+          )}
+
+          {/* Icon */}
+          <View
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: borderRadius.card,
+              backgroundColor: colors.verdict.context.bg,
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: spacing.lg,
+            }}
+          >
+            <HelpCircle size={32} color={colors.verdict.context.text} strokeWidth={1.5} />
+          </View>
+
+          {/* Title */}
+          <Text
+            style={{
+              ...typography.display.screenTitle,
+              color: colors.text.primary,
+              textAlign: "center",
+              marginBottom: spacing.sm,
+            }}
+          >
+            Couldn't identify this item
+          </Text>
+
+          {/* Description */}
+          <Text
+            style={{
+              ...typography.ui.body,
+              color: colors.text.secondary,
+              textAlign: "center",
+              marginBottom: spacing.lg,
+            }}
+          >
+            We couldn't determine what type of clothing this is. Try a clearer photo with better lighting.
+          </Text>
+
+          {/* Tips */}
+          <View
+            style={{
+              backgroundColor: colors.bg.tertiary,
+              borderRadius: borderRadius.card,
+              padding: spacing.md,
+              marginBottom: spacing.xl,
+              width: "100%",
+            }}
+          >
+            <Text style={{ ...typography.ui.caption, color: colors.text.tertiary, marginBottom: spacing.sm }}>
+              Tips for better results:
+            </Text>
+            <Text style={{ ...typography.ui.body, color: colors.text.secondary, marginBottom: spacing.xs }}>
+              • Lay flat or hang the item up
+            </Text>
+            <Text style={{ ...typography.ui.body, color: colors.text.secondary, marginBottom: spacing.xs }}>
+              • Use good lighting
+            </Text>
+            <Text style={{ ...typography.ui.body, color: colors.text.secondary }}>
+              • Include the full item in frame
+            </Text>
+          </View>
+
+          {/* Actions */}
+          <ButtonPrimary
+            label="Try Another Photo"
+            onPress={() => {
+              setImageUri(null);
+              setAnalysis(null);
+              setIsUncertainFashion(false);
+              setScreenState("ready");
+            }}
+            style={{ width: "100%", marginBottom: spacing.md }}
+          />
+          <ButtonTertiary
+            label="Cancel"
+            onPress={handleClose}
+          />
+        </View>
       </View>
     );
   }

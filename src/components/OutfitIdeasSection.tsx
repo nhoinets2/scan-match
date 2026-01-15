@@ -93,6 +93,7 @@ const CATEGORY_TO_SLOT: Record<Category, OutfitSlot | null> = {
   skirts: 'BOTTOM',
   bags: null,
   accessories: null,
+  unknown: null,
 };
 
 /** Standard track slot order */

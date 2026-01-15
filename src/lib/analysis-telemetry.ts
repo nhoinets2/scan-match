@@ -33,6 +33,11 @@ export interface AnalysisTelemetryEvent {
   context_sufficient: boolean;
   detected_category?: string;
   
+  // Non-fashion detection
+  is_fashion_item?: boolean;
+  is_non_fashion_fallback_used?: boolean; // True if keyword fallback determined non-fashion
+  descriptive_label?: string; // For debugging non-fashion false positives
+  
   // Cache info
   cache_hit: boolean;
   cache_key_prefix?: string; // First 8 chars of hash
@@ -243,6 +248,10 @@ export interface CreateTelemetryParams {
   cacheKeyPrefix?: string;
   styleTagsCount?: number;
   colorsCount?: number;
+  // Non-fashion detection
+  isFashionItem?: boolean;
+  isNonFashionFallbackUsed?: boolean;
+  descriptiveLabel?: string;
 }
 
 export function createAnalysisTelemetryEvent(params: CreateTelemetryParams): Omit<AnalysisTelemetryEvent, 'timestamp'> {
@@ -261,6 +270,10 @@ export function createAnalysisTelemetryEvent(params: CreateTelemetryParams): Omi
     cache_key_prefix: params.cacheKeyPrefix,
     style_tags_count: params.styleTagsCount,
     colors_count: params.colorsCount,
+    // Non-fashion detection
+    is_fashion_item: params.isFashionItem,
+    is_non_fashion_fallback_used: params.isNonFashionFallbackUsed,
+    descriptive_label: params.descriptiveLabel,
   };
 }
 
