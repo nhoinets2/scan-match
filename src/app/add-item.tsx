@@ -949,8 +949,14 @@ export default function AddItemScreen() {
       console.log("[Storage] Queuing background upload for:", savedItem.id);
       void queueBackgroundUpload(savedItem.id, localImageUri, user.id);
 
-      // Navigate to wardrobe tab immediately (no waiting for upload!)
-      router.replace("/(tabs)/wardrobe");
+      // Navigate back to previous screen (wardrobe tab if came from there)
+      // Using back() instead of replace() to avoid duplicate screens in stack
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        // Fallback: if no history (deep link), go to wardrobe tab
+        router.replace("/(tabs)/wardrobe");
+      }
     } catch (error) {
       console.error("[Storage] Failed to add item:", error);
       setIsSaving(false); // Reset loading state

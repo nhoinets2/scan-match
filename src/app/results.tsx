@@ -1117,9 +1117,10 @@ export default function ResultsScreen() {
   useEffect(() => {
     if (addRecentCheckMutation.isSuccess) {
       // Record this as a positive action and potentially prompt for review
-      recordPositiveAction().then(() => {
-        requestReviewIfAppropriate();
-      });
+      // Fire-and-forget: failures are non-critical and should never bubble up
+      void recordPositiveAction()
+        .then(() => requestReviewIfAppropriate())
+        .catch(() => {}); // Silently ignore - review prompts are non-critical
     }
   }, [addRecentCheckMutation.isSuccess]);
 
