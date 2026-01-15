@@ -32,7 +32,6 @@ import {
   Puzzle,
   CloudUpload,
   RefreshCw,
-  Shirt,
 } from "lucide-react-native";
 import { GridPlaceholderImage } from "@/components/PlaceholderImage";
 import Clipboard from "@react-native-clipboard/clipboard";
