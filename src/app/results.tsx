@@ -1390,6 +1390,11 @@ export default function ResultsScreen() {
 // ============================================
 // Contains all scannedItem-dependent hooks and UI.
 // Only mounts when scannedItem is guaranteed non-null.
+//
+// IMPORTANT: All scannedItem-dependent hooks must live inside ResultsSuccess.
+// Do NOT add hooks that depend on scannedItem above the loading/failed early
+// returns in ResultsScreen — doing so will cause "hooks order changed" errors
+// when transitioning from loading → success state.
 
 function ResultsSuccess({
   scannedItem,
