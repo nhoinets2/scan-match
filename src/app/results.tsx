@@ -249,7 +249,7 @@ type ResultsState =
   | { status: "failed"; imageUri: string; error: AnalyzeError; attempt: number }
   | { status: "success"; imageUri: string; item: ScannedItemType; attempt: number };
 
-const MAX_RETRIES = 4;
+const MAX_RETRIES = 3;
 
 // ============================================
 // PR3: LOADING & FAILED COMPONENTS
