@@ -1304,16 +1304,28 @@ export default function ResultsScreen() {
   console.log("ResultsScreen mount, currentScan exists:", !!currentScan, "savedCheck:", !!savedCheck);
 
   // Get the ID of the most recently added check (for saving)
+  // Works for both new imageUri flow and legacy currentScan flow
   const currentCheckId = useMemo(() => {
-    if (currentScan && recentChecks.length > 0) {
-      // Find the check that matches the current scanned item
+    if (recentChecks.length === 0) return null;
+    
+    // New imageUri flow: match by imageUri param
+    if (imageUri) {
+      const matchingCheck = recentChecks.find(
+        (c: RecentCheck) => c.imageUri === imageUri
+      );
+      if (matchingCheck) return matchingCheck.id;
+    }
+    
+    // Legacy flow: match by currentScan.imageUri
+    if (currentScan) {
       const matchingCheck = recentChecks.find(
         (c: RecentCheck) => c.imageUri === currentScan.imageUri
       );
-      return matchingCheck?.id ?? null;
+      if (matchingCheck) return matchingCheck.id;
     }
+    
     return null;
-  }, [currentScan, recentChecks]);
+  }, [imageUri, currentScan, recentChecks]);
 
   // ============================================
   // PR3: EARLY RETURNS FOR STATE MACHINE
@@ -1823,8 +1835,9 @@ function ResultsSuccess({
   };
 
   // Can save if: 1) fresh scan not yet saved, or 2) viewing unsaved check
+  // Works for both new imageUri flow and legacy currentScan flow
   const canSaveCheck = 
-    (!!currentScan && !isViewingSavedCheck && !!currentCheckId && !isSaved) ||
+    (!isViewingSavedCheck && !!currentCheckId && !isSaved) ||
     (isViewingSavedCheck && savedCheck?.outcome !== "saved_to_revisit" && !isSaved);
 
   // Build wardrobe match rows from confidence engine (preferred) or legacy engine
@@ -2326,11 +2339,13 @@ function ResultsSuccess({
       setIsSaved(false); // Immediate visual feedback
       
       const originalOutcome = getOriginalOutcome();
-      const idToUnsave = currentScan && !isViewingSavedCheck && currentCheckId 
+      // Use currentCheckId for fresh scans, savedCheck.id for saved checks
+      const idToUnsave = !isViewingSavedCheck && currentCheckId 
         ? currentCheckId 
-        : checkId;
-      const imageUriToCleanup = currentScan && !isViewingSavedCheck && currentCheckId
-        ? currentScan.imageUri
+        : savedCheck?.id;
+      // Use resolvedImageUri for fresh scans, savedCheck.imageUri for saved checks
+      const imageUriToCleanup = !isViewingSavedCheck && currentCheckId
+        ? (resolvedImageUri || scannedItem.imageUri)
         : savedCheck?.imageUri;
       
       if (idToUnsave) {
@@ -2396,10 +2411,15 @@ function ResultsSuccess({
         }
       };
       
-      if (currentScan && !isViewingSavedCheck && currentCheckId) {
-        void performSave(currentCheckId, currentScan.imageUri);
-      } else if (isViewingSavedCheck && checkId && savedCheck) {
-        void performSave(checkId, savedCheck.imageUri);
+      // Use resolvedImageUri for the fresh source, fall back to scannedItem.imageUri
+      const imageUriToSave = resolvedImageUri || scannedItem.imageUri;
+      
+      if (!isViewingSavedCheck && currentCheckId) {
+        // Fresh scan (new imageUri flow or legacy flow)
+        void performSave(currentCheckId, imageUriToSave);
+      } else if (isViewingSavedCheck && savedCheck?.id) {
+        // Viewing saved check
+        void performSave(savedCheck.id, savedCheck.imageUri);
       }
     }
   };
