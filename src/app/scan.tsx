@@ -756,15 +756,6 @@ export default function ScanScreen() {
         {/* Processing overlay */}
         {isProcessing && <ProcessingOverlay />}
 
-        {/* Error overlay */}
-        {errorKind && !isProcessing && (
-          <ErrorOverlay
-            errorKind={errorKind}
-            onRetry={handleRetry}
-            onDismiss={handleDismissError}
-          />
-        )}
-
         {/* Top bar - simplified */}
         <View
           className="absolute top-0 left-0 right-0 px-5"
@@ -865,6 +856,15 @@ export default function ScanScreen() {
         onPurchaseComplete={handlePaywallSuccess}
         reason="in_store_limit"
       />
+
+      {/* Error overlay - rendered last to be on top of everything */}
+      {errorKind && !isProcessing && (
+        <ErrorOverlay
+          errorKind={errorKind}
+          onRetry={handleRetry}
+          onDismiss={handleDismissError}
+        />
+      )}
     </View>
   );
 }
