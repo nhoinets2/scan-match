@@ -718,6 +718,11 @@ export default function AddItemScreen() {
   const [isSaving, setIsSaving] = useState(false); // Loading state for Add to Wardrobe button
   // Idempotency key for current attempt - reused if AI fails and user retries
   const [currentIdempotencyKey, setCurrentIdempotencyKey] = useState<string | null>(null);
+  
+  // AbortController for cancelling in-flight analysis when user closes screen
+  // isActiveRef prevents state updates after unmount
+  const analysisAbortRef = useRef<AbortController | null>(null);
+  const isActiveRef = useRef(true);
 
   // Quota and Pro status (usage-based, synced across devices)
   const { isPro, refetch: refetchProStatus } = useProStatus();
@@ -747,6 +752,14 @@ export default function AddItemScreen() {
       setCurrentTipIndex((prev) => (prev + 1) % TIPS.length);
     }, 4000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Cleanup: mark inactive + abort any in-flight analysis on unmount
+  useEffect(() => {
+    return () => {
+      isActiveRef.current = false;
+      analysisAbortRef.current?.abort();
+    };
   }, []);
 
   // Optional preselect from route params (used by "Helpful additions" flows)
@@ -784,6 +797,9 @@ export default function AddItemScreen() {
 
   const handleClose = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Abort any in-flight analysis to prevent state updates after close
+    // Don't null the ref here - let finally clean it up safely
+    analysisAbortRef.current?.abort();
     router.back();
   };
 
@@ -807,6 +823,12 @@ export default function AddItemScreen() {
     setIsNonFashionItem(false);
     setIsUncertainFashion(false);
     setAnalysis(null);
+
+    // Create local AbortController for this analysis attempt
+    // Store in ref so close/unmount can abort, but use local var for checks
+    const controller = new AbortController();
+    analysisAbortRef.current?.abort(); // Cancel any previous in-flight analysis
+    analysisAbortRef.current = controller;
 
     // For new attempts, generate new idempotency key
     // For retries, reuse the existing key to prevent double-charging
@@ -834,7 +856,13 @@ export default function AddItemScreen() {
       // Credit consumed (or idempotent replay) - now safe to make AI call
       console.log("[Quota] Credit allowed (reason:", consumeResult.reason, "), proceeding with AI call");
       
-      const result = await analyzeClothingImage({ imageUri: uri });
+      const result = await analyzeClothingImage({ imageUri: uri, signal: controller.signal });
+      
+      // Check if user closed screen or component unmounted during analysis
+      if (!isActiveRef.current || controller.signal.aborted) {
+        console.log("[AddItem] Aborted - screen closed/unmounted, skipping state update");
+        return;
+      }
       
       // Handle analysis failure
       if (!result.ok) {
@@ -897,6 +925,11 @@ export default function AddItemScreen() {
       console.log("Unexpected error during analysis:", error);
       setAnalysisFailed(true);
       setScreenState("analyzed");
+    } finally {
+      // Clear ref only if it still points to this controller (prevents race with new attempts)
+      if (analysisAbortRef.current === controller) {
+        analysisAbortRef.current = null;
+      }
     }
   };
 

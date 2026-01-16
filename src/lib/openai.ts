@@ -832,10 +832,11 @@ Respond with ONLY the JSON object.`;
     return { ok: true, data: validatedAnalysis, cacheHit: false };
   } catch (error) {
     clearTimeout(timeoutId);
-    console.log("Image analysis failed:", error);
     
     // Deterministic abort handling - no string guessing needed
     if (controller.signal.aborted) {
+      // Don't log as error - abort is expected when user closes screen
+      console.log("[Analysis] Aborted:", didTimeout ? "timeout" : "user cancelled");
       const abortError: AnalyzeError = didTimeout
         ? { kind: "timeout", message: "It's taking longer than usual. Try again in a moment." }
         : { kind: "cancelled", message: "Cancelled.", debug: "Aborted by navigation/unmount" };
@@ -848,7 +849,8 @@ Respond with ONLY the JSON object.`;
       return { ok: false, error: abortError };
     }
     
-    // Classify non-abort errors (network, HTTP, etc.)
+    // Classify non-abort errors (network, HTTP, etc.) - these are real errors
+    console.log("[Analysis] Failed:", error);
     const classifiedError = classifyAnalyzeError(error);
     logFailureTelemetry(classifiedError);
     

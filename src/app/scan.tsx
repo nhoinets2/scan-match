@@ -412,6 +412,11 @@ export default function ScanScreen() {
   const [showPaywall, setShowPaywall] = useState(false);
   // Idempotency key for current attempt - reused on retries to prevent double-charging
   const [currentIdempotencyKey, setCurrentIdempotencyKey] = useState<string | null>(null);
+  
+  // AbortController for cancelling in-flight analysis when user closes screen
+  // isActiveRef prevents navigation after unmount
+  const analysisAbortRef = useRef<AbortController | null>(null);
+  const isActiveRef = useRef(true);
 
   const setScannedItem = useSnapToMatchStore((s) => s.setScannedItem);
   const clearScan = useSnapToMatchStore((s) => s.clearScan);
@@ -442,6 +447,14 @@ export default function ScanScreen() {
   useEffect(() => {
     clearScan();
   }, [clearScan]);
+
+  // Cleanup: mark inactive + abort any in-flight analysis on unmount
+  useEffect(() => {
+    return () => {
+      isActiveRef.current = false;
+      analysisAbortRef.current?.abort();
+    };
+  }, []);
 
   // Pre-warm cache connection to avoid cold start latency during scan
   useEffect(() => {
@@ -541,6 +554,12 @@ export default function ScanScreen() {
     setLastImageSource(source);
     console.log("processImage called with imageUri:", imageUri?.slice(0, 50));
 
+    // Create local AbortController for this analysis attempt
+    // Store in ref so close/unmount can abort, but use local var for checks
+    const controller = new AbortController();
+    analysisAbortRef.current?.abort(); // Cancel any previous in-flight analysis
+    analysisAbortRef.current = controller;
+
     // For new attempts, generate new idempotency key
     // For retries, reuse the existing key to prevent double-charging
     const idempotencyKey = retryKey ?? generateIdempotencyKey();
@@ -574,12 +593,20 @@ export default function ScanScreen() {
       console.log("Calling analyzeClothingImage...");
       const result = await analyzeClothingImage({
         imageUri,
+        signal: controller.signal, // Allow cancellation on close
         ctx: {
           image_source: source,
           image_width: dimensions.width,
           image_height: dimensions.height,
         },
       });
+      
+      // Check if user closed screen or component unmounted during analysis
+      if (!isActiveRef.current || controller.signal.aborted) {
+        console.log("[Scan] Aborted - screen closed/unmounted, skipping navigation");
+        setIsProcessing(false);
+        return;
+      }
       
       // Handle analysis failure - show error, don't navigate
       if (!result.ok) {
@@ -647,6 +674,11 @@ export default function ScanScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setIsProcessing(false);
       setErrorKind("other");
+    } finally {
+      // Clear ref only if it still points to this controller (prevents race with new attempts)
+      if (analysisAbortRef.current === controller) {
+        analysisAbortRef.current = null;
+      }
     }
   };
 
@@ -668,6 +700,9 @@ export default function ScanScreen() {
 
   const handleClose = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Abort any in-flight analysis to prevent navigation after close
+    // Don't null the ref here - let finally clean it up safely
+    analysisAbortRef.current?.abort();
     router.back();
   };
 
