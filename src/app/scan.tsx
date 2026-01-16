@@ -167,23 +167,43 @@ function ProcessingOverlay() {
 }
 
 function ErrorOverlay({
-  message,
+  errorKind,
   onRetry,
   onDismiss,
 }: {
-  message: string;
+  errorKind: "network" | "timeout" | "other";
   onRetry: () => void;
   onDismiss: () => void;
 }) {
-  const isNetworkError = message.toLowerCase().includes('connection');
+  // Get subtitle based on error kind
+  const getSubtitle = () => {
+    switch (errorKind) {
+      case "network":
+        return "Connection unavailable. Please check your internet and try again.";
+      case "timeout":
+        return "It's taking longer than usual. Try again in a moment.";
+      default:
+        return "Please try again or use a different photo.";
+    }
+  };
 
   return (
     <Animated.View
       entering={FadeIn.duration(300)}
       exiting={FadeOut.duration(200)}
-      className="absolute inset-0 bg-black/85 items-center justify-center px-8"
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.85)",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: spacing.xl,
+      }}
     >
-      <View className="items-center">
+      <View style={{ alignItems: "center", maxWidth: 320 }}>
         {/* Icon */}
         <View
           style={{
@@ -193,48 +213,50 @@ function ErrorOverlay({
             backgroundColor: "rgba(255,255,255,0.1)",
             alignItems: "center",
             justifyContent: "center",
-            marginBottom: 20,
+            marginBottom: spacing.lg,
           }}
         >
-          {isNetworkError ? (
+          {errorKind === "network" ? (
             <WifiOff size={28} color="rgba(255,255,255,0.8)" strokeWidth={1.5} />
           ) : (
             <RefreshCw size={28} color="rgba(255,255,255,0.8)" strokeWidth={1.5} />
           )}
         </View>
 
-        {/* Message */}
+        {/* Title */}
         <Text
           style={{
-            fontFamily: "Inter_500Medium",
-            fontSize: 16,
+            fontFamily: typography.fontFamily.semibold,
+            fontSize: typography.sizes.h3,
             color: colors.text.inverse,
             textAlign: "center",
-            marginBottom: 8,
+            marginBottom: spacing.xs,
           }}
         >
-          {isNetworkError ? "Connection issue" : "Couldn't analyze"}
+          We couldn't analyze this item
         </Text>
+        
+        {/* Subtitle */}
         <Text
           style={{
-            fontFamily: "Inter_400Regular",
-            fontSize: 14,
+            fontFamily: typography.fontFamily.regular,
+            fontSize: typography.sizes.body,
             color: "rgba(255,255,255,0.7)",
             textAlign: "center",
-            lineHeight: 20,
-            marginBottom: 24,
+            lineHeight: typography.lineHeight.normal * typography.sizes.body,
+            marginBottom: spacing.xl,
           }}
         >
-          {message}
+          {getSubtitle()}
         </Text>
 
         {/* Buttons */}
-        <View style={{ flexDirection: "row", gap: 12 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
           <Pressable
             onPress={onDismiss}
             style={({ pressed }) => ({
-              paddingHorizontal: 20,
-              paddingVertical: 12,
+              paddingHorizontal: spacing.lg,
+              paddingVertical: spacing.sm + spacing.xs,
               borderRadius: 12,
               backgroundColor: "rgba(255,255,255,0.1)",
               opacity: pressed ? 0.7 : 1,
@@ -242,8 +264,8 @@ function ErrorOverlay({
           >
             <Text
               style={{
-                fontFamily: "Inter_500Medium",
-                fontSize: 15,
+                fontFamily: typography.fontFamily.medium,
+                fontSize: typography.sizes.body,
                 color: "rgba(255,255,255,0.8)",
               }}
             >
@@ -253,22 +275,22 @@ function ErrorOverlay({
           <Pressable
             onPress={onRetry}
             style={({ pressed }) => ({
-              paddingHorizontal: 20,
-              paddingVertical: 12,
+              paddingHorizontal: spacing.lg,
+              paddingVertical: spacing.sm + spacing.xs,
               borderRadius: 12,
               backgroundColor: colors.accent.terracotta,
               opacity: pressed ? 0.8 : 1,
               flexDirection: "row",
               alignItems: "center",
-              gap: 6,
             })}
           >
             <RefreshCw size={16} color={colors.text.inverse} strokeWidth={2} />
             <Text
               style={{
-                fontFamily: "Inter_600SemiBold",
-                fontSize: 15,
+                fontFamily: typography.fontFamily.semibold,
+                fontSize: typography.sizes.body,
                 color: colors.text.inverse,
+                marginLeft: spacing.xs,
               }}
             >
               Try again
@@ -380,7 +402,7 @@ export default function ScanScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
-  const [scanError, setScanError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<"network" | "timeout" | "other" | null>(null);
   const [lastImageUri, setLastImageUri] = useState<string | null>(null);
   const [lastImageSource, setLastImageSource] = useState<'camera' | 'gallery'>('camera');
   const [showPaywall, setShowPaywall] = useState(false);
@@ -510,7 +532,7 @@ export default function ScanScreen() {
   const processImage = async (imageUri: string, source: 'camera' | 'gallery' = 'camera', retryKey?: string) => {
     setIsProcessing(true);
     setIsCapturing(false);
-    setScanError(null);
+    setErrorKind(null);
     setLastImageUri(imageUri);
     setLastImageSource(source);
     console.log("processImage called with imageUri:", imageUri?.slice(0, 50));
@@ -561,25 +583,17 @@ export default function ScanScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         setIsProcessing(false);
         
-        // Map error kind to user-friendly message
-        let errorMessage: string;
+        // Map error kind to overlay error type
         switch (result.error.kind) {
           case "no_network":
-            errorMessage = "Connection issue. Check your internet and try again.";
+            setErrorKind("network");
             break;
           case "timeout":
-            errorMessage = "Taking too long. Please try again.";
-            break;
-          case "rate_limited":
-            errorMessage = "Too many requests. Please wait a moment and try again.";
-            break;
-          case "server_error":
-            errorMessage = "Server issue. Please try again in a moment.";
+            setErrorKind("timeout");
             break;
           default:
-            errorMessage = "Couldn't analyze this image. Try again or use a different photo.";
+            setErrorKind("other");
         }
-        setScanError(errorMessage);
         return;
       }
       
@@ -620,13 +634,13 @@ export default function ScanScreen() {
       console.log("Unexpected error processing image:", error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setIsProcessing(false);
-      setScanError("Something went wrong. Please try again.");
+      setErrorKind("other");
     }
   };
 
   const handleRetry = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setScanError(null);
+    setErrorKind(null);
     if (lastImageUri) {
       // IMPORTANT: Reuse the same idempotency key for retries
       // This prevents double-charging if the credit was consumed but AI failed
@@ -636,7 +650,7 @@ export default function ScanScreen() {
 
   const handleDismissError = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setScanError(null);
+    setErrorKind(null);
     setLastImageUri(null);
   };
 
@@ -739,9 +753,9 @@ export default function ScanScreen() {
         {isProcessing && <ProcessingOverlay />}
 
         {/* Error overlay */}
-        {scanError && !isProcessing && (
+        {errorKind && !isProcessing && (
           <ErrorOverlay
-            message={scanError}
+            errorKind={errorKind}
             onRetry={handleRetry}
             onDismiss={handleDismissError}
           />
