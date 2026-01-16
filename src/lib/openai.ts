@@ -118,16 +118,23 @@ export function classifyAnalyzeError(err: unknown, res?: Response): AnalyzeError
   // via didTimeout flag. This function only classifies non-abort errors.
 
   // Network/fetch errors - focused on common React Native patterns
+  // iOS-specific: "The network connection was lost" = NSURLErrorNetworkConnectionLost (-1005)
+  // iOS-specific: "A data connection is not currently allowed" = NSURLErrorDataNotAllowed (-1020)
+  // iOS-specific: "The request timed out" = NSURLErrorTimedOut (-1001)
   const isNetworkError =
     errMessage.includes("Network request failed") ||
     errMessage.includes("The Internet connection appears to be offline") ||
+    errMessage.includes("The network connection was lost") ||
+    errMessage.includes("A data connection is not currently allowed") ||
+    errMessage.includes("The request timed out") ||
     errMessage.includes("ENOTFOUND") ||
     errMessage.includes("ECONNRESET") ||
     errMessage.includes("ECONNREFUSED") ||
     errMessage.includes("EHOSTUNREACH") ||
     errMessage.includes("Unable to resolve host") ||
     errMessage.includes("NSURLErrorDomain") ||
-    errMessage.includes("Could not connect");
+    errMessage.includes("Could not connect") ||
+    errMessage.includes("kCFErrorDomainCFNetwork");
 
   if (isNetworkError) {
     return {
