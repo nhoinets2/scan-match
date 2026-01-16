@@ -251,7 +251,7 @@ function ErrorOverlay({
         </Text>
 
         {/* Buttons */}
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
           <Pressable
             onPress={onDismiss}
             style={({ pressed }) => ({
@@ -260,7 +260,6 @@ function ErrorOverlay({
               borderRadius: 12,
               backgroundColor: "rgba(255,255,255,0.1)",
               opacity: pressed ? 0.7 : 1,
-              marginRight: spacing.lg,
             })}
           >
             <Text
@@ -273,6 +272,10 @@ function ErrorOverlay({
               Dismiss
             </Text>
           </Pressable>
+          
+          {/* Spacer */}
+          <View style={{ width: spacing.md }} />
+          
           <Pressable
             onPress={onRetry}
             style={({ pressed }) => ({
