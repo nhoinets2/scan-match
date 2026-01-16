@@ -15,7 +15,7 @@ import Clipboard from "@react-native-clipboard/clipboard";
 import { ArrowLeft, Clock, Copy, X, CloudUpload, RefreshCw } from "lucide-react-native";
 import { ImageWithFallback } from "@/components/PlaceholderImage";
 
-import { useRecentChecks, useRemoveRecentCheck, SCAN_RETENTION, useWardrobe } from "@/lib/database";
+import { useRecentChecks, useRemoveRecentCheck, SCAN_RETENTION } from "@/lib/database";
 import { hasPendingUpload, isUploadFailed } from "@/lib/storage";
 import { colors, typography, spacing, borderRadius, cards, shadows, button } from "@/lib/design-tokens";
 import { getTextStyle } from "@/lib/typography-helpers";
@@ -732,7 +732,6 @@ function StatusPill({ label, color }: { label: string; color: string }) {
 export default function AllChecksScreen() {
   const insets = useSafeAreaInsets();
   const { data: recentChecks = [] } = useRecentChecks();
-  const { data: wardrobe = [] } = useWardrobe();
   const removeRecentCheckMutation = useRemoveRecentCheck();
   const [itemToDelete, setItemToDelete] = useState<RecentCheck | null>(null);
   const [showToast, setShowToast] = useState(false);
