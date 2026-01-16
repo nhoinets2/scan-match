@@ -456,21 +456,6 @@ export async function analyzeClothingImage(
   console.log("analyzeClothingImage called, API key exists:", !!OPENAI_API_KEY);
 
   // ============================================
-  // DEV: SIMULATE TIMEOUT FOR TESTING
-  // Set to true to test timeout error UI
-  // ============================================
-  const SIMULATE_TIMEOUT = true;
-  if (SIMULATE_TIMEOUT) {
-    console.log("[DEV] Simulating timeout after 2 seconds...");
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    return {
-      ok: false,
-      error: { kind: "timeout", message: "It's taking longer than usual. Try again in a moment." },
-    };
-  }
-  // ============================================
-
-  // ============================================
   // ABORT/TIMEOUT HANDLING (deterministic, no string guessing)
   // ============================================
   // We use a single internal controller and cascade external aborts into it.
