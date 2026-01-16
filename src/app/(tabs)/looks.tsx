@@ -452,13 +452,13 @@ export default function SavedChecksScreen() {
     hasSweepedRef.current = true;
     console.log('[Looks] Running orphan sweep');
     
-    // Collect all local URIs that are in use
-    const validLocalUris = new Set<string>(
-      savedChecks
-        .map((c) => c.imageUri)
-        .filter((uri): uri is string => !!uri && uri.startsWith('file://'))
-    );
-    
+      // Collect all local URIs that are in use
+      const validLocalUris = new Set<string>(
+        savedChecks
+          .map((c) => c.imageUri)
+          .filter((uri): uri is string => !!uri && uri.startsWith('file://'))
+      );
+      
     // Include pending uploads (belt and suspenders)
     const pendingUris = getPendingUploadLocalUris('scan');
     for (const uri of pendingUris) {
@@ -471,7 +471,7 @@ export default function SavedChecksScreen() {
       validLocalUris.add(uri);
     }
     
-    void sweepOrphanedLocalImages(validLocalUris, 'scan');
+      void sweepOrphanedLocalImages(validLocalUris, 'scan');
   }, [savedChecks]);
   
   // Run orphan sweep once per session after saved checks load

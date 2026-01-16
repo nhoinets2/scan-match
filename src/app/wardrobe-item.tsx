@@ -197,7 +197,7 @@ export default function WardrobeItemScreen() {
 
   // Image error state
   const [imageError, setImageError] = useState(false);
-  
+
   // Edit mode state
   const [isEditMode, setIsEditMode] = useState(false);
   const [editCategory, setEditCategory] = useState<Category>(

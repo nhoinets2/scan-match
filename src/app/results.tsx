@@ -467,17 +467,26 @@ function ResultsFailed({
 
         {/* Buttons */}
         <View style={{ width: "100%", gap: spacing.md }}>
-          {!isMaxRetries && (
+          {isMaxRetries ? (
+            // Max retries exceeded: only show "Scan another item" as primary CTA
             <ButtonPrimary
-              label="Try again"
-              onPress={onRetry}
-              icon={RefreshCw}
+              label="Scan another item"
+              onPress={() => router.back()}
             />
+          ) : (
+            // Normal failure: "Try again" is primary, "Scan another" is secondary
+            <>
+              <ButtonPrimary
+                label="Try again"
+                onPress={onRetry}
+                icon={RefreshCw}
+              />
+              <ButtonTertiary
+                label="Scan another item"
+                onPress={() => router.back()}
+              />
+            </>
           )}
-          <ButtonTertiary
-            label={isMaxRetries ? "Scan another item" : "Scan another item"}
-            onPress={() => router.back()}
-          />
         </View>
       </View>
     </View>
