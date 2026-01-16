@@ -179,7 +179,7 @@ const CheckGridItem = React.memo(function CheckGridItem({
       </Pressable>
     </Animated.View>
   );
-}
+});
 
 // Delete Confirmation Modal
 function DeleteConfirmationModal({
