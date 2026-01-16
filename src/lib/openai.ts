@@ -459,7 +459,7 @@ export async function analyzeClothingImage(
   // DEV: SIMULATE TIMEOUT FOR TESTING
   // Set to true to test timeout error UI
   // ============================================
-  const SIMULATE_TIMEOUT = true;
+  const SIMULATE_TIMEOUT = false;
   if (SIMULATE_TIMEOUT) {
     console.log("[DEV] Simulating timeout after 2 seconds...");
     await new Promise(resolve => setTimeout(resolve, 2000));
