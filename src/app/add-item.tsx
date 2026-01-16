@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from "react-native";
 import { Image } from "expo-image";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -40,6 +41,7 @@ import {
   AlertTriangle,
   HelpCircle,
   Pencil,
+  WifiOff,
 } from "lucide-react-native";
 
 import { cn } from "@/lib/cn";
@@ -707,6 +709,7 @@ export default function AddItemScreen() {
   const [analysisFailed, setAnalysisFailed] = useState(false);
   const [isNonFashionItem, setIsNonFashionItem] = useState(false);
   const [isUncertainFashion, setIsUncertainFashion] = useState(false);
+  const [networkError, setNetworkError] = useState(false);
   const [analysis, setAnalysis] = useState<ClothingAnalysisResult | null>(null);
   const [category, setCategory] = useState<Category | null>(null);
   const [selectedStyles, setSelectedStyles] = useState<StyleVibe[]>([]);
@@ -875,6 +878,15 @@ export default function AddItemScreen() {
           return;
         }
         
+        // Network errors: show modal (user can't save without connection anyway)
+        if (result.error.kind === "no_network") {
+          console.log("Network error during analysis, showing modal");
+          setNetworkError(true);
+          setScreenState("ready");
+          return;
+        }
+        
+        // Other errors: let user proceed with manual form
         setAnalysisFailed(true);
         setScreenState("analyzed");
         return;
@@ -922,9 +934,29 @@ export default function AddItemScreen() {
       }
     } catch (error) {
       // Unexpected errors (not from analyzeClothingImage)
-      console.log("Unexpected error during analysis:", error);
-      setAnalysisFailed(true);
-      setScreenState("analyzed");
+      // Usually network errors during credit consumption
+      const errMessage = error instanceof Error ? error.message : String(error || "");
+      const isNetworkErr =
+        errMessage.includes("Network request failed") ||
+        errMessage.includes("The Internet connection appears to be offline") ||
+        errMessage.includes("The network connection was lost") ||
+        errMessage.includes("Unable to resolve host") ||
+        errMessage.includes("Failed to fetch") ||
+        errMessage.includes("fetch failed") ||
+        errMessage.includes("ENOTFOUND") ||
+        errMessage.includes("ECONNREFUSED");
+      
+      console.log("[AddItem] Error during processing:", errMessage, "isNetwork:", isNetworkErr);
+      
+      if (isNetworkErr) {
+        // Network error: show modal (can't proceed without connection)
+        setNetworkError(true);
+        setScreenState("ready");
+      } else {
+        // Other errors: let user proceed with manual form
+        setAnalysisFailed(true);
+        setScreenState("analyzed");
+      }
     } finally {
       // Clear ref only if it still points to this controller (prevents race with new attempts)
       if (analysisAbortRef.current === controller) {
@@ -1277,6 +1309,80 @@ export default function AddItemScreen() {
           onPurchaseComplete={handlePaywallSuccess}
           reason="wardrobe_limit"
         />
+
+        {/* Network error modal */}
+        <Modal
+          visible={networkError}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setNetworkError(false)}
+        >
+          <Pressable 
+            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+            onPress={() => setNetworkError(false)}
+          >
+            <Pressable 
+              onPress={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: colors.bg.primary,
+                borderRadius: 24,
+                padding: spacing.xl,
+                marginHorizontal: spacing.lg,
+                alignItems: "center",
+                maxWidth: 320,
+              }}
+            >
+              {/* Icon */}
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  backgroundColor: colors.verdict.okay.bg,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: spacing.md,
+                }}
+              >
+                <WifiOff size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+              </View>
+
+              {/* Title */}
+              <Text
+                style={{
+                  fontFamily: "PlayfairDisplay_600SemiBold",
+                  fontSize: typography.sizes.h3,
+                  color: colors.text.primary,
+                  textAlign: "center",
+                  marginBottom: spacing.xs,
+                }}
+              >
+                No connection
+              </Text>
+
+              {/* Subtitle */}
+              <Text
+                style={{
+                  fontFamily: "Inter_400Regular",
+                  fontSize: typography.sizes.body,
+                  color: colors.text.secondary,
+                  textAlign: "center",
+                  marginBottom: spacing.lg,
+                  lineHeight: 22,
+                }}
+              >
+                Please check your internet connection and try again.
+              </Text>
+
+              {/* Button */}
+              <ButtonPrimary
+                label="Try again"
+                onPress={() => setNetworkError(false)}
+                style={{ width: "100%" }}
+              />
+            </Pressable>
+          </Pressable>
+        </Modal>
       </View>
     );
   }
