@@ -59,6 +59,7 @@ import {
   WifiOff,
   Clock,
   AlertOctagon,
+  AlertCircle,
 } from "lucide-react-native";
 import { ThumbnailPlaceholderImage, ThumbnailWithFallback } from "@/components/PlaceholderImage";
 
@@ -1605,7 +1606,7 @@ function ResultsSuccess({
   const [showFavoriteStoresModal, setShowFavoriteStoresModal] = useState(false);
   const [showStoreSavedToast, setShowStoreSavedToast] = useState(false);
   const [showScanSavedToast, setShowScanSavedToast] = useState(false);
-  const [showSaveErrorToast, setShowSaveErrorToast] = useState(false);
+  const [saveError, setSaveError] = useState<'network' | 'other' | null>(null);
   const { data: storePreference } = useStorePreference();
   const updateStorePreference = useUpdateStorePreference();
   const { data: tailorCardSeen } = useTailorCardSeen();
@@ -2551,10 +2552,23 @@ function ResultsSuccess({
           );
         } catch (error) {
           console.error('[Save] Failed to save scan:', error);
-          // Revert visual state and show error toast
+          // Revert visual state
           setIsSaved(false);
-          setShowSaveErrorToast(true);
-          setTimeout(() => setShowSaveErrorToast(false), 3000);
+          
+          // Check if it's a network error
+          const errMessage = error instanceof Error ? error.message : String(error || "");
+          const isNetworkErr =
+            errMessage.includes("Network request failed") ||
+            errMessage.includes("The Internet connection appears to be offline") ||
+            errMessage.includes("The network connection was lost") ||
+            errMessage.includes("Unable to resolve host") ||
+            errMessage.includes("Failed to fetch") ||
+            errMessage.includes("fetch failed") ||
+            errMessage.includes("ENOTFOUND") ||
+            errMessage.includes("ECONNREFUSED");
+          
+          console.log("[Save] Error:", errMessage, "isNetwork:", isNetworkErr);
+          setSaveError(isNetworkErr ? 'network' : 'other');
         }
       };
       
@@ -4553,34 +4567,92 @@ width: spacing.xs / 2,
         </Animated.View>
       )}
 
-      {/* Save error toast */}
-      {showSaveErrorToast && (
-        <Animated.View
-          entering={FadeInUp.duration(300)}
-          exiting={FadeOut.duration(200)}
-          style={{
-            position: "absolute",
-            bottom: insets.bottom + 100,
-            left: 24,
-            right: 24,
-            backgroundColor: colors.status.error,
-            borderRadius: borderRadius.image,
-            paddingVertical: 14,
-            paddingHorizontal: 20,
-            alignItems: "center",
-            zIndex: 1000,
-          }}
+      {/* Save error modal */}
+      <Modal
+        visible={saveError !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSaveError(null)}
+      >
+        <Pressable 
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+          onPress={() => setSaveError(null)}
         >
-          <Text
+          <Pressable 
+            onPress={(e) => e.stopPropagation()}
             style={{
-              ...typography.ui.bodyMedium,
-              color: colors.text.inverse,
+              backgroundColor: colors.bg.primary,
+              borderRadius: 24,
+              padding: spacing.xl,
+              marginHorizontal: spacing.lg,
+              alignItems: "center",
+              maxWidth: 320,
             }}
           >
-            Couldn't save scan. Please try again.
-          </Text>
-        </Animated.View>
-      )}
+            {/* Icon */}
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: colors.verdict.okay.bg,
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: spacing.md,
+              }}
+            >
+              {saveError === 'network' ? (
+                <WifiOff size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+              ) : (
+                <AlertCircle size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+              )}
+            </View>
+
+            {/* Title */}
+            <Text
+              style={{
+                fontFamily: "PlayfairDisplay_600SemiBold",
+                fontSize: typography.sizes.h3,
+                color: colors.text.primary,
+                textAlign: "center",
+                marginBottom: spacing.xs,
+              }}
+            >
+              {saveError === 'network' ? 'Connection unavailable' : "Couldn't save scan"}
+            </Text>
+
+            {/* Subtitle */}
+            <Text
+              style={{
+                fontFamily: "Inter_400Regular",
+                fontSize: typography.sizes.body,
+                color: colors.text.secondary,
+                textAlign: "center",
+                marginBottom: spacing.lg,
+                lineHeight: 22,
+              }}
+            >
+              {saveError === 'network' 
+                ? 'Please check your internet and try again.' 
+                : 'Please try again in a moment.'}
+            </Text>
+
+            {/* Primary Button */}
+            <ButtonPrimary
+              label="Try again"
+              onPress={() => setSaveError(null)}
+              style={{ width: "100%" }}
+            />
+
+            {/* Secondary Button */}
+            <ButtonTertiary
+              label="Close"
+              onPress={() => setSaveError(null)}
+              style={{ marginTop: spacing.sm }}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Matches bottom sheet - shows all HIGH or NEAR core matches only */}
       {shouldRenderMatchesSheet && (
