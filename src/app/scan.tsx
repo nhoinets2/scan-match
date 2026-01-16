@@ -680,32 +680,32 @@ export default function ScanScreen() {
               <WifiOff size={28} color={colors.verdict.okay.text} strokeWidth={2} />
             </View>
 
-            {/* Title */}
-            <Text
-              style={{
-                fontFamily: "PlayfairDisplay_600SemiBold",
-                fontSize: typography.sizes.h3,
-                color: colors.text.primary,
-                textAlign: "center",
-                marginBottom: spacing.xs,
-              }}
-            >
-              No connection
-            </Text>
+              {/* Title */}
+              <Text
+                style={{
+                  fontFamily: "PlayfairDisplay_600SemiBold",
+                  fontSize: typography.sizes.h3,
+                  color: colors.text.primary,
+                  textAlign: "center",
+                  marginBottom: spacing.xs,
+                }}
+              >
+                Connection unavailable
+              </Text>
 
-            {/* Subtitle */}
-            <Text
-              style={{
-                fontFamily: "Inter_400Regular",
-                fontSize: typography.sizes.body,
-                color: colors.text.secondary,
-                textAlign: "center",
-                marginBottom: spacing.lg,
-                lineHeight: 22,
-              }}
-            >
-              Please check your internet connection and try again.
-            </Text>
+              {/* Subtitle */}
+              <Text
+                style={{
+                  fontFamily: "Inter_400Regular",
+                  fontSize: typography.sizes.body,
+                  color: colors.text.secondary,
+                  textAlign: "center",
+                  marginBottom: spacing.lg,
+                  lineHeight: 22,
+                }}
+              >
+                Please check your internet and try again.
+              </Text>
 
             {/* Button */}
             <ButtonPrimary

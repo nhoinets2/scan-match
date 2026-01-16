@@ -881,6 +881,8 @@ export default function AddItemScreen() {
         // Network errors: show modal (user can't save without connection anyway)
         if (result.error.kind === "no_network") {
           console.log("Network error during analysis, showing modal");
+          // Reset isCapturing so user can take another photo after dismissing
+          setIsCapturing(false);
           setNetworkError(true);
           setScreenState("ready");
           return;
@@ -950,6 +952,8 @@ export default function AddItemScreen() {
       
       if (isNetworkErr) {
         // Network error: show modal (can't proceed without connection)
+        // Reset isCapturing so user can take another photo after dismissing
+        setIsCapturing(false);
         setNetworkError(true);
         setScreenState("ready");
       } else {
@@ -1357,7 +1361,7 @@ export default function AddItemScreen() {
                   marginBottom: spacing.xs,
                 }}
               >
-                No connection
+                Connection unavailable
               </Text>
 
               {/* Subtitle */}
@@ -1371,7 +1375,7 @@ export default function AddItemScreen() {
                   lineHeight: 22,
                 }}
               >
-                Please check your internet connection and try again.
+                Please check your internet and try again.
               </Text>
 
               {/* Button */}
