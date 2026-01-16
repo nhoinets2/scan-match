@@ -27,6 +27,7 @@ import {
   HelpCircle,
   ChevronDown,
   WifiOff,
+  AlertCircle,
 } from "lucide-react-native";
 
 import { useSnapToMatchStore } from "@/lib/store";
@@ -264,7 +265,7 @@ export default function ScanScreen() {
   const [showHelp, setShowHelp] = useState(false);
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [showPaywall, setShowPaywall] = useState(false);
-  const [networkError, setNetworkError] = useState(false);
+  const [creditCheckError, setCreditCheckError] = useState<'network' | 'other' | null>(null);
 
   const clearScan = useSnapToMatchStore((s) => s.clearScan);
 
@@ -434,13 +435,18 @@ export default function ScanScreen() {
         errMessage.includes("ENOTFOUND") ||
         errMessage.includes("ECONNREFUSED");
       
+      // Don't show modal for user-initiated cancellation (abort on unmount)
+      const isCancelled = errMessage.includes("cancelled") || errMessage.includes("aborted");
+      if (isCancelled) {
+        console.log("[Scan] Credit check cancelled, ignoring");
+        setIsProcessing(false);
+        return;
+      }
+      
       console.log("[Scan] Error during credit check:", errMessage, "isNetwork:", isNetworkError);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setIsProcessing(false);
-      
-      if (isNetworkError) {
-        setNetworkError(true);
-      }
+      setCreditCheckError(isNetworkError ? 'network' : 'other');
     }
   };
 
@@ -643,16 +649,16 @@ export default function ScanScreen() {
         reason="in_store_limit"
       />
 
-      {/* Network error overlay */}
+      {/* Credit check error modal */}
       <Modal
-        visible={networkError}
+        visible={creditCheckError !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setNetworkError(false)}
+        onRequestClose={() => setCreditCheckError(null)}
       >
         <Pressable 
           style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
-          onPress={() => setNetworkError(false)}
+          onPress={() => setCreditCheckError(null)}
         >
           <Pressable 
             onPress={(e) => e.stopPropagation()}
@@ -677,41 +683,54 @@ export default function ScanScreen() {
                 marginBottom: spacing.md,
               }}
             >
-              <WifiOff size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+              {creditCheckError === 'network' ? (
+                <WifiOff size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+              ) : (
+                <AlertCircle size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+              )}
             </View>
 
-              {/* Title */}
-              <Text
-                style={{
-                  fontFamily: "PlayfairDisplay_600SemiBold",
-                  fontSize: typography.sizes.h3,
-                  color: colors.text.primary,
-                  textAlign: "center",
-                  marginBottom: spacing.xs,
-                }}
-              >
-                Connection unavailable
-              </Text>
+            {/* Title */}
+            <Text
+              style={{
+                fontFamily: "PlayfairDisplay_600SemiBold",
+                fontSize: typography.sizes.h3,
+                color: colors.text.primary,
+                textAlign: "center",
+                marginBottom: spacing.xs,
+              }}
+            >
+              {creditCheckError === 'network' ? 'Connection unavailable' : "Couldn't check credits"}
+            </Text>
 
-              {/* Subtitle */}
-              <Text
-                style={{
-                  fontFamily: "Inter_400Regular",
-                  fontSize: typography.sizes.body,
-                  color: colors.text.secondary,
-                  textAlign: "center",
-                  marginBottom: spacing.lg,
-                  lineHeight: 22,
-                }}
-              >
-                Please check your internet and try again.
-              </Text>
+            {/* Subtitle */}
+            <Text
+              style={{
+                fontFamily: "Inter_400Regular",
+                fontSize: typography.sizes.body,
+                color: colors.text.secondary,
+                textAlign: "center",
+                marginBottom: spacing.lg,
+                lineHeight: 22,
+              }}
+            >
+              {creditCheckError === 'network' 
+                ? 'Please check your internet and try again.' 
+                : 'Please try again in a moment.'}
+            </Text>
 
-            {/* Button */}
+            {/* Primary Button */}
             <ButtonPrimary
               label="Try again"
-              onPress={() => setNetworkError(false)}
+              onPress={() => setCreditCheckError(null)}
               style={{ width: "100%" }}
+            />
+
+            {/* Secondary Button */}
+            <ButtonTertiary
+              label="Close"
+              onPress={() => setCreditCheckError(null)}
+              style={{ marginTop: spacing.sm }}
             />
           </Pressable>
         </Pressable>

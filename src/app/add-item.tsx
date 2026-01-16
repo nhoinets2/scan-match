@@ -709,7 +709,7 @@ export default function AddItemScreen() {
   const [analysisFailed, setAnalysisFailed] = useState(false);
   const [isNonFashionItem, setIsNonFashionItem] = useState(false);
   const [isUncertainFashion, setIsUncertainFashion] = useState(false);
-  const [networkError, setNetworkError] = useState(false);
+  const [creditCheckError, setCreditCheckError] = useState<'network' | 'other' | null>(null);
   const [analysis, setAnalysis] = useState<ClothingAnalysisResult | null>(null);
   const [category, setCategory] = useState<Category | null>(null);
   const [selectedStyles, setSelectedStyles] = useState<StyleVibe[]>([]);
@@ -883,7 +883,7 @@ export default function AddItemScreen() {
           console.log("Network error during analysis, showing modal");
           // Reset isCapturing so user can take another photo after dismissing
           setIsCapturing(false);
-          setNetworkError(true);
+          setCreditCheckError('network');
           setScreenState("ready");
           return;
         }
@@ -948,18 +948,28 @@ export default function AddItemScreen() {
         errMessage.includes("ENOTFOUND") ||
         errMessage.includes("ECONNREFUSED");
       
+      // Don't show modal for user-initiated cancellation (abort on unmount)
+      const isCancelled = errMessage.includes("cancelled") || errMessage.includes("aborted");
+      if (isCancelled) {
+        console.log("[AddItem] Credit check cancelled, ignoring");
+        setIsCapturing(false);
+        setScreenState("ready");
+        return;
+      }
+      
       console.log("[AddItem] Error during processing:", errMessage, "isNetwork:", isNetworkErr);
+      
+      // Reset isCapturing so user can take another photo after dismissing
+      setIsCapturing(false);
       
       if (isNetworkErr) {
         // Network error: show modal (can't proceed without connection)
-        // Reset isCapturing so user can take another photo after dismissing
-        setIsCapturing(false);
-        setNetworkError(true);
+        setCreditCheckError('network');
         setScreenState("ready");
       } else {
-        // Other errors: let user proceed with manual form
-        setAnalysisFailed(true);
-        setScreenState("analyzed");
+        // Other errors during credit check: show modal
+        setCreditCheckError('other');
+        setScreenState("ready");
       }
     } finally {
       // Clear ref only if it still points to this controller (prevents race with new attempts)
@@ -1314,16 +1324,16 @@ export default function AddItemScreen() {
           reason="wardrobe_limit"
         />
 
-        {/* Network error modal */}
+        {/* Credit check error modal */}
         <Modal
-          visible={networkError}
+          visible={creditCheckError !== null}
           transparent
           animationType="fade"
-          onRequestClose={() => setNetworkError(false)}
+          onRequestClose={() => setCreditCheckError(null)}
         >
           <Pressable 
             style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
-            onPress={() => setNetworkError(false)}
+            onPress={() => setCreditCheckError(null)}
           >
             <Pressable 
               onPress={(e) => e.stopPropagation()}
@@ -1348,7 +1358,11 @@ export default function AddItemScreen() {
                   marginBottom: spacing.md,
                 }}
               >
-                <WifiOff size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+                {creditCheckError === 'network' ? (
+                  <WifiOff size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+                ) : (
+                  <AlertCircle size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+                )}
               </View>
 
               {/* Title */}
@@ -1361,7 +1375,7 @@ export default function AddItemScreen() {
                   marginBottom: spacing.xs,
                 }}
               >
-                Connection unavailable
+                {creditCheckError === 'network' ? 'Connection unavailable' : "Couldn't check credits"}
               </Text>
 
               {/* Subtitle */}
@@ -1375,14 +1389,23 @@ export default function AddItemScreen() {
                   lineHeight: 22,
                 }}
               >
-                Please check your internet and try again.
+                {creditCheckError === 'network' 
+                  ? 'Please check your internet and try again.' 
+                  : 'Please try again in a moment.'}
               </Text>
 
-              {/* Button */}
+              {/* Primary Button */}
               <ButtonPrimary
                 label="Try again"
-                onPress={() => setNetworkError(false)}
+                onPress={() => setCreditCheckError(null)}
                 style={{ width: "100%" }}
+              />
+
+              {/* Secondary Button */}
+              <ButtonTertiary
+                label="Close"
+                onPress={() => setCreditCheckError(null)}
+                style={{ marginTop: spacing.sm }}
               />
             </Pressable>
           </Pressable>
