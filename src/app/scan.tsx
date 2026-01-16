@@ -584,8 +584,16 @@ export default function ScanScreen() {
       // Handle analysis failure - show error, don't navigate
       if (!result.ok) {
         console.log("Analysis failed:", result.error.kind, result.error.message);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         setIsProcessing(false);
+        
+        // Don't show error UI for user cancellations (navigation away, etc.)
+        if (result.error.kind === "cancelled") {
+          console.log("Analysis cancelled by user, no error UI");
+          return;
+        }
+        
+        // Show error haptic and overlay for actual errors
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         
         // Map error kind to overlay error type
         switch (result.error.kind) {

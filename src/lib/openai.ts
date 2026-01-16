@@ -61,7 +61,8 @@ const OPENAI_API_KEY = process.env.EXPO_PUBLIC_VIBECODE_OPENAI_API_KEY;
  */
 export type AnalyzeErrorKind =
   | "no_network"      // Network request failed, no connectivity
-  | "timeout"         // Request took too long (AbortController)
+  | "timeout"         // Request took too long (AbortController timeout)
+  | "cancelled"       // User cancelled (navigation/unmount) - usually don't show UI
   | "rate_limited"    // 429 - too many requests
   | "api_error"       // Generic API error (non-specific 4xx/5xx)
   | "unauthorized"    // 401/403 - auth issues
@@ -105,25 +106,28 @@ export type AnalyzeResult =
  * Handles network errors, HTTP status codes, and fallback to unknown.
  */
 export function classifyAnalyzeError(err: unknown, res?: Response): AnalyzeError {
-  // Timeouts (AbortController)
-  if (err && typeof err === "object" && "name" in err && err.name === "AbortError") {
-    return {
-      kind: "timeout",
-      message: "Taking too long to analyze.",
-      debug: "AbortController timeout",
-    };
-  }
-
-  // Network/fetch errors
   const errMessage = err instanceof Error ? err.message : String(err || "");
+  const errName = err && typeof err === "object" && "name" in err ? String(err.name) : "";
+  
+  // Debug logging in dev only
+  if (__DEV__) {
+    console.log("[classifyAnalyzeError] name:", errName, "message:", errMessage);
+  }
+  
+  // Note: Abort/timeout detection is handled deterministically in analyzeClothingImage
+  // via didTimeout flag. This function only classifies non-abort errors.
+
+  // Network/fetch errors - focused on common React Native patterns
   const isNetworkError =
     errMessage.includes("Network request failed") ||
-    errMessage.includes("Failed to fetch") ||
+    errMessage.includes("The Internet connection appears to be offline") ||
     errMessage.includes("ENOTFOUND") ||
     errMessage.includes("ECONNRESET") ||
     errMessage.includes("ECONNREFUSED") ||
-    errMessage.includes("network") ||
-    errMessage.includes("fetch");
+    errMessage.includes("EHOSTUNREACH") ||
+    errMessage.includes("Unable to resolve host") ||
+    errMessage.includes("NSURLErrorDomain") ||
+    errMessage.includes("Could not connect");
 
   if (isNetworkError) {
     return {
@@ -451,17 +455,32 @@ export async function analyzeClothingImage(
   const startTime = Date.now();
   console.log("analyzeClothingImage called, API key exists:", !!OPENAI_API_KEY);
 
-  // Set up timeout with AbortController
+  // ============================================
+  // ABORT/TIMEOUT HANDLING (deterministic, no string guessing)
+  // ============================================
+  // We use a single internal controller and cascade external aborts into it.
+  // This gives us deterministic classification:
+  //   - Timeout: didTimeout=true + controller.abort() → "timeout" error
+  //   - User cancel: externalSignal aborts → controller.abort() → "cancelled" error
+  //
+  // The fetch uses controller.signal, so we check controller.signal.aborted in catch.
+  // This is equivalent to merging signals but simpler.
+  // ============================================
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  let didTimeout = false;
   
-  // Link external abort signal if provided
+  const timeoutId = setTimeout(() => {
+    didTimeout = true;
+    controller.abort();
+  }, timeoutMs);
+  
+  // Link external abort signal if provided (user cancellation via navigation/unmount)
   if (externalSignal) {
     if (externalSignal.aborted) {
       clearTimeout(timeoutId);
       return {
         ok: false,
-        error: { kind: "timeout", message: "Analysis was cancelled." },
+        error: { kind: "cancelled", message: "Cancelled.", debug: "External signal already aborted" },
       };
     }
     externalSignal.addEventListener("abort", () => controller.abort());
@@ -815,7 +834,21 @@ Respond with ONLY the JSON object.`;
     clearTimeout(timeoutId);
     console.log("Image analysis failed:", error);
     
-    // Classify the error
+    // Deterministic abort handling - no string guessing needed
+    if (controller.signal.aborted) {
+      const abortError: AnalyzeError = didTimeout
+        ? { kind: "timeout", message: "It's taking longer than usual. Try again in a moment." }
+        : { kind: "cancelled", message: "Cancelled.", debug: "Aborted by navigation/unmount" };
+      
+      // Only log telemetry for timeouts, not user cancellations
+      if (didTimeout) {
+        logFailureTelemetry(abortError);
+      }
+      
+      return { ok: false, error: abortError };
+    }
+    
+    // Classify non-abort errors (network, HTTP, etc.)
     const classifiedError = classifyAnalyzeError(error);
     logFailureTelemetry(classifiedError);
     

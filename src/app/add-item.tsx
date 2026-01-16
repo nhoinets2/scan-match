@@ -839,6 +839,14 @@ export default function AddItemScreen() {
       // Handle analysis failure
       if (!result.ok) {
         console.log("Analysis failed:", result.error.kind, result.error.message);
+        
+        // Don't show error UI for user cancellations
+        if (result.error.kind === "cancelled") {
+          console.log("Analysis cancelled by user, resetting");
+          setScreenState("ready");
+          return;
+        }
+        
         setAnalysisFailed(true);
         setScreenState("analyzed");
         return;
