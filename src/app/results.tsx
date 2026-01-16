@@ -134,6 +134,86 @@ import {
   incrementAndGetScanCount,
 } from "@/lib/analytics";
 
+// ============================================
+// PR2: COMPONENT SPLIT DOCUMENTATION
+// ============================================
+// This documents the intended split for PR3's state machine refactor.
+//
+// Parent (ResultsScreen) will keep:
+//   - useLocalSearchParams (route params)
+//   - useRecentChecks, useWardrobe, useWardrobeCount, usePreferences (independent queries)
+//   - useAuth, useSafeAreaInsets
+//   - useSnapToMatchStore (clearScan, currentScan)
+//   - savedCheck derivation, scannedItem extraction
+//   - State machine: loading | failed | success
+//   - Guard UI for missing/invalid scannedItem, loading, and failed states
+//
+// ResultsSuccess will get (via props):
+//   - scannedItem (guaranteed non-null by parent guard)
+//   - useConfidenceEngine, useComboAssembler, useResultsTabs (scannedItem-dependent hooks)
+//   - All scannedItem-dependent state and effects
+//   - All UI rendering for success state
+//
+// PR2 establishes:
+//   - This documentation
+//   - The props interface (ready for extraction)
+//   - Clean guard behavior for missing scannedItem
+//
+// PR3 will:
+//   - Add loading/failed states to parent
+//   - Extract ResultsSuccess as a separate component
+//   - Move scannedItem-dependent hooks into ResultsSuccess
+// ============================================
+
+import type { UseMutationResult } from "@tanstack/react-query";
+import type { ScannedItem as ScannedItemType } from "@/lib/types";
+
+/**
+ * Props for ResultsSuccess component (used in PR3).
+ * Parent provides all dependencies; child owns scannedItem-dependent logic.
+ * 
+ * NOTE: This interface is defined now but ResultsSuccess extraction happens in PR3.
+ * This allows the interface to be reviewed and finalized before the code motion.
+ */
+interface ResultsSuccessProps {
+  // Core data (guaranteed non-null by parent guard)
+  scannedItem: ScannedItemType;
+  resolvedImageUri: string | undefined;
+  
+  // Independent data from parent queries
+  wardrobe: WardrobeItem[];
+  wardrobeCount: number;
+  preferences: { fitPreference?: "oversized" | "regular" | "slim" } | undefined;
+  recentChecks: RecentCheck[];
+  
+  // Check context
+  savedCheck: RecentCheck | null;
+  isViewingSavedCheck: boolean;
+  currentCheckId: string | null;
+  currentScan: ScannedItemType | null;
+  
+  // Save state (managed by parent, used by child for UI)
+  isSaved: boolean;
+  setIsSaved: React.Dispatch<React.SetStateAction<boolean>>;
+  lastSaveTimestampRef: React.MutableRefObject<number>;
+  
+  // Mutations (stable references from parent)
+  addRecentCheckMutation: UseMutationResult<RecentCheck, Error, any, unknown>;
+  updateRecentCheckOutcomeMutation: UseMutationResult<void, Error, any, unknown>;
+  
+  // Actions
+  clearScan: () => void;
+  
+  // Layout
+  insets: { top: number; bottom: number; left: number; right: number };
+  
+  // Auth
+  user: { id: string } | null;
+}
+
+// Suppress unused warning - interface is used in PR3
+void (0 as unknown as ResultsSuccessProps);
+
 // Core vs Optional category definitions for matches routing
 // Core: used in outfit formulas (TOP+BOTTOM+SHOES or DRESS+SHOES)
 // Optional: finishing touches shown in "Optional add-ons" section
