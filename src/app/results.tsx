@@ -2512,18 +2512,14 @@ function ResultsSuccess({
         );
       }
     } else {
-      // Save
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      
-      // Immediate visual feedback
+      // Save - optimistic visual feedback only (bookmark filled)
       setIsSaved(true);
-      setShowScanSavedToast(true);
-      setTimeout(() => setShowScanSavedToast(false), 2000);
       
-      // Helper to perform save with local storage + cloud upload (runs in background)
+      // Helper to perform save with local storage + cloud upload
       const performSave = async (id: string, currentImageUri: string) => {
         if (!user?.id) {
           console.error('[Save] No user ID, cannot save');
+          setIsSaved(false);
           return;
         }
         
@@ -2531,25 +2527,25 @@ function ResultsSuccess({
           // 1. Prepare: copy image to local storage with deterministic name
           const localUri = await prepareScanForSave(id, currentImageUri, user.id);
           
-          // 2. Update DB with outcome AND new local imageUri
-          updateRecentCheckOutcomeMutation.mutate(
-            { 
-              id, 
-              outcome: "saved_to_revisit",
-              imageUri: localUri !== currentImageUri ? localUri : undefined, // Only update if changed
-            },
-            { 
-              onSuccess: async () => {
-                // 3. Queue background upload (fire and forget)
-                try {
-                  await completeScanSave(id, localUri, user.id);
-                } catch (uploadError) {
-                  console.error('[Save] Failed to queue upload:', uploadError);
-                  // Non-fatal: scan is saved locally, upload will retry
-                }
-              },
-            }
-          );
+          // 2. Update DB with outcome AND new local imageUri (await to catch errors)
+          await updateRecentCheckOutcomeMutation.mutateAsync({ 
+            id, 
+            outcome: "saved_to_revisit",
+            imageUri: localUri !== currentImageUri ? localUri : undefined, // Only update if changed
+          });
+          
+          // Success! Show haptic and toast now
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          setShowScanSavedToast(true);
+          setTimeout(() => setShowScanSavedToast(false), 2000);
+          
+          // 3. Queue background upload (fire and forget)
+          try {
+            await completeScanSave(id, localUri, user.id);
+          } catch (uploadError) {
+            console.error('[Save] Failed to queue upload:', uploadError);
+            // Non-fatal: scan is saved locally, upload will retry
+          }
         } catch (error) {
           console.error('[Save] Failed to save scan:', error);
           // Revert visual state
