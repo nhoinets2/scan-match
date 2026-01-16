@@ -26,6 +26,7 @@ import {
   ImageIcon,
   HelpCircle,
   ChevronDown,
+  WifiOff,
 } from "lucide-react-native";
 
 import { useSnapToMatchStore } from "@/lib/store";
@@ -263,6 +264,7 @@ export default function ScanScreen() {
   const [showHelp, setShowHelp] = useState(false);
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [networkError, setNetworkError] = useState(false);
 
   const clearScan = useSnapToMatchStore((s) => s.clearScan);
 
@@ -420,10 +422,25 @@ export default function ScanScreen() {
       
       setIsProcessing(false);
     } catch (error) {
-      // Unexpected errors during quota check
-      console.log("Unexpected error processing image:", error);
+      // Check if it's a network error
+      const errMessage = error instanceof Error ? error.message : String(error || "");
+      const isNetworkError =
+        errMessage.includes("Network request failed") ||
+        errMessage.includes("The Internet connection appears to be offline") ||
+        errMessage.includes("The network connection was lost") ||
+        errMessage.includes("Unable to resolve host") ||
+        errMessage.includes("Failed to fetch") ||
+        errMessage.includes("fetch failed") ||
+        errMessage.includes("ENOTFOUND") ||
+        errMessage.includes("ECONNREFUSED");
+      
+      console.log("[Scan] Error during credit check:", errMessage, "isNetwork:", isNetworkError);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setIsProcessing(false);
+      
+      if (isNetworkError) {
+        setNetworkError(true);
+      }
     }
   };
 
@@ -625,6 +642,80 @@ export default function ScanScreen() {
         onPurchaseComplete={handlePaywallSuccess}
         reason="in_store_limit"
       />
+
+      {/* Network error overlay */}
+      <Modal
+        visible={networkError}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setNetworkError(false)}
+      >
+        <Pressable 
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+          onPress={() => setNetworkError(false)}
+        >
+          <Pressable 
+            onPress={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: colors.bg.primary,
+              borderRadius: 24,
+              padding: spacing.xl,
+              marginHorizontal: spacing.lg,
+              alignItems: "center",
+              maxWidth: 320,
+            }}
+          >
+            {/* Icon */}
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: colors.verdict.okay.bg,
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: spacing.md,
+              }}
+            >
+              <WifiOff size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+            </View>
+
+            {/* Title */}
+            <Text
+              style={{
+                fontFamily: "PlayfairDisplay_600SemiBold",
+                fontSize: typography.sizes.h3,
+                color: colors.text.primary,
+                textAlign: "center",
+                marginBottom: spacing.xs,
+              }}
+            >
+              No connection
+            </Text>
+
+            {/* Subtitle */}
+            <Text
+              style={{
+                fontFamily: "Inter_400Regular",
+                fontSize: typography.sizes.body,
+                color: colors.text.secondary,
+                textAlign: "center",
+                marginBottom: spacing.lg,
+                lineHeight: 22,
+              }}
+            >
+              Please check your internet connection and try again.
+            </Text>
+
+            {/* Button */}
+            <ButtonPrimary
+              label="Try again"
+              onPress={() => setNetworkError(false)}
+              style={{ width: "100%" }}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
