@@ -1681,76 +1681,84 @@ function ResultsSuccess({
   }, [scannedItem]);
 
   // Add recent check when results are displayed (only once) - skip if viewing saved check
+  // Works for both new imageUri flow (scannedItem from analysis) and legacy flow (currentScan from store)
   useEffect(() => {
-    if (currentScan && !hasAddedCheck.current && !isViewingSavedCheck && preferences) {
-      hasAddedCheck.current = true;
-
-      // Run decision tree to determine outcome
-      const defaultSignals: ItemSignalsResult = {
-        stylingRisk: "medium" as StylingRisk,
-      };
-
-      const result = runDecisionTree({
-        category: currentScan.category,
-        itemSignals: currentScan.itemSignals || defaultSignals,
-        userFitPreference: preferences?.fitPreference ?? "regular",
-        contextSufficient: currentScan.contextSufficient ?? true,
-        wardrobeCount,
-      });
-
-      const confidence = outcomeToConfidence(result.outcome);
-      // Use confidence engine matches for score
-      const confidenceScore = confidenceResult.matches.length > 0
-        ? confidenceResult.matches[0].evaluation.raw_score
-        : 0.5;
-
-      // Build debug snapshot (only in development mode)
-      let engineSnapshot = null;
-      if (shouldSaveDebugData()) {
-        // Generate a temporary scanId (will be replaced with actual check ID after save)
-        const tempScanId = `temp-${Date.now()}`;
-
-        // Get itemCard category and label for debugging
-        const itemCardCategory = itemSummary.category;
-        const itemLabel = currentScan.descriptiveLabel || getDescriptiveLabel(itemSummary.category);
-
-        engineSnapshot = buildEngineSnapshot(
-          confidenceResult,
-          null, // No legacy matchResult
-          false, // Not using legacy engine
-          tempScanId,
-          currentScan.category,
-          wardrobeCount,
-          wardrobe,
-          itemCardCategory,
-          itemLabel
-        );
-      }
-
-      // Capitalize scannedItem fields before saving to database
-      const capitalizedScannedItem = {
-        ...currentScan,
-        descriptiveLabel: currentScan.descriptiveLabel 
-          ? capitalizeFirst(currentScan.descriptiveLabel) 
-          : currentScan.descriptiveLabel,
-        styleNotes: currentScan.styleNotes 
-          ? capitalizeItems(currentScan.styleNotes) 
-          : currentScan.styleNotes,
-      };
-
-      addRecentCheckMutation.mutate({
-        itemName: capitalizeFirst(currentScan.descriptiveLabel || "Scanned item"),
-        category: currentScan.category,
-        imageUri: currentScan.imageUri,
-        outcome: result.outcome,
-        confidence,
-        confidenceScore,
-        scannedItem: capitalizedScannedItem,
-        // TEMPORARY: Add engine snapshot
-        ...(engineSnapshot && { engineSnapshot }),
-      });
+    // Skip if:
+    // - Already added a check this session
+    // - Viewing a saved/recent check (not a fresh scan)
+    // - No preferences loaded yet
+    if (hasAddedCheck.current || isViewingSavedCheck || !preferences) {
+      return;
     }
-  }, [currentScan, wardrobeCount, preferences, isViewingSavedCheck, addRecentCheckMutation, confidenceResult, itemSummary, wardrobe]);
+    
+    hasAddedCheck.current = true;
+
+    // Run decision tree to determine outcome
+    const defaultSignals: ItemSignalsResult = {
+      stylingRisk: "medium" as StylingRisk,
+    };
+
+    const result = runDecisionTree({
+      category: scannedItem.category,
+      itemSignals: scannedItem.itemSignals || defaultSignals,
+      userFitPreference: preferences?.fitPreference ?? "regular",
+      contextSufficient: scannedItem.contextSufficient ?? true,
+      wardrobeCount,
+    });
+
+    const confidence = outcomeToConfidence(result.outcome);
+    // Use confidence engine matches for score
+    const confidenceScore = confidenceResult.matches.length > 0
+      ? confidenceResult.matches[0].evaluation.raw_score
+      : 0.5;
+
+    // Build debug snapshot (only in development mode)
+    let engineSnapshot = null;
+    if (shouldSaveDebugData()) {
+      // Generate a temporary scanId (will be replaced with actual check ID after save)
+      const tempScanId = `temp-${Date.now()}`;
+
+      // Get itemCard category and label for debugging
+      const itemCardCategory = itemSummary.category;
+      const itemLabel = scannedItem.descriptiveLabel || getDescriptiveLabel(itemSummary.category);
+
+      engineSnapshot = buildEngineSnapshot(
+        confidenceResult,
+        null, // No legacy matchResult
+        false, // Not using legacy engine
+        tempScanId,
+        scannedItem.category,
+        wardrobeCount,
+        wardrobe,
+        itemCardCategory,
+        itemLabel
+      );
+    }
+
+    // Capitalize scannedItem fields before saving to database
+    const capitalizedScannedItem = {
+      ...scannedItem,
+      descriptiveLabel: scannedItem.descriptiveLabel 
+        ? capitalizeFirst(scannedItem.descriptiveLabel) 
+        : scannedItem.descriptiveLabel,
+      styleNotes: scannedItem.styleNotes 
+        ? capitalizeItems(scannedItem.styleNotes) 
+        : scannedItem.styleNotes,
+    };
+
+    addRecentCheckMutation.mutate({
+      itemName: capitalizeFirst(scannedItem.descriptiveLabel || "Scanned item"),
+      category: scannedItem.category,
+      // Use resolvedImageUri for fresh source (param > savedCheck > JSONB)
+      imageUri: resolvedImageUri || scannedItem.imageUri,
+      outcome: result.outcome,
+      confidence,
+      confidenceScore,
+      scannedItem: capitalizedScannedItem,
+      // TEMPORARY: Add engine snapshot
+      ...(engineSnapshot && { engineSnapshot }),
+    });
+  }, [scannedItem, resolvedImageUri, wardrobeCount, preferences, isViewingSavedCheck, addRecentCheckMutation, confidenceResult, itemSummary, wardrobe]);
 
   // Trigger store review after successful scan save (iOS only)
   useEffect(() => {
