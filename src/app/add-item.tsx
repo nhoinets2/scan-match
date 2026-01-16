@@ -1602,16 +1602,28 @@ export default function AddItemScreen() {
                 )}
                 <View style={{ flex: 1, marginLeft: spacing.sm + spacing.xs / 2 }}>
                   {analysisFailed ? (
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <AlertCircle size={16} color={colors.verdict.okay.text} style={{ marginRight: spacing.sm }} />
+                    <View style={{ flexDirection: "column" }}>
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <AlertCircle size={16} color={colors.verdict.okay.text} style={{ marginRight: spacing.sm }} />
+                        <Text
+                          style={{ 
+                            ...typography.ui.bodyMedium,
+                            color: colors.text.primary,
+                            flex: 1,
+                          }}
+                        >
+                          Select a category to continue
+                        </Text>
+                      </View>
                       <Text
-                        style={{ 
-                          ...typography.ui.bodyMedium,
-                          color: colors.text.primary,
-                          flex: 1,
+                        style={{
+                          ...typography.ui.caption,
+                          color: colors.text.tertiary,
+                          marginTop: spacing.xs,
+                          marginLeft: 16 + spacing.sm, // Align with text after icon
                         }}
                       >
-                        Select a category below
+                        Next, you can add style, color, and brand details (optional).
                       </Text>
                     </View>
                   ) : analysis ? (
