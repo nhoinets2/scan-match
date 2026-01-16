@@ -6,6 +6,7 @@ import {
   ScrollView,
   Pressable,
   Modal,
+  useWindowDimensions,
 } from "react-native";
 import { Image } from "expo-image";
 import { BlurView } from "expo-blur";
@@ -16,6 +17,11 @@ import Animated, {
   FadeInDown,
   FadeInUp,
   FadeOut,
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  Easing,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import {
@@ -251,6 +257,14 @@ const MAX_RETRIES = 3;
  * Loading state UI - shown while analysis is in progress.
  * Displays the scanned image with a subtle pulse animation.
  */
+// Micro-step messages for the analyzing screen
+const ANALYSIS_STEPS = [
+  "Finding wardrobe matches…",
+  "Checking color harmony…",
+  "Evaluating style fit…",
+  "Almost there…",
+];
+
 function ResultsLoading({ 
   imageUri, 
   insets 
@@ -258,57 +272,125 @@ function ResultsLoading({
   imageUri: string; 
   insets: { top: number; bottom: number } 
 }) {
+  // Screen dimensions for responsive sizing
+  const { width: screenWidth } = useWindowDimensions();
+  const cardWidth = Math.min(280, screenWidth - 72);
+  const cardHeight = cardWidth * 1.25; // 4:5 aspect ratio
+  
+  // Micro-step animation
+  const [stepIndex, setStepIndex] = useState(0);
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStepIndex((prev) => (prev + 1) % ANALYSIS_STEPS.length);
+    }, 900);
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Breathing pulse animation
+  const pulseScale = useSharedValue(1);
+  const pulseOpacity = useSharedValue(0.4);
+  
+  useEffect(() => {
+    pulseScale.value = withRepeat(
+      withTiming(1.08, { duration: 1800, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true
+    );
+    pulseOpacity.value = withRepeat(
+      withTiming(0.15, { duration: 1800, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true
+    );
+  }, []);
+  
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseScale.value }],
+    opacity: pulseOpacity.value,
+  }));
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
-      {/* Header */}
+      {/* Header - minimal top bar with text close button */}
       <View
         style={{
-          paddingTop: insets.top + spacing.md,
+          paddingTop: insets.top + spacing.sm,
           paddingHorizontal: spacing.lg,
-          paddingBottom: spacing.md,
+          paddingBottom: spacing.sm,
         }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <IconButton
-            icon={X}
-            onPress={() => router.back()}
-            accessibilityLabel="Close"
-          />
-          <View style={{ width: 40 }} />
-        </View>
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={({ pressed }) => ({
+            alignSelf: "flex-start",
+            opacity: pressed ? 0.6 : 1,
+          })}
+        >
+          <Text
+            style={{
+              ...typography.ui.body,
+              color: colors.text.secondary,
+              fontWeight: "500",
+            }}
+          >
+            Close
+          </Text>
+        </Pressable>
       </View>
 
-      {/* Content */}
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xl }}>
-        {/* Image with pulse animation */}
-        <Animated.View
-          entering={FadeIn.duration(300)}
-          style={{
-            width: 200,
-            height: 260,
-            borderRadius: borderRadius.card,
-            overflow: "hidden",
-            marginBottom: spacing.xl,
-          }}
-        >
-          <Image
-            source={{ uri: imageUri }}
-            style={{ width: "100%", height: "100%" }}
-            contentFit="cover"
-          />
-          {/* Pulse overlay */}
+      {/* Content - positioned higher (not centered) */}
+      <View style={{ 
+        flex: 1, 
+        alignItems: "center", 
+        paddingTop: spacing.xxl,
+        paddingHorizontal: spacing.xl,
+      }}>
+        {/* Hero card with breathing pulse ring */}
+        <View style={{ position: "relative", marginBottom: spacing.xl }}>
+          {/* Breathing pulse ring */}
           <Animated.View
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: colors.bg.primary,
-              opacity: 0.3,
-            }}
+            style={[
+              {
+                position: "absolute",
+                top: -8,
+                left: -8,
+                right: -8,
+                bottom: -8,
+                borderRadius: borderRadius.card + 8,
+                borderWidth: 2,
+                borderColor: colors.border.subtle,
+              },
+              pulseStyle,
+            ]}
           />
-        </Animated.View>
+          
+          {/* Image card */}
+          <Animated.View
+            entering={FadeIn.duration(400)}
+            style={{
+              width: cardWidth,
+              height: cardHeight,
+              borderRadius: borderRadius.card,
+              overflow: "hidden",
+              // Hairline border
+              borderWidth: 1,
+              borderColor: `${colors.border.subtle}25`,
+              // Soft shadow
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.12,
+              shadowRadius: 24,
+              elevation: 8,
+            }}
+          >
+            <Image
+              source={{ uri: imageUri }}
+              style={{ width: "100%", height: "100%" }}
+              contentFit="cover"
+            />
+          </Animated.View>
+        </View>
 
         {/* Loading text */}
         <Text
@@ -316,7 +398,7 @@ function ResultsLoading({
             ...typography.styles.h2,
             color: colors.text.primary,
             textAlign: "center",
-            marginBottom: spacing.sm,
+            marginBottom: spacing.xs,
           }}
         >
           Analyzing your item
@@ -326,10 +408,24 @@ function ResultsLoading({
             ...typography.ui.body,
             color: colors.text.secondary,
             textAlign: "center",
+            marginBottom: spacing.md,
           }}
         >
-          This usually takes a moment
+          This usually takes a moment.
         </Text>
+        
+        {/* Micro-step indicator */}
+        <Animated.Text
+          key={stepIndex}
+          entering={FadeIn.duration(200)}
+          style={{
+            ...typography.ui.caption,
+            color: colors.text.tertiary,
+            textAlign: "center",
+          }}
+        >
+          {ANALYSIS_STEPS[stepIndex]}
+        </Animated.Text>
       </View>
     </View>
   );
