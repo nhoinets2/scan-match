@@ -1297,27 +1297,6 @@ export default function ResultsScreen() {
     };
   }, [shouldUseImageUriFlow, imageUri, analysisState?.status, analysisState?.attempt, analysisKey, source]);
   
-  // ============================================
-  // PR3: GUARD RETURNS FOR STATE MACHINE
-  // ============================================
-  // If using imageUri flow, handle loading/failed states before rest of component
-  if (shouldUseImageUriFlow && analysisState) {
-    if (analysisState.status === "loading") {
-      return <ResultsLoading imageUri={analysisState.imageUri} insets={insets} />;
-    }
-    if (analysisState.status === "failed") {
-      return (
-        <ResultsFailed
-          imageUri={analysisState.imageUri}
-          error={analysisState.error}
-          attempt={analysisState.attempt}
-          onRetry={handleRetry}
-          insets={insets}
-        />
-      );
-    }
-  }
-  
   // Extract checkId from params (for viewing saved checks)
   const checkId = params.checkId;
 
@@ -2363,6 +2342,28 @@ export default function ResultsScreen() {
   };
 
   // Determine data source: either from fresh scan (currentScan), saved check, 
+  // ============================================
+  // PR3: GUARD RETURNS FOR STATE MACHINE
+  // ============================================
+  // These must come AFTER all hooks but BEFORE any JSX returns.
+  // This ensures hooks are called consistently regardless of state.
+  if (shouldUseImageUriFlow && analysisState) {
+    if (analysisState.status === "loading") {
+      return <ResultsLoading imageUri={analysisState.imageUri} insets={insets} />;
+    }
+    if (analysisState.status === "failed") {
+      return (
+        <ResultsFailed
+          imageUri={analysisState.imageUri}
+          error={analysisState.error}
+          attempt={analysisState.attempt}
+          onRetry={handleRetry}
+          insets={insets}
+        />
+      );
+    }
+  }
+
   // legacy param, or new imageUri flow
   const hasData = currentScan || savedCheck || legacyScannedItem || 
     (analysisState?.status === "success");
