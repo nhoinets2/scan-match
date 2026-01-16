@@ -47,6 +47,10 @@ import {
   ChevronRight,
   ChevronDown,
   Lock,
+  RefreshCw,
+  WifiOff,
+  Clock,
+  AlertOctagon,
 } from "lucide-react-native";
 import { ThumbnailPlaceholderImage, ThumbnailWithFallback } from "@/components/PlaceholderImage";
 
@@ -79,8 +83,10 @@ import {
 import { colors, spacing, typography, borderRadius, shadows, cards, button, components } from "@/lib/design-tokens";
 import { getTextStyle } from "@/lib/typography-helpers";
 import { runDecisionTree, outcomeToConfidence, DecisionTreeResult } from "@/lib/decision-tree";
-import { ItemSignalsResult } from "@/lib/openai";
+import { ItemSignalsResult, analyzeClothingImage, AnalyzeError } from "@/lib/openai";
+import { logAnalysisLifecycleEvent } from "@/lib/analysis-telemetry";
 import { capitalizeFirst, capitalizeItems, capitalizeSentences } from "@/lib/text-utils";
+import { generateIdempotencyKey } from "@/lib/database";
 import { recordPositiveAction, requestReviewIfAppropriate } from "@/lib/useStoreReview";
 import { useConfidenceEngine, tierToVerdictState, tierToLabel } from "@/lib/useConfidenceEngine";
 import { prepareScanForSave, completeScanSave, isLocalUri, cancelUpload, cleanupScanStorage } from "@/lib/storage";
@@ -213,6 +219,326 @@ interface ResultsSuccessProps {
 
 // Suppress unused warning - interface is used in PR3
 void (0 as unknown as ResultsSuccessProps);
+
+// ============================================
+// PR3: ROUTE PARAMS & STATE MACHINE TYPES
+// ============================================
+
+/**
+ * Route params for results screen.
+ * Supports both legacy (scannedItem JSON) and new (imageUri) flows.
+ */
+type ResultsRouteParams = {
+  // Legacy: JSON stringified ScannedItem (from old scan.tsx flow)
+  scannedItem?: string;
+  // New flow: results owns analysis
+  imageUri?: string;
+  analysisKey?: string;
+  source?: "camera" | "gallery" | "recent" | "saved";
+  // Existing: for viewing saved/recent checks
+  checkId?: string;
+  from?: string;
+};
+
+/**
+ * State machine for analysis lifecycle.
+ * Only used when imageUri is provided (new flow).
+ */
+type ResultsState =
+  | { status: "loading"; imageUri: string; attempt: number }
+  | { status: "failed"; imageUri: string; error: AnalyzeError; attempt: number }
+  | { status: "success"; imageUri: string; item: ScannedItemType; attempt: number };
+
+const MAX_RETRIES = 3;
+
+// ============================================
+// PR3: LOADING & FAILED COMPONENTS
+// ============================================
+
+/**
+ * Loading state UI - shown while analysis is in progress.
+ * Displays the scanned image with a subtle pulse animation.
+ */
+function ResultsLoading({ 
+  imageUri, 
+  insets 
+}: { 
+  imageUri: string; 
+  insets: { top: number; bottom: number } 
+}) {
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
+      {/* Header */}
+      <View
+        style={{
+          paddingTop: insets.top + spacing.md,
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.md,
+        }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <IconButton
+            icon={X}
+            onPress={() => router.back()}
+            accessibilityLabel="Close"
+          />
+          <View style={{ width: 40 }} />
+        </View>
+      </View>
+
+      {/* Content */}
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xl }}>
+        {/* Image with pulse animation */}
+        <Animated.View
+          entering={FadeIn.duration(300)}
+          style={{
+            width: 200,
+            height: 260,
+            borderRadius: borderRadius.card,
+            overflow: "hidden",
+            marginBottom: spacing.xl,
+          }}
+        >
+          <Image
+            source={{ uri: imageUri }}
+            style={{ width: "100%", height: "100%" }}
+            contentFit="cover"
+          />
+          {/* Pulse overlay */}
+          <Animated.View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: colors.bg.primary,
+              opacity: 0.3,
+            }}
+          />
+        </Animated.View>
+
+        {/* Loading text */}
+        <Text
+          style={{
+            ...typography.styles.h2,
+            color: colors.text.primary,
+            textAlign: "center",
+            marginBottom: spacing.sm,
+          }}
+        >
+          Analyzing your item
+        </Text>
+        <Text
+          style={{
+            ...typography.ui.body,
+            color: colors.text.secondary,
+            textAlign: "center",
+          }}
+        >
+          This usually takes a moment
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Failed state UI - shown when analysis fails.
+ * Displays error message with retry option.
+ */
+function ResultsFailed({
+  imageUri,
+  error,
+  attempt,
+  onRetry,
+  insets,
+}: {
+  imageUri: string;
+  error: AnalyzeError;
+  attempt: number;
+  onRetry: () => void;
+  insets: { top: number; bottom: number };
+}) {
+  const isMaxRetries = attempt >= MAX_RETRIES;
+
+  // Get error-specific hint
+  const getErrorHint = () => {
+    if (isMaxRetries) {
+      if (error.kind === "no_network") {
+        return "Check your connection and try again later.";
+      }
+      return "Please try again later, or scan another item.";
+    }
+
+    switch (error.kind) {
+      case "no_network":
+        return "Connection unavailable. Please check your internet and try again.";
+      case "timeout":
+        return "It's taking longer than usual. Try again in a moment.";
+      case "rate_limited":
+        return "We're getting a lot of requests right now. Please try again shortly.";
+      default:
+        return "Please try again or use a different photo.";
+    }
+  };
+
+  // Get error icon
+  const ErrorIcon = error.kind === "no_network" ? WifiOff : 
+                    error.kind === "timeout" ? Clock : 
+                    AlertOctagon;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
+      {/* Header */}
+      <View
+        style={{
+          paddingTop: insets.top + spacing.md,
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.md,
+        }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <IconButton
+            icon={X}
+            onPress={() => router.back()}
+            accessibilityLabel="Close"
+          />
+          <View style={{ width: 40 }} />
+        </View>
+      </View>
+
+      {/* Content */}
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xl }}>
+        {/* Image */}
+        <View
+          style={{
+            width: 160,
+            height: 200,
+            borderRadius: borderRadius.card,
+            overflow: "hidden",
+            marginBottom: spacing.lg,
+            opacity: 0.6,
+          }}
+        >
+          <Image
+            source={{ uri: imageUri }}
+            style={{ width: "100%", height: "100%" }}
+            contentFit="cover"
+          />
+        </View>
+
+        {/* Error icon */}
+        <View
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 24,
+            backgroundColor: colors.verdict.okay.bg,
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: spacing.md,
+          }}
+        >
+          <ErrorIcon size={24} color={colors.verdict.okay.text} />
+        </View>
+
+        {/* Error text */}
+        <Text
+          style={{
+            ...typography.styles.h2,
+            color: colors.text.primary,
+            textAlign: "center",
+            marginBottom: spacing.sm,
+          }}
+        >
+          We couldn't analyze this item
+        </Text>
+        <Text
+          style={{
+            ...typography.ui.body,
+            color: colors.text.secondary,
+            textAlign: "center",
+            marginBottom: spacing.xl,
+          }}
+        >
+          {getErrorHint()}
+        </Text>
+
+        {/* Buttons */}
+        <View style={{ width: "100%", gap: spacing.md }}>
+          {!isMaxRetries && (
+            <ButtonPrimary
+              label="Try again"
+              onPress={onRetry}
+              icon={RefreshCw}
+            />
+          )}
+          <ButtonTertiary
+            label={isMaxRetries ? "Scan another item" : "Scan another item"}
+            onPress={() => router.back()}
+          />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Missing scan data UI - shown when neither scannedItem nor imageUri is provided.
+ */
+function MissingScanData({ insets }: { insets: { top: number; bottom: number } }) {
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
+      {/* Header */}
+      <View
+        style={{
+          paddingTop: insets.top + spacing.md,
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.md,
+        }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <IconButton
+            icon={X}
+            onPress={() => router.back()}
+            accessibilityLabel="Close"
+          />
+          <View style={{ width: 40 }} />
+        </View>
+      </View>
+
+      {/* Content */}
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xl }}>
+        <HelpCircle size={48} color={colors.text.tertiary} style={{ marginBottom: spacing.md }} />
+        <Text
+          style={{
+            ...typography.styles.h2,
+            color: colors.text.primary,
+            textAlign: "center",
+            marginBottom: spacing.sm,
+          }}
+        >
+          Missing scan data
+        </Text>
+        <Text
+          style={{
+            ...typography.ui.body,
+            color: colors.text.secondary,
+            textAlign: "center",
+            marginBottom: spacing.xl,
+          }}
+        >
+          Something went wrong. Please try scanning again.
+        </Text>
+        <ButtonPrimary
+          label="Go back"
+          onPress={() => router.back()}
+        />
+      </View>
+    </View>
+  );
+}
 
 // Core vs Optional category definitions for matches routing
 // Core: used in outfit formulas (TOP+BOTTOM+SHOES or DRESS+SHOES)
@@ -810,7 +1136,7 @@ function EmptyWardrobeState({ itemLabel }: { itemLabel: string }) {
 
 export default function ResultsScreen() {
   const insets = useSafeAreaInsets();
-  const { checkId, from } = useLocalSearchParams<{ checkId?: string; from?: string }>();
+  const params = useLocalSearchParams<ResultsRouteParams>();
   const { data: recentChecks = [] } = useRecentChecks();
   const wardrobeCount = useWardrobeCount();
   const { data: wardrobe = [] } = useWardrobe();
@@ -822,6 +1148,168 @@ export default function ResultsScreen() {
   const updateRecentCheckOutcomeMutation = useUpdateRecentCheckOutcome();
 
   const hasAddedCheck = useRef(false);
+  
+  // ============================================
+  // PR3: LEGACY SCANNED ITEM PARAM (backwards compat)
+  // ============================================
+  // If scannedItem JSON param is provided, parse it and use directly
+  // This is the legacy path from old scan.tsx - no state machine needed
+  const legacyScannedItem = useMemo(() => {
+    if (!params.scannedItem) return null;
+    try {
+      return JSON.parse(params.scannedItem) as ScannedItemType;
+    } catch (e) {
+      console.error("[Results] Failed to parse legacy scannedItem param:", e);
+      return null;
+    }
+  }, [params.scannedItem]);
+  
+  // ============================================
+  // PR3: STATE MACHINE FOR NEW imageUri FLOW
+  // ============================================
+  // Only used when imageUri is provided and no legacy sources exist
+  const imageUri = params.imageUri;
+  const analysisKey = params.analysisKey ?? generateIdempotencyKey();
+  const source = params.source;
+  
+  // Determine if we should use the new imageUri flow
+  // New flow: imageUri provided AND no legacy data (currentScan, checkId, legacyScannedItem)
+  const shouldUseImageUriFlow = !!imageUri && !currentScan && !params.checkId && !legacyScannedItem;
+  
+  // State machine for imageUri flow
+  const [analysisState, setAnalysisState] = useState<ResultsState | null>(() => {
+    if (!shouldUseImageUriFlow || !imageUri) return null;
+    return { status: "loading", imageUri, attempt: 1 };
+  });
+  
+  // Retry handler
+  const handleRetry = useCallback(() => {
+    if (!analysisState || analysisState.status === "loading") return;
+    if (analysisState.attempt >= MAX_RETRIES) return;
+    
+    logAnalysisLifecycleEvent({
+      name: "analysis_retry_tapped",
+      props: { attempt: analysisState.attempt + 1, analysisKey, source },
+    });
+    
+    setAnalysisState({
+      status: "loading",
+      imageUri: analysisState.imageUri,
+      attempt: analysisState.attempt + 1,
+    });
+  }, [analysisState, analysisKey, source]);
+  
+  // Analysis effect - runs when imageUri flow is active and status is loading
+  useEffect(() => {
+    if (!shouldUseImageUriFlow || !imageUri || !analysisState) return;
+    if (analysisState.status !== "loading") return;
+    
+    const ac = new AbortController();
+    const startTime = Date.now();
+    
+    logAnalysisLifecycleEvent({
+      name: "analysis_started",
+      props: { attempt: analysisState.attempt, analysisKey, source },
+    });
+    
+    (async () => {
+      const result = await analyzeClothingImage({
+        imageUri,
+        signal: ac.signal,
+      });
+      
+      if (ac.signal.aborted) return;
+      
+      const durationMs = Date.now() - startTime;
+      
+      if (!result.ok) {
+        // Don't show failed UI for cancellations
+        if (result.error.kind === "cancelled") return;
+        
+        logAnalysisLifecycleEvent({
+          name: "analysis_failed",
+          props: {
+            attempt: analysisState.attempt,
+            analysisKey,
+            source,
+            errorKind: result.error.kind,
+            durationMs,
+          },
+        });
+        
+        // Check if max retries reached
+        if (analysisState.attempt >= MAX_RETRIES) {
+          logAnalysisLifecycleEvent({
+            name: "analysis_max_retries",
+            props: { attempt: analysisState.attempt, analysisKey, source, errorKind: result.error.kind },
+          });
+        }
+        
+        setAnalysisState({
+          status: "failed",
+          imageUri,
+          error: result.error,
+          attempt: analysisState.attempt,
+        });
+        return;
+      }
+      
+      // Success!
+      if (analysisState.attempt > 1) {
+        logAnalysisLifecycleEvent({
+          name: "analysis_recovered_success",
+          props: { attempt: analysisState.attempt, analysisKey, source, durationMs, cacheHit: result.cacheHit },
+        });
+      } else {
+        logAnalysisLifecycleEvent({
+          name: "analysis_succeeded",
+          props: { attempt: analysisState.attempt, analysisKey, source, durationMs, cacheHit: result.cacheHit },
+        });
+      }
+      
+      setAnalysisState({
+        status: "success",
+        imageUri,
+        item: result.data as unknown as ScannedItemType,
+        attempt: analysisState.attempt,
+      });
+    })();
+    
+    return () => {
+      ac.abort();
+      // Only log cancelled if we were actually loading
+      if (analysisState.status === "loading") {
+        logAnalysisLifecycleEvent({
+          name: "analysis_cancelled",
+          props: { attempt: analysisState.attempt, analysisKey, source },
+        });
+      }
+    };
+  }, [shouldUseImageUriFlow, imageUri, analysisState?.status, analysisState?.attempt, analysisKey, source]);
+  
+  // ============================================
+  // PR3: GUARD RETURNS FOR STATE MACHINE
+  // ============================================
+  // If using imageUri flow, handle loading/failed states before rest of component
+  if (shouldUseImageUriFlow && analysisState) {
+    if (analysisState.status === "loading") {
+      return <ResultsLoading imageUri={analysisState.imageUri} insets={insets} />;
+    }
+    if (analysisState.status === "failed") {
+      return (
+        <ResultsFailed
+          imageUri={analysisState.imageUri}
+          error={analysisState.error}
+          attempt={analysisState.attempt}
+          onRetry={handleRetry}
+          insets={insets}
+        />
+      );
+    }
+  }
+  
+  // Extract checkId from params (for viewing saved checks)
+  const checkId = params.checkId;
 
   // Check if viewing a saved check
   const savedCheck = useMemo(() => {
@@ -934,13 +1422,23 @@ export default function ResultsScreen() {
   const hasTrackedFirstMatch = useRef(false);
   const hasTrackedNoMatch = useRef(false);
 
-  // Extract scannedItem from either source
-  const scannedItem = currentScan ?? savedCheck?.scannedItem ?? null;
+  // Extract scannedItem from available sources (in priority order):
+  // 1. analysisState.item - from new imageUri flow (PR3)
+  // 2. legacyScannedItem - from scannedItem JSON param (backwards compat)
+  // 3. currentScan - from store (current legacy flow)
+  // 4. savedCheck.scannedItem - from database (viewing saved check)
+  const scannedItem = 
+    (analysisState?.status === "success" ? analysisState.item : null) ??
+    legacyScannedItem ??
+    currentScan ?? 
+    savedCheck?.scannedItem ?? 
+    null;
   
   // IMPORTANT: Use the top-level imageUri from savedCheck if available
   // The scannedItem.imageUri is stored in JSONB and never gets updated after upload
   // savedCheck.imageUri is what gets updated to the remote URL after successful upload
-  const resolvedImageUri = savedCheck?.imageUri ?? scannedItem?.imageUri;
+  // For new imageUri flow, use the imageUri from params (freshest source)
+  const resolvedImageUri = imageUri ?? savedCheck?.imageUri ?? scannedItem?.imageUri;
 
   // Reset image error state when image URI changes
   useEffect(() => {
@@ -1854,48 +2352,18 @@ export default function ResultsScreen() {
     router.push("/add-item");
   };
 
-  // Determine data source: either from fresh scan (currentScan) or saved check
-  const hasData = currentScan || savedCheck;
+  // Determine data source: either from fresh scan (currentScan), saved check, 
+  // legacy param, or new imageUri flow
+  const hasData = currentScan || savedCheck || legacyScannedItem || 
+    (analysisState?.status === "success");
 
   if (!hasData) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.bg.primary, alignItems: "center", justifyContent: "center" }}>
-        <Text
-          style={{
-            ...typography.ui.body,
-            color: colors.text.secondary,
-          }}
-        >
-          No scan results available
-        </Text>
-        <ButtonTertiary
-          label="Go Back"
-          onPress={handleBack}
-          style={{ marginTop: spacing.md }}
-        />
-      </View>
-    );
+    return <MissingScanData insets={insets} />;
   }
 
-  // Early return if no scannedItem
+  // Early return if no scannedItem (shouldn't happen after hasData check, but safety net)
   if (!scannedItem) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.bg.primary, alignItems: "center", justifyContent: "center" }}>
-        <Text
-          style={{
-            ...typography.ui.body,
-            color: colors.text.secondary,
-          }}
-        >
-          Item data not available
-        </Text>
-        <ButtonTertiary
-          label="Go Back"
-          onPress={handleBack}
-          style={{ marginTop: spacing.md }}
-        />
-      </View>
-    );
+    return <MissingScanData insets={insets} />;
   }
 
   // ============================================

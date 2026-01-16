@@ -26,19 +26,15 @@ import {
   ImageIcon,
   HelpCircle,
   ChevronDown,
-  RefreshCw,
-  WifiOff,
 } from "lucide-react-native";
 
 import { useSnapToMatchStore } from "@/lib/store";
-import { ScannedItem } from "@/lib/types";
-import { analyzeClothingImage } from "@/lib/openai";
 import { prewarmCacheConnection } from "@/lib/analysis-cache";
 import { colors, typography, spacing, components } from "@/lib/design-tokens";
 import { ButtonTertiary } from "@/components/ButtonTertiary";
 import { IconButton } from "@/components/IconButton";
 import { ButtonPrimary } from "@/components/ButtonPrimary";
-import { useWardrobe, usePreferences, useUsageQuota, useConsumeScanCredit, generateIdempotencyKey } from "@/lib/database";
+import { useUsageQuota, useConsumeScanCredit, generateIdempotencyKey } from "@/lib/database";
 import { useProStatus } from "@/lib/useProStatus";
 import { Paywall } from "@/components/Paywall";
 
@@ -166,146 +162,6 @@ function ProcessingOverlay() {
   );
 }
 
-function ErrorOverlay({
-  errorKind,
-  onRetry,
-  onDismiss,
-}: {
-  errorKind: "network" | "timeout" | "other";
-  onRetry: () => void;
-  onDismiss: () => void;
-}) {
-  // Get subtitle based on error kind
-  const getSubtitle = () => {
-    switch (errorKind) {
-      case "network":
-        return "Connection unavailable. Please check your internet and try again.";
-      case "timeout":
-        return "It's taking longer than usual. Try again in a moment.";
-      default:
-        return "Please try again or use a different photo.";
-    }
-  };
-
-  return (
-    <Animated.View
-      entering={FadeIn.duration(300)}
-      exiting={FadeOut.duration(200)}
-      style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.85)",
-        alignItems: "center",
-        justifyContent: "center",
-        paddingHorizontal: spacing.xl,
-      }}
-    >
-      <View style={{ alignItems: "center", maxWidth: 320 }}>
-        {/* Icon */}
-        <View
-          style={{
-            width: 64,
-            height: 64,
-            borderRadius: 32,
-            backgroundColor: "rgba(255,255,255,0.1)",
-            alignItems: "center",
-            justifyContent: "center",
-            marginBottom: spacing.lg,
-          }}
-        >
-          {errorKind === "network" ? (
-            <WifiOff size={28} color="rgba(255,255,255,0.8)" strokeWidth={1.5} />
-          ) : (
-            <RefreshCw size={28} color="rgba(255,255,255,0.8)" strokeWidth={1.5} />
-          )}
-        </View>
-
-        {/* Title */}
-        <Text
-          style={{
-            fontFamily: typography.fontFamily.semibold,
-            fontSize: typography.sizes.h3,
-            color: colors.text.inverse,
-            textAlign: "center",
-            marginBottom: spacing.xs,
-          }}
-        >
-          We couldn't analyze this item
-        </Text>
-        
-        {/* Subtitle */}
-        <Text
-          style={{
-            fontFamily: typography.fontFamily.regular,
-            fontSize: typography.sizes.body,
-            color: "rgba(255,255,255,0.7)",
-            textAlign: "center",
-            lineHeight: typography.lineHeight.normal * typography.sizes.body,
-            marginBottom: spacing.xl,
-          }}
-        >
-          {getSubtitle()}
-        </Text>
-
-        {/* Buttons */}
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-          <Pressable
-            onPress={onDismiss}
-            style={({ pressed }) => ({
-              paddingHorizontal: spacing.lg,
-              paddingVertical: spacing.sm + spacing.xs,
-              borderRadius: 12,
-              backgroundColor: "rgba(255,255,255,0.1)",
-              opacity: pressed ? 0.7 : 1,
-            })}
-          >
-            <Text
-              style={{
-                fontFamily: typography.fontFamily.medium,
-                fontSize: typography.sizes.body,
-                color: "rgba(255,255,255,0.8)",
-              }}
-            >
-              Dismiss
-            </Text>
-          </Pressable>
-          
-          {/* Spacer */}
-          <View style={{ width: spacing.md }} />
-          
-          <Pressable
-            onPress={onRetry}
-            style={({ pressed }) => ({
-              paddingHorizontal: spacing.lg,
-              paddingVertical: spacing.sm + spacing.xs,
-              borderRadius: 12,
-              backgroundColor: colors.accent.terracotta,
-              opacity: pressed ? 0.8 : 1,
-            })}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <RefreshCw size={16} color={colors.text.inverse} strokeWidth={2} />
-              <Text
-                style={{
-                  fontFamily: typography.fontFamily.semibold,
-                  fontSize: typography.sizes.body,
-                  color: colors.text.inverse,
-                  marginLeft: spacing.xs,
-                }}
-              >
-                Try again
-              </Text>
-            </View>
-          </Pressable>
-        </View>
-      </View>
-    </Animated.View>
-  );
-}
-
 function HelpBottomSheet({
   visible,
   onClose
@@ -406,31 +262,14 @@ export default function ScanScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
-  const [errorKind, setErrorKind] = useState<"network" | "timeout" | "other" | null>(null);
-  const [lastImageUri, setLastImageUri] = useState<string | null>(null);
-  const [lastImageSource, setLastImageSource] = useState<'camera' | 'gallery'>('camera');
   const [showPaywall, setShowPaywall] = useState(false);
-  // Idempotency key for current attempt - reused on retries to prevent double-charging
-  const [currentIdempotencyKey, setCurrentIdempotencyKey] = useState<string | null>(null);
-  
-  // AbortController for cancelling in-flight analysis when user closes screen
-  // isActiveRef prevents navigation after unmount
-  const analysisAbortRef = useRef<AbortController | null>(null);
-  const isActiveRef = useRef(true);
 
-  const setScannedItem = useSnapToMatchStore((s) => s.setScannedItem);
   const clearScan = useSnapToMatchStore((s) => s.clearScan);
-  const setCachedWardrobe = useSnapToMatchStore((s) => s.setCachedWardrobe);
-  const setCachedPreferences = useSnapToMatchStore((s) => s.setCachedPreferences);
 
   // Quota and Pro status (usage-based, synced across devices)
   const { isPro, refetch: refetchProStatus } = useProStatus();
   const { scansUsed, hasScansRemaining, isLoading: isLoadingQuota } = useUsageQuota();
   const consumeScanCredit = useConsumeScanCredit();
-
-  // Fetch wardrobe and preferences to cache for Confidence Engine
-  const { data: wardrobe = [] } = useWardrobe();
-  const { data: preferences } = usePreferences();
 
   const captureScale = useSharedValue(1);
 
@@ -447,14 +286,6 @@ export default function ScanScreen() {
   useEffect(() => {
     clearScan();
   }, [clearScan]);
-
-  // Cleanup: mark inactive + abort any in-flight analysis on unmount
-  useEffect(() => {
-    return () => {
-      isActiveRef.current = false;
-      analysisAbortRef.current?.abort();
-    };
-  }, []);
 
   // Pre-warm cache connection to avoid cold start latency during scan
   useEffect(() => {
@@ -546,163 +377,58 @@ export default function ScanScreen() {
     });
   };
 
-  const processImage = async (imageUri: string, source: 'camera' | 'gallery' = 'camera', retryKey?: string) => {
+  // ============================================
+  // PR3: SIMPLIFIED processImage
+  // ============================================
+  // Now just checks quota and navigates to results with imageUri.
+  // The actual analysis happens in results.tsx (state machine).
+  const processImage = async (imageUri: string, source: 'camera' | 'gallery' = 'camera') => {
     setIsProcessing(true);
     setIsCapturing(false);
-    setErrorKind(null);
-    setLastImageUri(imageUri);
-    setLastImageSource(source);
     console.log("processImage called with imageUri:", imageUri?.slice(0, 50));
 
-    // Create local AbortController for this analysis attempt
-    // Store in ref so close/unmount can abort, but use local var for checks
-    const controller = new AbortController();
-    analysisAbortRef.current?.abort(); // Cancel any previous in-flight analysis
-    analysisAbortRef.current = controller;
-
-    // For new attempts, generate new idempotency key
-    // For retries, reuse the existing key to prevent double-charging
-    const idempotencyKey = retryKey ?? generateIdempotencyKey();
-    if (!retryKey) {
-      setCurrentIdempotencyKey(idempotencyKey);
-    }
+    // Generate analysisKey for telemetry correlation
+    const analysisKey = generateIdempotencyKey();
 
     try {
-      // CRITICAL: Consume credit BEFORE AI call to prevent over-quota usage
+      // CRITICAL: Consume credit BEFORE navigating to prevent over-quota usage
       // This is atomic and server-side enforced
-      // Pass idempotency key - same key for retries prevents double-charge
-      console.log("[Quota] Attempting to consume scan credit with key:", idempotencyKey);
-      const consumeResult = await consumeScanCredit.mutateAsync(idempotencyKey);
+      console.log("[Quota] Attempting to consume scan credit with key:", analysisKey);
+      const consumeResult = await consumeScanCredit.mutateAsync(analysisKey);
       console.log("[Quota] Consume result:", consumeResult.reason, consumeResult);
       
       if (!consumeResult.allowed) {
-        // Credit denied - show paywall, DO NOT make AI call
+        // Credit denied - show paywall, DO NOT navigate
         console.log("[Quota] Credit denied (reason:", consumeResult.reason, "), showing paywall");
         setIsProcessing(false);
         setShowPaywall(true);
         return;
       }
       
-      // Credit consumed (or idempotent replay) - now safe to make AI call
-      console.log("[Quota] Credit allowed (reason:", consumeResult.reason, "), proceeding with AI call");
+      // Credit consumed - navigate to results (analysis will happen there)
+      console.log("[Quota] Credit allowed, navigating to results with imageUri");
       
-      // Get image dimensions for telemetry
-      const dimensions = await getImageDimensions(imageUri);
-      
-      // Analyze the image using AI - now returns AnalyzeResult
-      console.log("Calling analyzeClothingImage...");
-      const result = await analyzeClothingImage({
-        imageUri,
-        signal: controller.signal, // Allow cancellation on close
-        ctx: {
-          image_source: source,
-          image_width: dimensions.width,
-          image_height: dimensions.height,
+      // Navigate to results - results.tsx will handle analysis via state machine
+      router.replace({
+        pathname: "/results",
+        params: {
+          imageUri,
+          analysisKey,
+          source,
         },
       });
       
-      // Check if user closed screen or component unmounted during analysis
-      if (!isActiveRef.current || controller.signal.aborted) {
-        console.log("[Scan] Aborted - screen closed/unmounted, skipping navigation");
-        setIsProcessing(false);
-        return;
-      }
-      
-      // Handle analysis failure - show error, don't navigate
-      if (!result.ok) {
-        console.log("Analysis failed:", result.error.kind, result.error.message);
-        setIsProcessing(false);
-        
-        // Don't show error UI for user cancellations (navigation away, etc.)
-        if (result.error.kind === "cancelled") {
-          console.log("Analysis cancelled by user, no error UI");
-          return;
-        }
-        
-        // Show error haptic and overlay for actual errors
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        
-        // Map error kind to overlay error type
-        switch (result.error.kind) {
-          case "no_network":
-            setErrorKind("network");
-            break;
-          case "timeout":
-            setErrorKind("timeout");
-            break;
-          default:
-            setErrorKind("other");
-        }
-        return;
-      }
-      
-      // Success - extract analysis data
-      const analysis = result.data;
-      console.log("Analysis result:", JSON.stringify(analysis));
-
-      const scannedItem: ScannedItem = {
-        id: Math.random().toString(36).substring(2, 15),
-        imageUri,
-        category: analysis.category,
-        colors: analysis.colors,
-        styleTags: analysis.styleTags,
-        descriptiveLabel: analysis.descriptiveLabel,
-        styleNotes: analysis.styleNotes,
-        store: undefined,
-        scannedAt: Date.now(),
-        itemSignals: analysis.itemSignals,
-        contextSufficient: analysis.contextSufficient,
-        isFashionItem: analysis.isFashionItem,
-      };
-
-      setScannedItem(scannedItem);
-      console.log("Scanned item set");
-
-      // Sync wardrobe and preferences to store for Confidence Engine
-      setCachedWardrobe(wardrobe);
-      if (preferences) {
-        setCachedPreferences(preferences);
-      }
-
-      // Navigate to results - Confidence Engine will evaluate matches there
-      console.log("Navigating to results...");
-      router.replace("/results");
       setIsProcessing(false);
     } catch (error) {
-      // This catch handles unexpected errors (not from analyzeClothingImage)
+      // Unexpected errors during quota check
       console.log("Unexpected error processing image:", error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setIsProcessing(false);
-      setErrorKind("other");
-    } finally {
-      // Clear ref only if it still points to this controller (prevents race with new attempts)
-      if (analysisAbortRef.current === controller) {
-        analysisAbortRef.current = null;
-      }
     }
-  };
-
-  const handleRetry = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setErrorKind(null);
-    if (lastImageUri) {
-      // IMPORTANT: Reuse the same idempotency key for retries
-      // This prevents double-charging if the credit was consumed but AI failed
-      processImage(lastImageUri, lastImageSource, currentIdempotencyKey ?? undefined);
-    }
-  };
-
-  const handleDismissError = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setErrorKind(null);
-    setLastImageUri(null);
   };
 
   const handleClose = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Abort any in-flight analysis to prevent navigation after close
-    // Don't null the ref here - let finally clean it up safely
-    analysisAbortRef.current?.abort();
     router.back();
   };
 
@@ -899,15 +625,6 @@ export default function ScanScreen() {
         onPurchaseComplete={handlePaywallSuccess}
         reason="in_store_limit"
       />
-
-      {/* Error overlay - rendered last to be on top of everything */}
-      {errorKind && !isProcessing && (
-        <ErrorOverlay
-          errorKind={errorKind}
-          onRetry={handleRetry}
-          onDismiss={handleDismissError}
-        />
-      )}
     </View>
   );
 }
