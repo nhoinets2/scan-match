@@ -251,7 +251,7 @@ function ErrorOverlay({
         </Text>
 
         {/* Buttons */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
           <Pressable
             onPress={onDismiss}
             style={({ pressed }) => ({
@@ -260,6 +260,7 @@ function ErrorOverlay({
               borderRadius: 12,
               backgroundColor: "rgba(255,255,255,0.1)",
               opacity: pressed ? 0.7 : 1,
+              marginRight: spacing.sm,
             })}
           >
             <Text
@@ -280,21 +281,21 @@ function ErrorOverlay({
               borderRadius: 12,
               backgroundColor: colors.accent.terracotta,
               opacity: pressed ? 0.8 : 1,
-              flexDirection: "row",
-              alignItems: "center",
             })}
           >
-            <RefreshCw size={16} color={colors.text.inverse} strokeWidth={2} />
-            <Text
-              style={{
-                fontFamily: typography.fontFamily.semibold,
-                fontSize: typography.sizes.body,
-                color: colors.text.inverse,
-                marginLeft: spacing.xs,
-              }}
-            >
-              Try again
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <RefreshCw size={16} color={colors.text.inverse} strokeWidth={2} />
+              <Text
+                style={{
+                  fontFamily: typography.fontFamily.semibold,
+                  fontSize: typography.sizes.body,
+                  color: colors.text.inverse,
+                  marginLeft: spacing.xs,
+                }}
+              >
+                Try again
+              </Text>
+            </View>
           </Pressable>
         </View>
       </View>
