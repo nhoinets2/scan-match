@@ -198,11 +198,6 @@ interface ResultsSuccessProps {
   currentCheckId: string | null;
   currentScan: ScannedItemType | null;
   
-  // Save state (managed by parent, used by child for UI)
-  isSaved: boolean;
-  setIsSaved: React.Dispatch<React.SetStateAction<boolean>>;
-  lastSaveTimestampRef: React.MutableRefObject<number>;
-  
   // Mutations (stable references from parent)
   addRecentCheckMutation: UseMutationResult<RecentCheck, Error, any, unknown>;
   updateRecentCheckOutcomeMutation: UseMutationResult<void, Error, any, unknown>;
@@ -216,9 +211,6 @@ interface ResultsSuccessProps {
   // Auth
   user: { id: string } | null;
 }
-
-// Suppress unused warning - interface is used in PR3
-void (0 as unknown as ResultsSuccessProps);
 
 // ============================================
 // PR3: ROUTE PARAMS & STATE MACHINE TYPES
@@ -1156,8 +1148,6 @@ export default function ResultsScreen() {
   const { user } = useAuth();
   const addRecentCheckMutation = useAddRecentCheck();
   const updateRecentCheckOutcomeMutation = useUpdateRecentCheckOutcome();
-
-  const hasAddedCheck = useRef(false);
   
   // ============================================
   // PR3: LEGACY SCANNED ITEM PARAM (backwards compat)
@@ -1325,6 +1315,101 @@ export default function ResultsScreen() {
     return null;
   }, [currentScan, recentChecks]);
 
+  // ============================================
+  // PR3: EARLY RETURNS FOR STATE MACHINE
+  // ============================================
+  // These must come BEFORE scannedItem-dependent hooks.
+  // All hooks after this point will be in ResultsSuccess.
+  if (shouldUseImageUriFlow && analysisState) {
+    if (analysisState.status === "loading") {
+      return <ResultsLoading imageUri={analysisState.imageUri} insets={insets} />;
+    }
+    if (analysisState.status === "failed") {
+      return (
+        <ResultsFailed
+          imageUri={analysisState.imageUri}
+          error={analysisState.error}
+          attempt={analysisState.attempt}
+          onRetry={handleRetry}
+          insets={insets}
+        />
+      );
+    }
+  }
+
+  // Extract scannedItem from available sources (in priority order):
+  // 1. analysisState.item - from new imageUri flow (PR3)
+  // 2. legacyScannedItem - from scannedItem JSON param (backwards compat)
+  // 3. currentScan - from store (current legacy flow)
+  // 4. savedCheck.scannedItem - from database (viewing saved check)
+  const scannedItem = 
+    (analysisState?.status === "success" ? analysisState.item : null) ??
+    legacyScannedItem ??
+    currentScan ?? 
+    savedCheck?.scannedItem ?? 
+    null;
+  
+  // IMPORTANT: Use the top-level imageUri from savedCheck if available
+  // The scannedItem.imageUri is stored in JSONB and never gets updated after upload
+  // savedCheck.imageUri is what gets updated to the remote URL after successful upload
+  // For new imageUri flow, use the imageUri from params (freshest source)
+  const resolvedImageUri = imageUri ?? savedCheck?.imageUri ?? scannedItem?.imageUri;
+
+  // Guard for missing data
+  if (!scannedItem) {
+    return <MissingScanData insets={insets} />;
+  }
+
+  // ============================================
+  // RENDER RESULTS SUCCESS
+  // ============================================
+  // All scannedItem-dependent hooks and UI are in ResultsSuccess
+  return (
+    <ResultsSuccess
+      scannedItem={scannedItem}
+      resolvedImageUri={resolvedImageUri}
+      wardrobe={wardrobe}
+      wardrobeCount={wardrobeCount}
+      preferences={preferences}
+      recentChecks={recentChecks}
+      savedCheck={savedCheck}
+      isViewingSavedCheck={isViewingSavedCheck}
+      currentCheckId={currentCheckId}
+      currentScan={currentScan}
+      clearScan={clearScan}
+      addRecentCheckMutation={addRecentCheckMutation}
+      updateRecentCheckOutcomeMutation={updateRecentCheckOutcomeMutation}
+      insets={insets}
+      user={user}
+    />
+  );
+}
+
+// ============================================
+// RESULTS SUCCESS COMPONENT
+// ============================================
+// Contains all scannedItem-dependent hooks and UI.
+// Only mounts when scannedItem is guaranteed non-null.
+
+function ResultsSuccess({
+  scannedItem,
+  resolvedImageUri,
+  wardrobe,
+  wardrobeCount,
+  preferences,
+  recentChecks,
+  savedCheck,
+  isViewingSavedCheck,
+  currentCheckId,
+  currentScan,
+  clearScan,
+  addRecentCheckMutation,
+  updateRecentCheckOutcomeMutation,
+  insets,
+  user,
+}: ResultsSuccessProps) {
+  const hasAddedCheck = useRef(false);
+  
   const [showStoreSheet, setShowStoreSheet] = useState(false);
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
@@ -1410,24 +1495,6 @@ export default function ResultsScreen() {
   const hasTrackedScan = useRef(false);
   const hasTrackedFirstMatch = useRef(false);
   const hasTrackedNoMatch = useRef(false);
-
-  // Extract scannedItem from available sources (in priority order):
-  // 1. analysisState.item - from new imageUri flow (PR3)
-  // 2. legacyScannedItem - from scannedItem JSON param (backwards compat)
-  // 3. currentScan - from store (current legacy flow)
-  // 4. savedCheck.scannedItem - from database (viewing saved check)
-  const scannedItem = 
-    (analysisState?.status === "success" ? analysisState.item : null) ??
-    legacyScannedItem ??
-    currentScan ?? 
-    savedCheck?.scannedItem ?? 
-    null;
-  
-  // IMPORTANT: Use the top-level imageUri from savedCheck if available
-  // The scannedItem.imageUri is stored in JSONB and never gets updated after upload
-  // savedCheck.imageUri is what gets updated to the remote URL after successful upload
-  // For new imageUri flow, use the imageUri from params (freshest source)
-  const resolvedImageUri = imageUri ?? savedCheck?.imageUri ?? scannedItem?.imageUri;
 
   // Reset image error state when image URI changes
   useEffect(() => {
@@ -2341,38 +2408,10 @@ export default function ResultsScreen() {
     router.push("/add-item");
   };
 
-  // Determine data source: either from fresh scan (currentScan), saved check, 
   // ============================================
-  // PR3: GUARD RETURNS FOR STATE MACHINE
+  // NON-FASHION / UNCERTAIN ITEM GUARDS
   // ============================================
-  // These must come AFTER all hooks but BEFORE any JSX returns.
-  // This ensures hooks are called consistently regardless of state.
-  if (shouldUseImageUriFlow && analysisState) {
-    if (analysisState.status === "loading") {
-      return <ResultsLoading imageUri={analysisState.imageUri} insets={insets} />;
-    }
-    if (analysisState.status === "failed") {
-      return (
-        <ResultsFailed
-          imageUri={analysisState.imageUri}
-          error={analysisState.error}
-          attempt={analysisState.attempt}
-          onRetry={handleRetry}
-          insets={insets}
-        />
-      );
-    }
-  }
-
-  // legacy param, or new imageUri flow
-  const hasData = currentScan || savedCheck || legacyScannedItem || 
-    (analysisState?.status === "success");
-
-  if (!hasData) {
-    return <MissingScanData insets={insets} />;
-  }
-
-  // Early return if no scannedItem (shouldn't happen after hasData check, but safety net)
+  // These must come before the success rendering to show appropriate UIs
   if (!scannedItem) {
     return <MissingScanData insets={insets} />;
   }
