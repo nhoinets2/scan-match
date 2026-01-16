@@ -276,7 +276,7 @@ function ResultsLoading({
 }) {
   // Screen dimensions for responsive sizing
   const { width: screenWidth } = useWindowDimensions();
-  const cardWidth = Math.min(240, screenWidth - 96);
+  const cardWidth = Math.min(180, screenWidth - 120); // Smaller card to fit skeleton
   const cardHeight = cardWidth * 1.25; // 4:5 aspect ratio
   
   // Respect reduce motion accessibility setting
@@ -339,7 +339,6 @@ function ResultsLoading({
         style={{
           paddingTop: insets.top + spacing.md,
           paddingHorizontal: spacing.lg,
-          paddingBottom: spacing.lg, // 24px gap to hero
         }}
       >
         <Pressable
@@ -358,14 +357,14 @@ function ResultsLoading({
         </Pressable>
       </View>
 
-      {/* Content */}
-      <ScrollView 
-        contentContainerStyle={{ 
+      {/* Content - flex layout to fit everything on screen */}
+      <View 
+        style={{ 
+          flex: 1,
           alignItems: "center", 
           paddingHorizontal: spacing.lg,
-          paddingBottom: spacing.xxl,
+          paddingTop: spacing.md,
         }}
-        showsVerticalScrollIndicator={false}
       >
         {/* Hero card - beautiful card with subtle breathing */}
         <Animated.View
@@ -386,7 +385,7 @@ function ResultsLoading({
               shadowOpacity: 0.08,
               shadowRadius: 12,
               elevation: 4,
-              marginBottom: 20, // 20px gap to title
+              marginBottom: spacing.md,
             },
             cardStyle,
           ]}
@@ -401,10 +400,10 @@ function ResultsLoading({
         {/* Title */}
         <Text
           style={{
-            ...typography.styles.h2,
+            ...typography.styles.h3,
             color: colors.text.primary,
             textAlign: "center",
-            marginBottom: spacing.xs, // 8px gap to subtitle
+            marginBottom: 4,
           }}
         >
           Analyzing your item
@@ -413,10 +412,10 @@ function ResultsLoading({
         {/* Subtitle */}
         <Text
           style={{
-            ...typography.ui.body,
+            ...typography.ui.bodySmall,
             color: colors.text.secondary,
             textAlign: "center",
-            marginBottom: spacing.sm, // 12px gap to status pill
+            marginBottom: spacing.sm,
           }}
         >
           This usually takes a moment.
@@ -425,13 +424,13 @@ function ResultsLoading({
         {/* Status pill with animated dots */}
         <View
           style={{
-            height: 28,
-            paddingHorizontal: spacing.md,
-            borderRadius: 14,
-            backgroundColor: `${colors.text.primary}08`, // 3% black
+            height: 26,
+            paddingHorizontal: spacing.sm,
+            borderRadius: 13,
+            backgroundColor: `${colors.text.primary}0A`, // 4% black
             justifyContent: "center",
             alignItems: "center",
-            marginBottom: spacing.lg, // 24px gap to skeleton
+            marginBottom: spacing.lg,
           }}
         >
           <Text
@@ -446,30 +445,30 @@ function ResultsLoading({
         </View>
         
         {/* Mini results skeleton preview */}
-        <View style={{ width: "100%", opacity: 0.4 }}>
+        <View style={{ width: "100%", opacity: 0.45 }}>
           {/* Segmented control skeleton */}
           <View
             style={{
               flexDirection: "row",
               backgroundColor: colors.bg.secondary,
               borderRadius: borderRadius.pill,
-              padding: 4,
-              marginBottom: spacing.lg,
+              padding: 3,
+              marginBottom: spacing.md,
             }}
           >
             <View
               style={{
                 flex: 1,
-                height: 32,
+                height: 28,
                 borderRadius: borderRadius.pill - 2,
                 backgroundColor: colors.bg.primary,
               }}
             />
-            <View style={{ width: 4 }} />
+            <View style={{ width: 3 }} />
             <View
               style={{
                 flex: 1,
-                height: 32,
+                height: 28,
                 borderRadius: borderRadius.pill - 2,
                 backgroundColor: "transparent",
               }}
@@ -483,15 +482,15 @@ function ResultsLoading({
               style={{
                 flexDirection: "row",
                 alignItems: "center",
-                paddingVertical: spacing.sm,
-                marginBottom: spacing.xs,
+                paddingVertical: spacing.xs,
+                marginBottom: 2,
               }}
             >
               {/* Thumbnail */}
               <View
                 style={{
-                  width: 48,
-                  height: 48,
+                  width: 40,
+                  height: 40,
                   borderRadius: borderRadius.sm,
                   backgroundColor: colors.bg.secondary,
                   marginRight: spacing.sm,
@@ -501,18 +500,18 @@ function ResultsLoading({
               <View style={{ flex: 1 }}>
                 <View
                   style={{
-                    width: "60%",
-                    height: 14,
-                    borderRadius: 4,
+                    width: "55%",
+                    height: 12,
+                    borderRadius: 3,
                     backgroundColor: colors.bg.secondary,
-                    marginBottom: 6,
+                    marginBottom: 4,
                   }}
                 />
                 <View
                   style={{
-                    width: "40%",
-                    height: 10,
-                    borderRadius: 4,
+                    width: "35%",
+                    height: 8,
+                    borderRadius: 3,
                     backgroundColor: colors.bg.secondary,
                   }}
                 />
@@ -521,23 +520,23 @@ function ResultsLoading({
           ))}
           
           {/* Outfit ideas strip skeleton */}
-          <View style={{ marginTop: spacing.md }}>
+          <View style={{ marginTop: spacing.sm }}>
             <View
               style={{
-                width: 100,
-                height: 12,
-                borderRadius: 4,
+                width: 80,
+                height: 10,
+                borderRadius: 3,
                 backgroundColor: colors.bg.secondary,
-                marginBottom: spacing.sm,
+                marginBottom: spacing.xs,
               }}
             />
-            <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            <View style={{ flexDirection: "row", gap: spacing.xs }}>
               {[0, 1, 2].map((i) => (
                 <View
                   key={i}
                   style={{
-                    width: 80,
-                    height: 100,
+                    width: 64,
+                    height: 80,
                     borderRadius: borderRadius.sm,
                     backgroundColor: colors.bg.secondary,
                   }}
@@ -546,7 +545,7 @@ function ResultsLoading({
             </View>
           </View>
         </View>
-      </ScrollView>
+      </View>
     </View>
   );
 }
