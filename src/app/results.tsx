@@ -347,9 +347,10 @@ function ResultsLoading({
       >
         <Pressable
           onPress={handleClose}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           style={({ pressed }) => ({
-            width: spacing.xxl,
-            height: spacing.xxl,
+            width: spacing.xxl + spacing.xs,
+            height: spacing.xxl + spacing.xs,
             borderRadius: borderRadius.pill,
             backgroundColor: colors.surface.icon,
             alignItems: "center",
@@ -357,7 +358,7 @@ function ResultsLoading({
             opacity: pressed ? 0.7 : 1,
           })}
         >
-          <X size={20} color={colors.text.primary} strokeWidth={2} />
+          <X size={22} color={colors.text.primary} strokeWidth={2} />
         </Pressable>
       </View>
 
