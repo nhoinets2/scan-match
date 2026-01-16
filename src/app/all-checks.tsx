@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { View, Text, Pressable, Dimensions, ScrollView, Modal } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -21,7 +21,6 @@ import { colors, typography, spacing, borderRadius, cards, shadows, button } fro
 import { getTextStyle } from "@/lib/typography-helpers";
 import { OutcomeState, RecentCheck } from "@/lib/types";
 import { ButtonSecondary } from "@/components/ButtonSecondary";
-import { useMatchCount } from "@/lib/useMatchCount";
 
 // Helper to get status display info
 function getStatusDisplay(outcome: OutcomeState): { label: string; isSaved: boolean } {
@@ -32,30 +31,26 @@ function getStatusDisplay(outcome: OutcomeState): { label: string; isSaved: bool
 }
 
 // Grid tile for checks (matches Recent Scans style)
-function CheckGridItem({
+const CheckGridItem = React.memo(function CheckGridItem({
   check,
   index,
   onPress,
   onLongPress,
   tileSize,
-  onShowDebugSnapshot,
+  matchCount,
 }: {
   check: RecentCheck;
   index: number;
   onPress: (check: RecentCheck) => void;
   onLongPress: (check: RecentCheck) => void;
   tileSize: number;
-  onShowDebugSnapshot?: (snapshot: any) => void;
+  matchCount: string | null;
 }) {
   const statusDisplay = getStatusDisplay(check.outcome);
-  
-  // Get current wardrobe and calculate match count
-  const { data: wardrobe = [] } = useWardrobe();
-  const matchCount = useMatchCount(check, wardrobe);
 
   return (
     <Animated.View
-      entering={FadeInDown.delay(300 + index * 50).springify()}
+      entering={FadeInDown.delay(Math.min(index * 30, 300)).springify()}
       exiting={FadeOut.duration(150)}
     >
       <Pressable
@@ -737,12 +732,29 @@ function StatusPill({ label, color }: { label: string; color: string }) {
 export default function AllChecksScreen() {
   const insets = useSafeAreaInsets();
   const { data: recentChecks = [] } = useRecentChecks();
+  const { data: wardrobe = [] } = useWardrobe();
   const removeRecentCheckMutation = useRemoveRecentCheck();
   const [itemToDelete, setItemToDelete] = useState<RecentCheck | null>(null);
   const [showToast, setShowToast] = useState(false);
   // TEMPORARY: Debug snapshot modal state
   const [showDebugSnapshot, setShowDebugSnapshot] = useState(false);
   const [debugSnapshot, setDebugSnapshot] = useState<any>(null);
+  
+  // Pre-calculate match counts for all checks (avoid per-item hook calls)
+  const matchCountMap = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    for (const check of recentChecks) {
+      // Inline match count calculation to avoid hook overhead
+      const snapshot = check.debugSnapshot;
+      if (snapshot?.engines?.confidence?.matchesHighCount != null) {
+        const count = snapshot.engines.confidence.matchesHighCount;
+        map[check.id] = count > 0 ? `${count} match${count !== 1 ? 'es' : ''}` : null;
+      } else {
+        map[check.id] = null;
+      }
+    }
+    return map;
+  }, [recentChecks]);
 
   // Auto-hide toast after 2 seconds
   useEffect(() => {
@@ -849,10 +861,7 @@ export default function AllChecksScreen() {
                   onPress={handleCheckPress}
                   onLongPress={handleDeleteRequest}
                   tileSize={tileSize}
-                  onShowDebugSnapshot={(snapshot) => {
-                    setDebugSnapshot(snapshot);
-                    setShowDebugSnapshot(true);
-                  }}
+                  matchCount={matchCountMap[check.id]}
                 />
               );
             })}

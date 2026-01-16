@@ -1029,6 +1029,7 @@ export default function HomeScreen() {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     router.push("/all-checks");
                   }}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   style={{ flexDirection: "row", alignItems: "center" }}
                 >
                 <Text
