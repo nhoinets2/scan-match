@@ -625,6 +625,7 @@ async function cleanupItemStorage(
   kind: StorageKind = 'wardrobe'
 ): Promise<void> {
   console.log(`[Storage] Cleaning up ${kind} storage for:`, id);
+  console.log(`[Storage] Image URI to cleanup:`, imageUri);
   
   // 1) Cancel any pending upload
   await cancelUpload(id);
@@ -632,13 +633,25 @@ async function cleanupItemStorage(
   // 2) Delete local file if it's local
   if (imageUri?.startsWith('file://')) {
     // Sanitize URI - reject if it contains path traversal or invalid characters
-    const hasPathTraversal = imageUri.includes('..') || imageUri.includes('/./');
+    // Multiple checks for safety:
+    const hasPathTraversal = 
+      imageUri.includes('..') || 
+      imageUri.includes('/./') ||
+      imageUri.endsWith('/') ||
+      imageUri.endsWith('.');
+    
+    // Must end with a valid image extension (not followed by anything)
     const isValidFileUri = /^file:\/\/[^?#]+\.(jpg|jpeg|png|gif|webp|heic)$/i.test(imageUri);
+    
+    // Additional check: path should not contain suspicious patterns after extension
+    const hasPostExtensionContent = /\.(jpg|jpeg|png|gif|webp|heic)[^a-z]/i.test(imageUri);
 
     if (hasPathTraversal) {
       console.warn('[Storage] Skipping delete - URI contains path traversal:', imageUri);
     } else if (!isValidFileUri) {
       console.warn('[Storage] Skipping delete - Invalid file URI format:', imageUri);
+    } else if (hasPostExtensionContent) {
+      console.warn('[Storage] Skipping delete - Content after extension:', imageUri);
     } else {
       try {
         await FileSystem.deleteAsync(imageUri, { idempotent: true });
@@ -648,6 +661,8 @@ async function cleanupItemStorage(
         // Don't throw - cleanup failure shouldn't block deletion
       }
     }
+  } else {
+    console.log('[Storage] Skipping delete - not a local file URI');
   }
   
   console.log('[Storage] Storage cleanup complete for:', id);
