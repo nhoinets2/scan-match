@@ -22,6 +22,8 @@ import Animated, {
   withRepeat,
   withTiming,
   Easing,
+  useReducedMotion,
+  cancelAnimation,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import {
@@ -257,12 +259,12 @@ const MAX_RETRIES = 3;
  * Loading state UI - shown while analysis is in progress.
  * Displays the scanned image with a subtle pulse animation.
  */
-// Micro-step messages for the analyzing screen
+// Micro-step messages for the analyzing screen (premium, specific)
 const ANALYSIS_STEPS = [
+  "Identifying the item…",
   "Finding wardrobe matches…",
-  "Checking color harmony…",
-  "Evaluating style fit…",
-  "Almost there…",
+  "Building outfit options…",
+  "Final touches…",
 ];
 
 function ResultsLoading({ 
@@ -277,7 +279,10 @@ function ResultsLoading({
   const cardWidth = Math.min(280, screenWidth - 72);
   const cardHeight = cardWidth * 1.25; // 4:5 aspect ratio
   
-  // Micro-step animation
+  // Respect reduce motion accessibility setting
+  const reduceMotion = useReducedMotion();
+  
+  // Micro-step animation (cleaned up on unmount to prevent setState warnings)
   const [stepIndex, setStepIndex] = useState(0);
   
   useEffect(() => {
@@ -287,11 +292,19 @@ function ResultsLoading({
     return () => clearInterval(interval);
   }, []);
   
-  // Breathing pulse animation
+  // Breathing pulse animation (respects reduce motion)
   const pulseScale = useSharedValue(1);
-  const pulseOpacity = useSharedValue(0.4);
+  const pulseOpacity = useSharedValue(reduceMotion ? 0.25 : 0.4);
   
   useEffect(() => {
+    if (reduceMotion) {
+      // Static glow for reduce motion - no animation
+      pulseScale.value = 1.02;
+      pulseOpacity.value = 0.25;
+      return;
+    }
+    
+    // Animated pulse
     pulseScale.value = withRepeat(
       withTiming(1.08, { duration: 1800, easing: Easing.inOut(Easing.ease) }),
       -1,
@@ -302,12 +315,24 @@ function ResultsLoading({
       -1,
       true
     );
-  }, []);
+    
+    // Cleanup animations on unmount
+    return () => {
+      cancelAnimation(pulseScale);
+      cancelAnimation(pulseOpacity);
+    };
+  }, [reduceMotion]);
   
   const pulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseScale.value }],
     opacity: pulseOpacity.value,
   }));
+  
+  // Close handler with haptic feedback
+  const handleClose = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.back();
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
@@ -320,10 +345,11 @@ function ResultsLoading({
         }}
       >
         <Pressable
-          onPress={() => router.back()}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          onPress={handleClose}
           style={({ pressed }) => ({
             alignSelf: "flex-start",
+            minHeight: 44, // Generous hit area for accessibility
+            justifyContent: "center",
             opacity: pressed ? 0.6 : 1,
           })}
         >
@@ -346,9 +372,9 @@ function ResultsLoading({
         paddingTop: spacing.xxl,
         paddingHorizontal: spacing.xl,
       }}>
-        {/* Hero card with breathing pulse ring */}
+        {/* Hero card with breathing pulse ring (or static glow if reduce motion) */}
         <View style={{ position: "relative", marginBottom: spacing.xl }}>
-          {/* Breathing pulse ring */}
+          {/* Breathing pulse ring / static glow */}
           <Animated.View
             style={[
               {
