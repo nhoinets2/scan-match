@@ -49,6 +49,156 @@ import {
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_VIBECODE_OPENAI_API_KEY;
 
 // ============================================
+// ANALYZE RESULT TYPES (Error Union)
+// ============================================
+
+/**
+ * Categorized error kinds for analysis failures.
+ * Used for:
+ * - User-friendly error messages
+ * - Retry logic (e.g., rate_limited has retryAfterSeconds)
+ * - Telemetry segmentation
+ */
+export type AnalyzeErrorKind =
+  | "no_network"      // Network request failed, no connectivity
+  | "timeout"         // Request took too long (AbortController)
+  | "rate_limited"    // 429 - too many requests
+  | "api_error"       // Generic API error (non-specific 4xx/5xx)
+  | "unauthorized"    // 401/403 - auth issues
+  | "bad_request"     // 400 - malformed request or unprocessable image
+  | "server_error"    // 5xx - OpenAI server issues
+  | "parse_error"     // JSON parse failed or invalid schema
+  | "unknown";        // Catch-all for unexpected errors
+
+/**
+ * Structured error object for analysis failures.
+ * Contains user-safe message + optional debug info.
+ */
+export interface AnalyzeError {
+  kind: AnalyzeErrorKind;
+  message: string;           // User-safe short message
+  debug?: string;            // Optional developer string for logs
+  retryAfterSeconds?: number; // For rate_limited errors
+  httpStatus?: number;       // HTTP status code if available
+}
+
+/**
+ * Result union type for analyzeClothingImage.
+ * Either success with item data, or failure with error details.
+ * 
+ * Usage:
+ * ```
+ * const result = await analyzeClothingImage({ imageUri });
+ * if (!result.ok) {
+ *   // Handle error - result.error has kind, message, etc.
+ *   return;
+ * }
+ * // Success - result.data is ClothingAnalysisResult
+ * ```
+ */
+export type AnalyzeResult =
+  | { ok: true; data: ClothingAnalysisResult; cacheHit: boolean }
+  | { ok: false; error: AnalyzeError };
+
+/**
+ * Classify an error into AnalyzeError with appropriate kind and message.
+ * Handles network errors, HTTP status codes, and fallback to unknown.
+ */
+export function classifyAnalyzeError(err: unknown, res?: Response): AnalyzeError {
+  // Timeouts (AbortController)
+  if (err && typeof err === "object" && "name" in err && err.name === "AbortError") {
+    return {
+      kind: "timeout",
+      message: "Taking too long to analyze.",
+      debug: "AbortController timeout",
+    };
+  }
+
+  // Network/fetch errors
+  const errMessage = err instanceof Error ? err.message : String(err || "");
+  const isNetworkError =
+    errMessage.includes("Network request failed") ||
+    errMessage.includes("Failed to fetch") ||
+    errMessage.includes("ENOTFOUND") ||
+    errMessage.includes("ECONNRESET") ||
+    errMessage.includes("ECONNREFUSED") ||
+    errMessage.includes("network") ||
+    errMessage.includes("fetch");
+
+  if (isNetworkError) {
+    return {
+      kind: "no_network",
+      message: "No internet connection.",
+      debug: errMessage,
+    };
+  }
+
+  // HTTP-based errors
+  const status = res?.status;
+  if (status) {
+    if (status === 429) {
+      // Rate limited - try to get Retry-After header
+      const retryAfterHeader = res?.headers?.get?.("retry-after");
+      const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : undefined;
+      return {
+        kind: "rate_limited",
+        message: "Too many requests right now.",
+        httpStatus: status,
+        retryAfterSeconds: Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : undefined,
+      };
+    }
+    if (status === 401 || status === 403) {
+      return {
+        kind: "unauthorized",
+        message: "Authorization error.",
+        httpStatus: status,
+        debug: "API key may be invalid or expired",
+      };
+    }
+    if (status === 400) {
+      return {
+        kind: "bad_request",
+        message: "Couldn't analyze this image.",
+        httpStatus: status,
+        debug: errMessage || "Bad request",
+      };
+    }
+    if (status >= 500) {
+      return {
+        kind: "server_error",
+        message: "Server error. Please try again.",
+        httpStatus: status,
+        debug: `HTTP ${status}`,
+      };
+    }
+    if (status >= 400) {
+      return {
+        kind: "api_error",
+        message: "Couldn't analyze this image.",
+        httpStatus: status,
+        debug: `HTTP ${status}: ${errMessage}`,
+      };
+    }
+  }
+
+  // JSON parse errors
+  if (errMessage.includes("JSON") || errMessage.includes("parse") || errMessage.includes("Unexpected token")) {
+    return {
+      kind: "parse_error",
+      message: "Couldn't understand the analysis.",
+      debug: errMessage,
+    };
+  }
+
+  // Fallback to unknown
+  return {
+    kind: "unknown",
+    message: "Something went wrong.",
+    debug: errMessage || undefined,
+  };
+}
+
+// ============================================
 // NON-FASHION ITEM DETECTION (FALLBACK)
 // ============================================
 
@@ -266,29 +416,65 @@ export interface AnalysisContext {
 }
 
 /**
+ * Parameters for analyzeClothingImage
+ */
+export interface AnalyzeParams {
+  imageUri: string;
+  timeoutMs?: number;
+  signal?: AbortSignal; // External abort signal for cancellation
+  ctx?: AnalysisContext;
+}
+
+/**
  * Analyze a clothing item image using OpenAI GPT-5.1 Vision API.
  *
- * NEW: Results are cached by image hash for deterministic results.
+ * Returns a Result union type - either success with data or failure with error.
+ * NO FALLBACK DATA - failures are explicit errors that callers must handle.
+ *
+ * Results are cached by image hash for deterministic results.
  * Same image bytes → same analysis (until prompt/model version changes).
  *
- * @param imageUri - Path or URL to the image
- * @param ctx - Optional context for telemetry
+ * @param params - Image URI, optional timeout, abort signal, and telemetry context
+ * @returns AnalyzeResult - { ok: true, data } or { ok: false, error }
  */
 export async function analyzeClothingImage(
-  imageUri: string,
+  params: AnalyzeParams | string,
   ctx?: AnalysisContext
-): Promise<ClothingAnalysisResult> {
+): Promise<AnalyzeResult> {
+  // Support both old signature (string) and new signature (params object)
+  const normalizedParams: AnalyzeParams = typeof params === "string"
+    ? { imageUri: params, ctx }
+    : params;
+  
+  const { imageUri, timeoutMs = 30000, signal: externalSignal } = normalizedParams;
+  const telemetryCtx = normalizedParams.ctx ?? ctx;
   const startTime = Date.now();
   console.log("analyzeClothingImage called, API key exists:", !!OPENAI_API_KEY);
+
+  // Set up timeout with AbortController
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  // Link external abort signal if provided
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      clearTimeout(timeoutId);
+      return {
+        ok: false,
+        error: { kind: "timeout", message: "Analysis was cancelled." },
+      };
+    }
+    externalSignal.addEventListener("abort", () => controller.abort());
+  }
 
   // Helper to log telemetry
   const logTelemetry = (result: ClothingAnalysisResult, cacheHit: boolean, cacheKeyPrefix?: string, fallbackUsed?: boolean) => {
     const event = createAnalysisTelemetryEvent({
-      scanSessionId: ctx?.scan_session_id,
-      userId: ctx?.user_id,
-      imageWidth: ctx?.image_width ?? 0,
-      imageHeight: ctx?.image_height ?? 0,
-      imageSource: ctx?.image_source ?? 'unknown',
+      scanSessionId: telemetryCtx?.scan_session_id,
+      userId: telemetryCtx?.user_id,
+      imageWidth: telemetryCtx?.image_width ?? 0,
+      imageHeight: telemetryCtx?.image_height ?? 0,
+      imageSource: telemetryCtx?.image_source ?? 'unknown',
       analysisSuccess: true,
       analysisDurationMs: Date.now() - startTime,
       contextSufficient: result.contextSufficient,
@@ -306,9 +492,41 @@ export async function analyzeClothingImage(
     updateLocalStats({ ...event, timestamp: new Date().toISOString() });
   };
 
+  // Helper to log failure telemetry
+  const logFailureTelemetry = (error: AnalyzeError) => {
+    const event = createAnalysisTelemetryEvent({
+      scanSessionId: telemetryCtx?.scan_session_id,
+      userId: telemetryCtx?.user_id,
+      imageWidth: telemetryCtx?.image_width ?? 0,
+      imageHeight: telemetryCtx?.image_height ?? 0,
+      imageSource: telemetryCtx?.image_source ?? 'unknown',
+      analysisSuccess: false,
+      analysisDurationMs: Date.now() - startTime,
+      contextSufficient: false,
+      detectedCategory: undefined,
+      cacheHit: false,
+      styleTagsCount: 0,
+      colorsCount: 0,
+    });
+    logAnalysisTelemetry(event);
+    updateLocalStats({ ...event, timestamp: new Date().toISOString() });
+    
+    // Log error details in dev
+    if (__DEV__) {
+      console.log("[AnalysisTelemetry] Analysis failed:", error.kind, error.debug);
+    }
+  };
+
   if (!OPENAI_API_KEY) {
-    console.log("OpenAI API key not configured, using fallback detection");
-    return getFallbackAnalysis();
+    console.log("OpenAI API key not configured");
+    clearTimeout(timeoutId);
+    const error: AnalyzeError = {
+      kind: "unauthorized",
+      message: "API not configured.",
+      debug: "OPENAI_API_KEY is missing",
+    };
+    logFailureTelemetry(error);
+    return { ok: false, error };
   }
 
   try {
@@ -353,13 +571,14 @@ export async function analyzeClothingImage(
       const cacheStart = Date.now();
       const cachedResult = await getCachedAnalysis(cacheKey);
       if (cachedResult) {
-        logCacheTelemetry(true, imageSha256, ctx?.scan_session_id);
+        logCacheTelemetry(true, imageSha256, telemetryCtx?.scan_session_id);
         console.log(`[Perf] Cache HIT in ${Date.now() - cacheStart}ms, total: ${Date.now() - startTime}ms`);
         // Log telemetry for cache hit
         logTelemetry(cachedResult, true, imageSha256.slice(0, 8));
-        return cachedResult;
+        clearTimeout(timeoutId);
+        return { ok: true, data: cachedResult, cacheHit: true };
       }
-      logCacheTelemetry(false, imageSha256, ctx?.scan_session_id);
+      logCacheTelemetry(false, imageSha256, telemetryCtx?.scan_session_id);
       console.log(`[Perf] Cache miss (lookup: ${Date.now() - cacheStart}ms), calling OpenAI API...`);
     } else {
       console.log("[Perf] Skipping cache (no hash), calling OpenAI API directly");
@@ -498,12 +717,16 @@ Respond with ONLY the JSON object.`;
         max_completion_tokens: 1000,
         temperature: 0,
       }),
+      signal: controller.signal,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.log(`[Perf] OpenAI API error after ${Date.now() - apiStart}ms (status: ${response.status}):`, errorText);
-      return getFallbackAnalysis();
+      clearTimeout(timeoutId);
+      const error = classifyAnalyzeError(new Error(errorText), response);
+      logFailureTelemetry(error);
+      return { ok: false, error };
     }
 
     const data = await response.json();
@@ -515,7 +738,14 @@ Respond with ONLY the JSON object.`;
 
     if (!responseText) {
       console.log("No text response from OpenAI, data:", JSON.stringify(data));
-      return getFallbackAnalysis();
+      clearTimeout(timeoutId);
+      const error: AnalyzeError = {
+        kind: "parse_error",
+        message: "No response from analysis.",
+        debug: "Empty response text from OpenAI",
+      };
+      logFailureTelemetry(error);
+      return { ok: false, error };
     }
 
     if (__DEV__) {
@@ -536,7 +766,20 @@ Respond with ONLY the JSON object.`;
     }
     cleanedResponse = cleanedResponse.trim();
 
-    const analysis = JSON.parse(cleanedResponse) as ClothingAnalysisResult;
+    let analysis: ClothingAnalysisResult;
+    try {
+      analysis = JSON.parse(cleanedResponse) as ClothingAnalysisResult;
+    } catch (parseError) {
+      console.log("Failed to parse OpenAI response:", cleanedResponse.slice(0, 200));
+      clearTimeout(timeoutId);
+      const error: AnalyzeError = {
+        kind: "parse_error",
+        message: "Couldn't understand the analysis.",
+        debug: `JSON parse failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+      };
+      logFailureTelemetry(error);
+      return { ok: false, error };
+    }
 
     // Validate and normalize the response
     const { analysis: validatedAnalysis, nonFashionFallbackUsed } = validateAnalysis(analysis);
@@ -566,30 +809,17 @@ Respond with ONLY the JSON object.`;
     const totalDuration = Date.now() - startTime;
     console.log(`[Perf] ✅ Analysis complete: ${totalDuration}ms total (category: ${validatedAnalysis.category})`);
 
-    return validatedAnalysis;
+    clearTimeout(timeoutId);
+    return { ok: true, data: validatedAnalysis, cacheHit: false };
   } catch (error) {
-    console.log("Image analysis unavailable, using fallback detection");
-    // Log telemetry for failed analysis
-    const fallback = getFallbackAnalysis();
-    const failedEvent = createAnalysisTelemetryEvent({
-      scanSessionId: ctx?.scan_session_id,
-      userId: ctx?.user_id,
-      imageWidth: ctx?.image_width ?? 0,
-      imageHeight: ctx?.image_height ?? 0,
-      imageSource: ctx?.image_source ?? 'unknown',
-      analysisSuccess: false,
-      analysisDurationMs: Date.now() - startTime,
-      contextSufficient: false,
-      detectedCategory: undefined,
-      cacheHit: false,
-      styleTagsCount: 0,
-      colorsCount: 0,
-    });
-    logAnalysisTelemetry(failedEvent);
-    updateLocalStats({ ...failedEvent, timestamp: new Date().toISOString() });
+    clearTimeout(timeoutId);
+    console.log("Image analysis failed:", error);
     
-    // Don't cache fallback results - they're not real analysis
-    return fallback;
+    // Classify the error
+    const classifiedError = classifyAnalyzeError(error);
+    logFailureTelemetry(classifiedError);
+    
+    return { ok: false, error: classifiedError };
   }
 }
 
@@ -996,36 +1226,6 @@ function getDefaultLabel(category: Category): string {
   return labels[category];
 }
 
-/**
- * Fallback analysis when API is not available
- */
-function getFallbackAnalysis(): ClothingAnalysisResult {
-  return {
-    category: "tops",
-    descriptiveLabel: "Relaxed knit top",
-    colors: [
-      { hex: "#000000", name: "Black" },
-      { hex: "#FFFFFF", name: "White" },
-    ],
-    styleTags: ["casual", "minimal"],
-    styleNotes: ["Loose fit", "Layerable"],
-    itemSignals: {
-      silhouetteVolume: "relaxed",
-      lengthCategory: "mid",
-      layeringFriendly: true,
-      stylingRisk: "medium",
-    },
-    contextSufficient: true,
-    confidenceSignals: {
-      color_profile: {
-        is_neutral: true,
-        saturation: 'low',
-        value: 'low',
-      },
-      style_family: 'minimal',
-      formality_level: 2,
-      texture_type: 'soft',
-    },
-    isFashionItem: true, // Fallback assumes fashion item
-  };
-}
+// NOTE: getFallbackAnalysis has been removed.
+// The analyzeClothingImage function now returns AnalyzeResult with explicit errors.
+// Callers must handle the { ok: false, error } case appropriately.

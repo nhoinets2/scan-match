@@ -834,11 +834,22 @@ export default function AddItemScreen() {
       // Credit consumed (or idempotent replay) - now safe to make AI call
       console.log("[Quota] Credit allowed (reason:", consumeResult.reason, "), proceeding with AI call");
       
-      const result = await analyzeClothingImage(uri);
-      setAnalysis(result);
+      const result = await analyzeClothingImage({ imageUri: uri });
+      
+      // Handle analysis failure
+      if (!result.ok) {
+        console.log("Analysis failed:", result.error.kind, result.error.message);
+        setAnalysisFailed(true);
+        setScreenState("analyzed");
+        return;
+      }
+      
+      // Success - extract analysis data
+      const analysisData = result.data;
+      setAnalysis(analysisData);
       
       // Check if this is a non-fashion item (mug, phone, etc.)
-      if (result.isFashionItem === false) {
+      if (analysisData.isFashionItem === false) {
         setIsNonFashionItem(true);
         setIsUncertainFashion(false);
         setCategory(null);
@@ -850,23 +861,23 @@ export default function AddItemScreen() {
       }
       
       // Check if fashion but uncertain category (blurry photo)
-      if (result.category === "unknown") {
+      if (analysisData.category === "unknown") {
         setIsUncertainFashion(true);
         setIsNonFashionItem(false);
         setCategory(null);
         setSelectedStyles([]);
-        setEditedColors(result.colors || []);
+        setEditedColors(analysisData.colors || []);
         setAnalysisFailed(false);
         setScreenState("analyzed");
         // Don't return - let user pick a category
       } else {
-        setCategory(result.category);
+        setCategory(analysisData.category);
         // Pre-select style tags from AI analysis
-        if (result.styleTags && result.styleTags.length > 0) {
-          setSelectedStyles(result.styleTags);
+        if (analysisData.styleTags && analysisData.styleTags.length > 0) {
+          setSelectedStyles(analysisData.styleTags);
         }
-        if (result.colors) {
-          setEditedColors(result.colors); // Initialize edited colors with detected colors
+        if (analysisData.colors) {
+          setEditedColors(analysisData.colors); // Initialize edited colors with detected colors
         }
         setAnalysisFailed(false);
         setIsNonFashionItem(false);
@@ -874,7 +885,8 @@ export default function AddItemScreen() {
         setScreenState("analyzed");
       }
     } catch (error) {
-      console.log("Analysis failed:", error);
+      // Unexpected errors (not from analyzeClothingImage)
+      console.log("Unexpected error during analysis:", error);
       setAnalysisFailed(true);
       setScreenState("analyzed");
     }

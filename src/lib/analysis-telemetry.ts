@@ -11,9 +11,67 @@
  */
 
 import { supabase } from './supabase';
+import type { AnalyzeErrorKind } from './openai';
 
 // ============================================
-// TELEMETRY TYPES
+// ANALYSIS LIFECYCLE TELEMETRY TYPES
+// ============================================
+
+/**
+ * Telemetry events for the analysis lifecycle (loading → success/failure → retry).
+ * These are used in PR3 for tracking the results screen state machine.
+ * 
+ * Event types:
+ * - analysis_started: Analysis began (loading state)
+ * - analysis_succeeded: Analysis completed successfully
+ * - analysis_failed: Analysis failed with an error
+ * - analysis_retry_tapped: User tapped retry button
+ * - analysis_recovered_success: Succeeded after a previous failure
+ * - analysis_cancelled: User navigated away during loading
+ * - analysis_max_retries: Max retry limit reached
+ */
+export type AnalysisLifecycleEventName =
+  | "analysis_started"
+  | "analysis_succeeded"
+  | "analysis_failed"
+  | "analysis_retry_tapped"
+  | "analysis_recovered_success"
+  | "analysis_cancelled"
+  | "analysis_max_retries";
+
+export interface AnalysisLifecycleEvent {
+  name: AnalysisLifecycleEventName;
+  props: {
+    /** Source of the scan: camera, gallery, recent, saved */
+    source?: "camera" | "gallery" | "recent" | "saved";
+    /** Current attempt number (1-based) */
+    attempt: number;
+    /** Correlation key for linking events across retries */
+    analysisKey?: string;
+    /** Error kind (only for failed/max_retries events) */
+    errorKind?: AnalyzeErrorKind;
+    /** Duration in ms (for succeeded/failed events) */
+    durationMs?: number;
+    /** Whether this was a cache hit (for succeeded events) */
+    cacheHit?: boolean;
+  };
+}
+
+/**
+ * Log an analysis lifecycle event.
+ * These events help track user behavior through the analysis flow.
+ */
+export function logAnalysisLifecycleEvent(event: AnalysisLifecycleEvent): void {
+  if (__DEV__) {
+    console.log(`[AnalysisLifecycle] ${event.name}`, JSON.stringify(event.props));
+  }
+  
+  // TODO (PR3): Send to telemetry backend when results screen owns analysis
+  // For now, just log locally for debugging
+}
+
+// ============================================
+// EXISTING TELEMETRY TYPES
 // ============================================
 
 export interface AnalysisTelemetryEvent {

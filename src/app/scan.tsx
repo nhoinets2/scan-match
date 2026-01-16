@@ -544,13 +544,47 @@ export default function ScanScreen() {
       // Get image dimensions for telemetry
       const dimensions = await getImageDimensions(imageUri);
       
-      // Analyze the image using AI
+      // Analyze the image using AI - now returns AnalyzeResult
       console.log("Calling analyzeClothingImage...");
-      const analysis = await analyzeClothingImage(imageUri, {
-        image_source: source,
-        image_width: dimensions.width,
-        image_height: dimensions.height,
+      const result = await analyzeClothingImage({
+        imageUri,
+        ctx: {
+          image_source: source,
+          image_width: dimensions.width,
+          image_height: dimensions.height,
+        },
       });
+      
+      // Handle analysis failure - show error, don't navigate
+      if (!result.ok) {
+        console.log("Analysis failed:", result.error.kind, result.error.message);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        setIsProcessing(false);
+        
+        // Map error kind to user-friendly message
+        let errorMessage: string;
+        switch (result.error.kind) {
+          case "no_network":
+            errorMessage = "Connection issue. Check your internet and try again.";
+            break;
+          case "timeout":
+            errorMessage = "Taking too long. Please try again.";
+            break;
+          case "rate_limited":
+            errorMessage = "Too many requests. Please wait a moment and try again.";
+            break;
+          case "server_error":
+            errorMessage = "Server issue. Please try again in a moment.";
+            break;
+          default:
+            errorMessage = "Couldn't analyze this image. Try again or use a different photo.";
+        }
+        setScanError(errorMessage);
+        return;
+      }
+      
+      // Success - extract analysis data
+      const analysis = result.data;
       console.log("Analysis result:", JSON.stringify(analysis));
 
       const scannedItem: ScannedItem = {
@@ -582,16 +616,11 @@ export default function ScanScreen() {
       router.replace("/results");
       setIsProcessing(false);
     } catch (error) {
-      console.log("Error processing image:", error);
+      // This catch handles unexpected errors (not from analyzeClothingImage)
+      console.log("Unexpected error processing image:", error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setIsProcessing(false);
-      // Set user-friendly error message
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.toLowerCase().includes('network') || errorMessage.toLowerCase().includes('fetch')) {
-        setScanError("Connection issue. Check your internet and try again.");
-      } else {
-        setScanError("Couldn't analyze this image. Try again or use a different photo.");
-      }
+      setScanError("Something went wrong. Please try again.");
     }
   };
 
