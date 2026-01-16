@@ -3577,7 +3577,7 @@ width: spacing.xs / 2,
                   missingMessage={null}
                   sectionTitle={isHighTab ? RESULTS_COPY.sections.outfitsWearNow : RESULTS_COPY.sections.outfitsWorthTrying}
                   wardrobeItems={wardrobe}
-                  scannedItemImageUri={scannedItem?.imageUri}
+                  scannedItemImageUri={resolvedImageUri}
                   scannedCategory={scannedItem?.category}
                   onAddToWardrobe={handleAddWardrobe}
                   onComboPress={isHighTab ? undefined : handleNearOutfitSelect}
@@ -4419,7 +4419,7 @@ width: spacing.xs / 2,
         }
         matchType={matchesSheetType}
         scannedCategory={itemSummary.category}
-        scannedItemImageUri={scannedItem?.imageUri}
+        scannedItemImageUri={resolvedImageUri}
         scannedItemLabel={itemLabel}
         onItemPress={(item, index) => {
           const scannedCategory = itemSummary.category as Category;
