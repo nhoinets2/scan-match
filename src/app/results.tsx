@@ -257,18 +257,15 @@ const MAX_RETRIES = 3;
 
 /**
  * Loading state UI - shown while analysis is in progress.
- * Premium design with soft glow aura and shimmer effect.
+ * Premium design: beautiful card + status pill + results skeleton preview.
  */
-// Micro-step messages for the analyzing screen (premium, specific)
+// Micro-step messages for the status pill
 const ANALYSIS_STEPS = [
-  "Identifying the item…",
-  "Finding wardrobe matches…",
-  "Building outfit options…",
-  "Final touches…",
+  "Identifying the item",
+  "Finding wardrobe matches",
+  "Building outfit options",
+  "Final touches",
 ];
-
-// Glow padding from card edge (creates "spotlight aura" effect)
-const GLOW_PADDING = 20;
 
 function ResultsLoading({ 
   imageUri, 
@@ -279,78 +276,54 @@ function ResultsLoading({
 }) {
   // Screen dimensions for responsive sizing
   const { width: screenWidth } = useWindowDimensions();
-  const cardWidth = Math.min(280, screenWidth - 72);
+  const cardWidth = Math.min(240, screenWidth - 96);
   const cardHeight = cardWidth * 1.25; // 4:5 aspect ratio
   
   // Respect reduce motion accessibility setting
   const reduceMotion = useReducedMotion();
   
-  // Micro-step animation (cleaned up on unmount to prevent setState warnings)
+  // Micro-step animation
   const [stepIndex, setStepIndex] = useState(0);
   
   useEffect(() => {
     const interval = setInterval(() => {
       setStepIndex((prev) => (prev + 1) % ANALYSIS_STEPS.length);
-    }, 900);
+    }, 1200);
     return () => clearInterval(interval);
   }, []);
   
-  // Soft glow aura animation (subtle opacity + scale)
-  const glowScale = useSharedValue(1);
-  const glowOpacity = useSharedValue(reduceMotion ? 0.07 : 0.04);
+  // Animated dots (. .. ...)
+  const [dots, setDots] = useState("");
   
-  // Shimmer sweep animation
-  const shimmerPosition = useSharedValue(-1);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDots((prev) => (prev.length >= 3 ? "" : prev + "."));
+    }, 400);
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Subtle card breathing animation (scale 1.0 → 1.01)
+  const cardScale = useSharedValue(1);
   
   useEffect(() => {
     if (reduceMotion) {
-      // Static soft glow for reduce motion
-      glowScale.value = 1.01;
-      glowOpacity.value = 0.07;
+      cardScale.value = 1;
       return;
     }
     
-    // Breathing glow: opacity 0.04 → 0.10, scale 1.00 → 1.03
-    glowScale.value = withRepeat(
-      withTiming(1.03, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true
-    );
-    glowOpacity.value = withRepeat(
-      withTiming(0.10, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+    cardScale.value = withRepeat(
+      withTiming(1.01, { duration: 2500, easing: Easing.inOut(Easing.ease) }),
       -1,
       true
     );
     
-    // Shimmer sweep across image (subtle loading indicator)
-    shimmerPosition.value = withRepeat(
-      withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      false // Don't reverse, just restart from -1
-    );
-    
-    // Reset shimmer position for next cycle
-    const shimmerReset = setInterval(() => {
-      shimmerPosition.value = -1;
-      shimmerPosition.value = withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) });
-    }, 1800);
-    
-    // Cleanup animations on unmount
     return () => {
-      cancelAnimation(glowScale);
-      cancelAnimation(glowOpacity);
-      cancelAnimation(shimmerPosition);
-      clearInterval(shimmerReset);
+      cancelAnimation(cardScale);
     };
   }, [reduceMotion]);
   
-  const glowStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: glowScale.value }],
-    opacity: glowOpacity.value,
-  }));
-  
-  const shimmerStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: shimmerPosition.value * (cardWidth + 100) }],
+  const cardStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: cardScale.value }],
   }));
   
   // Close handler with haptic feedback
@@ -361,12 +334,12 @@ function ResultsLoading({
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
-      {/* Header - X icon button (matches result screen) */}
+      {/* Header - X icon button */}
       <View
         style={{
           paddingTop: insets.top + spacing.md,
           paddingHorizontal: spacing.lg,
-          paddingBottom: spacing.md,
+          paddingBottom: spacing.lg, // 24px gap to hero
         }}
       >
         <Pressable
@@ -385,122 +358,195 @@ function ResultsLoading({
         </Pressable>
       </View>
 
-      {/* Content - positioned higher (not centered) */}
-      <View style={{ 
-        flex: 1, 
-        alignItems: "center", 
-        paddingTop: spacing.lg,
-        paddingHorizontal: spacing.xl,
-      }}>
-        {/* Hero card with soft glow aura */}
-        <View style={{ position: "relative", marginBottom: spacing.xxl + spacing.md }}>
-          {/* Soft glow aura (filled rect with blur shadow) */}
-          <Animated.View
-            style={[
-              {
-                position: "absolute",
-                top: -GLOW_PADDING,
-                left: -GLOW_PADDING,
-                right: -GLOW_PADDING,
-                bottom: -GLOW_PADDING,
-                borderRadius: borderRadius.card + GLOW_PADDING,
-                backgroundColor: colors.text.tertiary,
-                // Fake blur with shadow spread
-                shadowColor: colors.text.tertiary,
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.3,
-                shadowRadius: 30,
-                elevation: 0,
-              },
-              glowStyle,
-            ]}
-          />
-          
-          {/* Image card (no border, soft shadow only) */}
-          <Animated.View
-            entering={FadeIn.duration(400)}
-            style={{
+      {/* Content */}
+      <ScrollView 
+        contentContainerStyle={{ 
+          alignItems: "center", 
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.xxl,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero card - beautiful card with subtle breathing */}
+        <Animated.View
+          entering={FadeIn.duration(400)}
+          style={[
+            {
               width: cardWidth,
               height: cardHeight,
               borderRadius: borderRadius.card,
               overflow: "hidden",
               backgroundColor: colors.bg.secondary,
-              // Soft shadow
+              // Hairline border
+              borderWidth: 1,
+              borderColor: `${colors.border.subtle}40`,
+              // Tiny shadow
               shadowColor: "#000",
-              shadowOffset: { width: 0, height: 12 },
-              shadowOpacity: 0.15,
-              shadowRadius: 28,
-              elevation: 10,
-            }}
-          >
-            <Image
-              source={{ uri: imageUri }}
-              style={{ width: "100%", height: "100%" }}
-              contentFit="cover"
-            />
-            
-            {/* Shimmer sweep overlay (micro-premium loading cue) */}
-            {!reduceMotion && (
-              <Animated.View
-                style={[
-                  {
-                    position: "absolute",
-                    top: 0,
-                    bottom: 0,
-                    width: 80,
-                    left: -80,
-                    backgroundColor: "transparent",
-                  },
-                  shimmerStyle,
-                ]}
-              >
-                <View
-                  style={{
-                    flex: 1,
-                    backgroundColor: "rgba(255,255,255,0.08)",
-                    transform: [{ skewX: "-20deg" }],
-                  }}
-                />
-              </Animated.View>
-            )}
-          </Animated.View>
-        </View>
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.08,
+              shadowRadius: 12,
+              elevation: 4,
+              marginBottom: 20, // 20px gap to title
+            },
+            cardStyle,
+          ]}
+        >
+          <Image
+            source={{ uri: imageUri }}
+            style={{ width: "100%", height: "100%" }}
+            contentFit="cover"
+          />
+        </Animated.View>
 
-        {/* Loading text */}
+        {/* Title */}
         <Text
           style={{
             ...typography.styles.h2,
             color: colors.text.primary,
             textAlign: "center",
-            marginBottom: spacing.xs,
+            marginBottom: spacing.xs, // 8px gap to subtitle
           }}
         >
           Analyzing your item
         </Text>
+        
+        {/* Subtitle */}
         <Text
           style={{
             ...typography.ui.body,
             color: colors.text.secondary,
             textAlign: "center",
-            marginBottom: spacing.md,
+            marginBottom: spacing.sm, // 12px gap to status pill
           }}
         >
           This usually takes a moment.
         </Text>
         
-        {/* Micro-step indicator */}
-        <Animated.Text
-          key={stepIndex}
-          entering={FadeIn.duration(200)}
+        {/* Status pill with animated dots */}
+        <View
           style={{
-            ...typography.ui.caption,
-            color: colors.text.tertiary,
-            textAlign: "center",
+            height: 28,
+            paddingHorizontal: spacing.md,
+            borderRadius: 14,
+            backgroundColor: `${colors.text.primary}08`, // 3% black
+            justifyContent: "center",
+            alignItems: "center",
+            marginBottom: spacing.lg, // 24px gap to skeleton
           }}
         >
-          {ANALYSIS_STEPS[stepIndex]}
-        </Animated.Text>
-      </View>
+          <Text
+            style={{
+              ...typography.ui.caption,
+              color: colors.text.secondary,
+              opacity: 0.7,
+            }}
+          >
+            {ANALYSIS_STEPS[stepIndex]}{dots}
+          </Text>
+        </View>
+        
+        {/* Mini results skeleton preview */}
+        <View style={{ width: "100%", opacity: 0.4 }}>
+          {/* Segmented control skeleton */}
+          <View
+            style={{
+              flexDirection: "row",
+              backgroundColor: colors.bg.secondary,
+              borderRadius: borderRadius.pill,
+              padding: 4,
+              marginBottom: spacing.lg,
+            }}
+          >
+            <View
+              style={{
+                flex: 1,
+                height: 32,
+                borderRadius: borderRadius.pill - 2,
+                backgroundColor: colors.bg.primary,
+              }}
+            />
+            <View style={{ width: 4 }} />
+            <View
+              style={{
+                flex: 1,
+                height: 32,
+                borderRadius: borderRadius.pill - 2,
+                backgroundColor: "transparent",
+              }}
+            />
+          </View>
+          
+          {/* Match rows skeleton */}
+          {[0, 1].map((i) => (
+            <View
+              key={i}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingVertical: spacing.sm,
+                marginBottom: spacing.xs,
+              }}
+            >
+              {/* Thumbnail */}
+              <View
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: borderRadius.sm,
+                  backgroundColor: colors.bg.secondary,
+                  marginRight: spacing.sm,
+                }}
+              />
+              {/* Text lines */}
+              <View style={{ flex: 1 }}>
+                <View
+                  style={{
+                    width: "60%",
+                    height: 14,
+                    borderRadius: 4,
+                    backgroundColor: colors.bg.secondary,
+                    marginBottom: 6,
+                  }}
+                />
+                <View
+                  style={{
+                    width: "40%",
+                    height: 10,
+                    borderRadius: 4,
+                    backgroundColor: colors.bg.secondary,
+                  }}
+                />
+              </View>
+            </View>
+          ))}
+          
+          {/* Outfit ideas strip skeleton */}
+          <View style={{ marginTop: spacing.md }}>
+            <View
+              style={{
+                width: 100,
+                height: 12,
+                borderRadius: 4,
+                backgroundColor: colors.bg.secondary,
+                marginBottom: spacing.sm,
+              }}
+            />
+            <View style={{ flexDirection: "row", gap: spacing.sm }}>
+              {[0, 1, 2].map((i) => (
+                <View
+                  key={i}
+                  style={{
+                    width: 80,
+                    height: 100,
+                    borderRadius: borderRadius.sm,
+                    backgroundColor: colors.bg.secondary,
+                  }}
+                />
+              ))}
+            </View>
+          </View>
+        </View>
+      </ScrollView>
     </View>
   );
 }
