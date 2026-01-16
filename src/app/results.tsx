@@ -3051,8 +3051,8 @@ function ResultsSuccess({
                   }}
                 />
               </View>
-              {/* Expanded description */}
-              {isScannedItemExpanded && (
+              {/* Expanded description - only show if style notes exist */}
+              {isScannedItemExpanded && styleNotes.length > 0 && (
                 <Animated.View
                   entering={FadeIn.duration(200)}
                   exiting={FadeOut.duration(200)}
@@ -3128,19 +3128,21 @@ function ResultsSuccess({
                   style={{
                     ...typography.ui.cardTitle,
                     color: colors.text.primary,
-                    marginBottom: spacing.xs,
+                    marginBottom: styleNotes.length > 0 ? spacing.xs : 0,
                   }}
                 >
                   {itemLabel}
                 </Text>
-                <Text
-                  style={{
-                    ...typography.ui.caption,
-                    color: colors.text.secondary,
-                  }}
-                >
-                  {styleNotes.join(" · ")}
-                </Text>
+                {styleNotes.length > 0 && (
+                  <Text
+                    style={{
+                      ...typography.ui.caption,
+                      color: colors.text.secondary,
+                    }}
+                  >
+                    {styleNotes.join(" · ")}
+                  </Text>
+                )}
               </View>
             </BlurView>
           </Animated.View>
@@ -3478,8 +3480,8 @@ width: spacing.xs / 2,
                   }}
                 />
               </View>
-              {/* Expanded description */}
-              {isScannedItemExpanded && (
+              {/* Expanded description - only show if style notes exist */}
+              {isScannedItemExpanded && styleNotes.length > 0 && (
                 <Animated.View
                   entering={FadeIn.duration(200)}
                   exiting={FadeOut.duration(200)}
