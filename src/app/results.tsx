@@ -305,7 +305,7 @@ function ResultsLoading({
     return () => clearInterval(interval);
   }, []);
   
-  // Subtle card breathing animation (scale 1.0 → 1.01)
+  // Card breathing animation (scale 1.0 → 1.03)
   const cardScale = useSharedValue(1);
   
   useEffect(() => {
@@ -315,7 +315,7 @@ function ResultsLoading({
     }
     
     cardScale.value = withRepeat(
-      withTiming(1.01, { duration: 2500, easing: Easing.inOut(Easing.ease) }),
+      withTiming(1.03, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
       -1,
       true
     );
@@ -370,36 +370,38 @@ function ResultsLoading({
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero card - beautiful card with subtle breathing */}
-        <Animated.View
-          entering={FadeIn.duration(400)}
-          style={[
-            {
-              width: cardWidth,
-              height: cardHeight,
-              borderRadius: borderRadius.card,
-              overflow: "hidden",
-              backgroundColor: colors.bg.secondary,
-              // Hairline border
-              borderWidth: 1,
-              borderColor: `${colors.border.subtle}40`,
-              // Tiny shadow
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.08,
-              shadowRadius: 12,
-              elevation: 4,
-              marginBottom: 20,
-            },
-            cardStyle,
-          ]}
-        >
+        {/* Hero card container - extra padding for breathing room */}
+        <View style={{ padding: spacing.sm, marginBottom: spacing.md }}>
+          {/* Hero card - beautiful card with breathing animation */}
+          <Animated.View
+            entering={FadeIn.duration(400)}
+            style={[
+              {
+                width: cardWidth,
+                height: cardHeight,
+                borderRadius: borderRadius.card,
+                overflow: "hidden",
+                backgroundColor: colors.bg.secondary,
+                // Hairline border
+                borderWidth: 1,
+                borderColor: `${colors.border.subtle}40`,
+                // Tiny shadow
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.08,
+                shadowRadius: 12,
+                elevation: 4,
+              },
+              cardStyle,
+            ]}
+          >
           <Image
             source={{ uri: imageUri }}
             style={{ width: "100%", height: "100%" }}
             contentFit="cover"
           />
-        </Animated.View>
+          </Animated.View>
+        </View>
 
         {/* Title */}
         <Text
