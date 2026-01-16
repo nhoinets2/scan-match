@@ -1763,7 +1763,7 @@ export default function AddItemScreen() {
                             flex: 1,
                           }}
                         >
-                          Select a category to continue
+                          Couldn't analyze automatically
                         </Text>
                       </View>
                       <Text
@@ -1774,7 +1774,7 @@ export default function AddItemScreen() {
                           marginLeft: 16 + spacing.sm, // Align with text after icon
                         }}
                       >
-                        Next, you can add style, color, and brand details (optional).
+                        Select a category below to add this item manually.
                       </Text>
                     </View>
                   ) : analysis ? (
