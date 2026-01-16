@@ -611,14 +611,19 @@ function ResultsFailed({
           paddingBottom: spacing.md,
         }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <IconButton
-            icon={X}
-            onPress={() => router.back()}
-            accessibilityLabel="Close"
-          />
-          <View style={{ width: 40 }} />
-        </View>
+        <Pressable
+          onPress={() => router.back()}
+          style={({ pressed }) => ({
+            width: spacing.xxl,
+            height: spacing.xxl,
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: pressed ? 0.5 : 1,
+          })}
+          accessibilityLabel="Close"
+        >
+          <X size={24} color={colors.text.primary} strokeWidth={2} />
+        </Pressable>
       </View>
 
       {/* Content */}
