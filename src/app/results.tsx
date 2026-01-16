@@ -257,7 +257,7 @@ const MAX_RETRIES = 3;
 
 /**
  * Loading state UI - shown while analysis is in progress.
- * Displays the scanned image with a subtle pulse animation.
+ * Premium design with soft glow aura and shimmer effect.
  */
 // Micro-step messages for the analyzing screen (premium, specific)
 const ANALYSIS_STEPS = [
@@ -266,6 +266,9 @@ const ANALYSIS_STEPS = [
   "Building outfit options…",
   "Final touches…",
 ];
+
+// Glow padding from card edge (creates "spotlight aura" effect)
+const GLOW_PADDING = 20;
 
 function ResultsLoading({ 
   imageUri, 
@@ -292,40 +295,62 @@ function ResultsLoading({
     return () => clearInterval(interval);
   }, []);
   
-  // Breathing pulse animation (respects reduce motion)
-  const pulseScale = useSharedValue(1);
-  const pulseOpacity = useSharedValue(reduceMotion ? 0.25 : 0.4);
+  // Soft glow aura animation (subtle opacity + scale)
+  const glowScale = useSharedValue(1);
+  const glowOpacity = useSharedValue(reduceMotion ? 0.07 : 0.04);
+  
+  // Shimmer sweep animation
+  const shimmerPosition = useSharedValue(-1);
   
   useEffect(() => {
     if (reduceMotion) {
-      // Static glow for reduce motion - no animation
-      pulseScale.value = 1.02;
-      pulseOpacity.value = 0.25;
+      // Static soft glow for reduce motion
+      glowScale.value = 1.01;
+      glowOpacity.value = 0.07;
       return;
     }
     
-    // Animated pulse
-    pulseScale.value = withRepeat(
-      withTiming(1.08, { duration: 1800, easing: Easing.inOut(Easing.ease) }),
+    // Breathing glow: opacity 0.04 → 0.10, scale 1.00 → 1.03
+    glowScale.value = withRepeat(
+      withTiming(1.03, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
       -1,
       true
     );
-    pulseOpacity.value = withRepeat(
-      withTiming(0.15, { duration: 1800, easing: Easing.inOut(Easing.ease) }),
+    glowOpacity.value = withRepeat(
+      withTiming(0.10, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
       -1,
       true
     );
     
+    // Shimmer sweep across image (subtle loading indicator)
+    shimmerPosition.value = withRepeat(
+      withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      false // Don't reverse, just restart from -1
+    );
+    
+    // Reset shimmer position for next cycle
+    const shimmerReset = setInterval(() => {
+      shimmerPosition.value = -1;
+      shimmerPosition.value = withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) });
+    }, 1800);
+    
     // Cleanup animations on unmount
     return () => {
-      cancelAnimation(pulseScale);
-      cancelAnimation(pulseOpacity);
+      cancelAnimation(glowScale);
+      cancelAnimation(glowOpacity);
+      cancelAnimation(shimmerPosition);
+      clearInterval(shimmerReset);
     };
   }, [reduceMotion]);
   
-  const pulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulseScale.value }],
-    opacity: pulseOpacity.value,
+  const glowStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: glowScale.value }],
+    opacity: glowOpacity.value,
+  }));
+  
+  const shimmerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shimmerPosition.value * (cardWidth + 100) }],
   }));
   
   // Close handler with haptic feedback
@@ -336,32 +361,27 @@ function ResultsLoading({
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
-      {/* Header - minimal top bar with text close button */}
+      {/* Header - X icon button (matches result screen) */}
       <View
         style={{
-          paddingTop: insets.top + spacing.sm,
+          paddingTop: insets.top + spacing.md,
           paddingHorizontal: spacing.lg,
-          paddingBottom: spacing.sm,
+          paddingBottom: spacing.md,
         }}
       >
         <Pressable
           onPress={handleClose}
           style={({ pressed }) => ({
-            alignSelf: "flex-start",
-            minHeight: 44, // Generous hit area for accessibility
+            width: spacing.xxl,
+            height: spacing.xxl,
+            borderRadius: borderRadius.pill,
+            backgroundColor: colors.surface.icon,
+            alignItems: "center",
             justifyContent: "center",
-            opacity: pressed ? 0.6 : 1,
+            opacity: pressed ? 0.7 : 1,
           })}
         >
-          <Text
-            style={{
-              ...typography.ui.body,
-              color: colors.text.secondary,
-              fontWeight: "500",
-            }}
-          >
-            Close
-          </Text>
+          <X size={20} color={colors.text.primary} strokeWidth={2} />
         </Pressable>
       </View>
 
@@ -369,29 +389,34 @@ function ResultsLoading({
       <View style={{ 
         flex: 1, 
         alignItems: "center", 
-        paddingTop: spacing.xxl,
+        paddingTop: spacing.lg,
         paddingHorizontal: spacing.xl,
       }}>
-        {/* Hero card with breathing pulse ring (or static glow if reduce motion) */}
-        <View style={{ position: "relative", marginBottom: spacing.xl }}>
-          {/* Breathing pulse ring / static glow */}
+        {/* Hero card with soft glow aura */}
+        <View style={{ position: "relative", marginBottom: spacing.xxl + spacing.md }}>
+          {/* Soft glow aura (filled rect with blur shadow) */}
           <Animated.View
             style={[
               {
                 position: "absolute",
-                top: -8,
-                left: -8,
-                right: -8,
-                bottom: -8,
-                borderRadius: borderRadius.card + 8,
-                borderWidth: 2,
-                borderColor: colors.border.subtle,
+                top: -GLOW_PADDING,
+                left: -GLOW_PADDING,
+                right: -GLOW_PADDING,
+                bottom: -GLOW_PADDING,
+                borderRadius: borderRadius.card + GLOW_PADDING,
+                backgroundColor: colors.text.tertiary,
+                // Fake blur with shadow spread
+                shadowColor: colors.text.tertiary,
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.3,
+                shadowRadius: 30,
+                elevation: 0,
               },
-              pulseStyle,
+              glowStyle,
             ]}
           />
           
-          {/* Image card */}
+          {/* Image card (no border, soft shadow only) */}
           <Animated.View
             entering={FadeIn.duration(400)}
             style={{
@@ -399,15 +424,13 @@ function ResultsLoading({
               height: cardHeight,
               borderRadius: borderRadius.card,
               overflow: "hidden",
-              // Hairline border
-              borderWidth: 1,
-              borderColor: `${colors.border.subtle}25`,
+              backgroundColor: colors.bg.secondary,
               // Soft shadow
               shadowColor: "#000",
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 0.12,
-              shadowRadius: 24,
-              elevation: 8,
+              shadowOffset: { width: 0, height: 12 },
+              shadowOpacity: 0.15,
+              shadowRadius: 28,
+              elevation: 10,
             }}
           >
             <Image
@@ -415,6 +438,31 @@ function ResultsLoading({
               style={{ width: "100%", height: "100%" }}
               contentFit="cover"
             />
+            
+            {/* Shimmer sweep overlay (micro-premium loading cue) */}
+            {!reduceMotion && (
+              <Animated.View
+                style={[
+                  {
+                    position: "absolute",
+                    top: 0,
+                    bottom: 0,
+                    width: 80,
+                    left: -80,
+                    backgroundColor: "transparent",
+                  },
+                  shimmerStyle,
+                ]}
+              >
+                <View
+                  style={{
+                    flex: 1,
+                    backgroundColor: "rgba(255,255,255,0.08)",
+                    transform: [{ skewX: "-20deg" }],
+                  }}
+                />
+              </Animated.View>
+            )}
           </Animated.View>
         </View>
 
