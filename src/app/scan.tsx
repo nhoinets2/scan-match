@@ -260,7 +260,7 @@ function ErrorOverlay({
               borderRadius: 12,
               backgroundColor: "rgba(255,255,255,0.1)",
               opacity: pressed ? 0.7 : 1,
-              marginRight: spacing.sm,
+              marginRight: spacing.md,
             })}
           >
             <Text
