@@ -276,8 +276,11 @@ function ResultsLoading({
 }) {
   // Screen dimensions for responsive sizing
   const { width: screenWidth } = useWindowDimensions();
-  const cardWidth = Math.min(180, screenWidth - 120); // Smaller card to fit skeleton
+  const cardWidth = Math.min(240, screenWidth - 96);
   const cardHeight = cardWidth * 1.25; // 4:5 aspect ratio
+  
+  // Skeleton color - use a visible gray instead of bg.secondary which may be too light
+  const skeletonColor = `${colors.text.primary}12`; // 7% of text color = visible gray
   
   // Respect reduce motion accessibility setting
   const reduceMotion = useReducedMotion();
@@ -339,6 +342,7 @@ function ResultsLoading({
         style={{
           paddingTop: insets.top + spacing.md,
           paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.lg,
         }}
       >
         <Pressable
@@ -357,14 +361,14 @@ function ResultsLoading({
         </Pressable>
       </View>
 
-      {/* Content - flex layout to fit everything on screen */}
-      <View 
-        style={{ 
-          flex: 1,
+      {/* Content */}
+      <ScrollView 
+        contentContainerStyle={{ 
           alignItems: "center", 
           paddingHorizontal: spacing.lg,
-          paddingTop: spacing.md,
+          paddingBottom: spacing.xxl,
         }}
+        showsVerticalScrollIndicator={false}
       >
         {/* Hero card - beautiful card with subtle breathing */}
         <Animated.View
@@ -385,7 +389,7 @@ function ResultsLoading({
               shadowOpacity: 0.08,
               shadowRadius: 12,
               elevation: 4,
-              marginBottom: spacing.md,
+              marginBottom: 20,
             },
             cardStyle,
           ]}
@@ -400,10 +404,10 @@ function ResultsLoading({
         {/* Title */}
         <Text
           style={{
-            ...typography.styles.h3,
+            ...typography.styles.h2,
             color: colors.text.primary,
             textAlign: "center",
-            marginBottom: 4,
+            marginBottom: spacing.xs,
           }}
         >
           Analyzing your item
@@ -412,7 +416,7 @@ function ResultsLoading({
         {/* Subtitle */}
         <Text
           style={{
-            ...typography.ui.bodySmall,
+            ...typography.ui.body,
             color: colors.text.secondary,
             textAlign: "center",
             marginBottom: spacing.sm,
@@ -424,10 +428,10 @@ function ResultsLoading({
         {/* Status pill with animated dots */}
         <View
           style={{
-            height: 26,
-            paddingHorizontal: spacing.sm,
-            borderRadius: 13,
-            backgroundColor: `${colors.text.primary}0A`, // 4% black
+            height: 28,
+            paddingHorizontal: spacing.md,
+            borderRadius: 14,
+            backgroundColor: skeletonColor,
             justifyContent: "center",
             alignItems: "center",
             marginBottom: spacing.lg,
@@ -437,7 +441,7 @@ function ResultsLoading({
             style={{
               ...typography.ui.caption,
               color: colors.text.secondary,
-              opacity: 0.7,
+              opacity: 0.8,
             }}
           >
             {ANALYSIS_STEPS[stepIndex]}{dots}
@@ -445,30 +449,30 @@ function ResultsLoading({
         </View>
         
         {/* Mini results skeleton preview */}
-        <View style={{ width: "100%", opacity: 0.45 }}>
+        <View style={{ width: "100%" }}>
           {/* Segmented control skeleton */}
           <View
             style={{
               flexDirection: "row",
-              backgroundColor: colors.bg.secondary,
+              backgroundColor: skeletonColor,
               borderRadius: borderRadius.pill,
-              padding: 3,
-              marginBottom: spacing.md,
+              padding: 4,
+              marginBottom: spacing.lg,
             }}
           >
             <View
               style={{
                 flex: 1,
-                height: 28,
+                height: 32,
                 borderRadius: borderRadius.pill - 2,
                 backgroundColor: colors.bg.primary,
               }}
             />
-            <View style={{ width: 3 }} />
+            <View style={{ width: 4 }} />
             <View
               style={{
                 flex: 1,
-                height: 28,
+                height: 32,
                 borderRadius: borderRadius.pill - 2,
                 backgroundColor: "transparent",
               }}
@@ -482,17 +486,17 @@ function ResultsLoading({
               style={{
                 flexDirection: "row",
                 alignItems: "center",
-                paddingVertical: spacing.xs,
-                marginBottom: 2,
+                paddingVertical: spacing.sm,
+                marginBottom: spacing.xs,
               }}
             >
               {/* Thumbnail */}
               <View
                 style={{
-                  width: 40,
-                  height: 40,
+                  width: 48,
+                  height: 48,
                   borderRadius: borderRadius.sm,
-                  backgroundColor: colors.bg.secondary,
+                  backgroundColor: skeletonColor,
                   marginRight: spacing.sm,
                 }}
               />
@@ -500,19 +504,19 @@ function ResultsLoading({
               <View style={{ flex: 1 }}>
                 <View
                   style={{
-                    width: "55%",
-                    height: 12,
-                    borderRadius: 3,
-                    backgroundColor: colors.bg.secondary,
-                    marginBottom: 4,
+                    width: "60%",
+                    height: 14,
+                    borderRadius: 4,
+                    backgroundColor: skeletonColor,
+                    marginBottom: 6,
                   }}
                 />
                 <View
                   style={{
-                    width: "35%",
-                    height: 8,
-                    borderRadius: 3,
-                    backgroundColor: colors.bg.secondary,
+                    width: "40%",
+                    height: 10,
+                    borderRadius: 4,
+                    backgroundColor: skeletonColor,
                   }}
                 />
               </View>
@@ -520,32 +524,32 @@ function ResultsLoading({
           ))}
           
           {/* Outfit ideas strip skeleton */}
-          <View style={{ marginTop: spacing.sm }}>
+          <View style={{ marginTop: spacing.md }}>
             <View
               style={{
-                width: 80,
-                height: 10,
-                borderRadius: 3,
-                backgroundColor: colors.bg.secondary,
-                marginBottom: spacing.xs,
+                width: 100,
+                height: 12,
+                borderRadius: 4,
+                backgroundColor: skeletonColor,
+                marginBottom: spacing.sm,
               }}
             />
-            <View style={{ flexDirection: "row", gap: spacing.xs }}>
+            <View style={{ flexDirection: "row", gap: spacing.sm }}>
               {[0, 1, 2].map((i) => (
                 <View
                   key={i}
                   style={{
-                    width: 64,
-                    height: 80,
+                    width: 80,
+                    height: 100,
                     borderRadius: borderRadius.sm,
-                    backgroundColor: colors.bg.secondary,
+                    backgroundColor: skeletonColor,
                   }}
                 />
               ))}
             </View>
           </View>
         </View>
-      </View>
+      </ScrollView>
     </View>
   );
 }
