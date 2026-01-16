@@ -148,46 +148,12 @@ import {
   incrementAndGetScanCount,
 } from "@/lib/analytics";
 
-// ============================================
-// PR2: COMPONENT SPLIT DOCUMENTATION
-// ============================================
-// This documents the intended split for PR3's state machine refactor.
-//
-// Parent (ResultsScreen) will keep:
-//   - useLocalSearchParams (route params)
-//   - useRecentChecks, useWardrobe, useWardrobeCount, usePreferences (independent queries)
-//   - useAuth, useSafeAreaInsets
-//   - useSnapToMatchStore (clearScan, currentScan)
-//   - savedCheck derivation, scannedItem extraction
-//   - State machine: loading | failed | success
-//   - Guard UI for missing/invalid scannedItem, loading, and failed states
-//
-// ResultsSuccess will get (via props):
-//   - scannedItem (guaranteed non-null by parent guard)
-//   - useConfidenceEngine, useComboAssembler, useResultsTabs (scannedItem-dependent hooks)
-//   - All scannedItem-dependent state and effects
-//   - All UI rendering for success state
-//
-// PR2 establishes:
-//   - This documentation
-//   - The props interface (ready for extraction)
-//   - Clean guard behavior for missing scannedItem
-//
-// PR3 will:
-//   - Add loading/failed states to parent
-//   - Extract ResultsSuccess as a separate component
-//   - Move scannedItem-dependent hooks into ResultsSuccess
-// ============================================
-
 import type { UseMutationResult } from "@tanstack/react-query";
 import type { ScannedItem as ScannedItemType } from "@/lib/types";
 
 /**
- * Props for ResultsSuccess component (used in PR3).
+ * Props for ResultsSuccess component.
  * Parent provides all dependencies; child owns scannedItem-dependent logic.
- * 
- * NOTE: This interface is defined now but ResultsSuccess extraction happens in PR3.
- * This allows the interface to be reviewed and finalized before the code motion.
  */
 interface ResultsSuccessProps {
   // Core data (guaranteed non-null by parent guard)
@@ -221,21 +187,18 @@ interface ResultsSuccessProps {
 }
 
 // ============================================
-// PR3: ROUTE PARAMS & STATE MACHINE TYPES
+// ROUTE PARAMS & STATE MACHINE TYPES
 // ============================================
 
 /**
  * Route params for results screen.
- * Supports both legacy (scannedItem JSON) and new (imageUri) flows.
  */
 type ResultsRouteParams = {
-  // Legacy: JSON stringified ScannedItem (from old scan.tsx flow)
-  scannedItem?: string;
   // New flow: results owns analysis
   imageUri?: string;
   analysisKey?: string;
   source?: "camera" | "gallery" | "recent" | "saved";
-  // Existing: for viewing saved/recent checks
+  // For viewing saved/recent checks
   checkId?: string;
   from?: string;
 };
@@ -252,7 +215,7 @@ type ResultsState =
 const MAX_RETRIES = 3;
 
 // ============================================
-// PR3: LOADING & FAILED COMPONENTS
+// LOADING & FAILED COMPONENTS
 // ============================================
 
 /**
@@ -792,31 +755,6 @@ if (__DEV__) {
   }
 }
 
-// Generate descriptive item label based on category and style
-function getDescriptiveLabel(category: string): string {
-  const labels: Record<string, string> = {
-    tops: "Relaxed knit top",
-    bottoms: "Classic-cut trousers",
-    outerwear: "Structured mid-length jacket",
-    shoes: "Clean everyday sneakers",
-    bags: "Compact crossbody bag",
-    accessories: "Minimal layering piece",
-  };
-  return labels[category] || "Classic item";
-}
-
-// Generate style notes based on category
-function getStyleNotes(category: string): string[] {
-  const notes: Record<string, string[]> = {
-    tops: ["Loose fit", "Layerable"],
-    bottoms: ["Mid-rise", "Straight leg"],
-    outerwear: ["Structured", "Mid-length"],
-    shoes: ["Clean lines", "Everyday wear"],
-    bags: ["Compact", "Functional"],
-    accessories: ["Subtle", "Stackable"],
-  };
-  return notes[category] || ["Classic style"];
-}
 
 // Generate verdict explanation based on confidence, context, and AI analysis
 function getVerdictExplanation(
@@ -1377,31 +1315,15 @@ export default function ResultsScreen() {
   const updateRecentCheckOutcomeMutation = useUpdateRecentCheckOutcome();
   
   // ============================================
-  // PR3: LEGACY SCANNED ITEM PARAM (backwards compat)
+  // STATE MACHINE FOR imageUri FLOW
   // ============================================
-  // If scannedItem JSON param is provided, parse it and use directly
-  // This is the legacy path from old scan.tsx - no state machine needed
-  const legacyScannedItem = useMemo(() => {
-    if (!params.scannedItem) return null;
-    try {
-      return JSON.parse(params.scannedItem) as ScannedItemType;
-    } catch (e) {
-      console.error("[Results] Failed to parse legacy scannedItem param:", e);
-      return null;
-    }
-  }, [params.scannedItem]);
-  
-  // ============================================
-  // PR3: STATE MACHINE FOR NEW imageUri FLOW
-  // ============================================
-  // Only used when imageUri is provided and no legacy sources exist
   const imageUri = params.imageUri;
   const analysisKey = params.analysisKey ?? generateIdempotencyKey();
   const source = params.source;
   
-  // Determine if we should use the new imageUri flow
-  // New flow: imageUri provided AND no legacy data (currentScan, checkId, legacyScannedItem)
-  const shouldUseImageUriFlow = !!imageUri && !currentScan && !params.checkId && !legacyScannedItem;
+  // Determine if we should use the imageUri flow (fresh scan from camera)
+  // imageUri flow: imageUri provided AND not viewing a saved check
+  const shouldUseImageUriFlow = !!imageUri && !currentScan && !params.checkId;
   
   // State machine for imageUri flow
   const [analysisState, setAnalysisState] = useState<ResultsState | null>(() => {
@@ -1531,7 +1453,7 @@ export default function ResultsScreen() {
   console.log("ResultsScreen mount, currentScan exists:", !!currentScan, "savedCheck:", !!savedCheck);
 
   // Get the ID of the most recently added check (for saving)
-  // Works for both new imageUri flow and legacy currentScan flow
+  // Works for both fresh scans (imageUri flow) and saved checks (checkId flow)
   const currentCheckId = useMemo(() => {
     if (recentChecks.length === 0) return null;
     
@@ -1555,7 +1477,7 @@ export default function ResultsScreen() {
   }, [imageUri, currentScan, recentChecks]);
 
   // ============================================
-  // PR3: EARLY RETURNS FOR STATE MACHINE
+  // EARLY RETURNS FOR STATE MACHINE
   // ============================================
   // These must come BEFORE scannedItem-dependent hooks.
   // All hooks after this point will be in ResultsSuccess.
@@ -1577,13 +1499,11 @@ export default function ResultsScreen() {
   }
 
   // Extract scannedItem from available sources (in priority order):
-  // 1. analysisState.item - from new imageUri flow (PR3)
-  // 2. legacyScannedItem - from scannedItem JSON param (backwards compat)
-  // 3. currentScan - from store (current legacy flow)
-  // 4. savedCheck.scannedItem - from database (viewing saved check)
+  // 1. analysisState.item - from imageUri flow (fresh scan)
+  // 2. currentScan - from store (if navigating back)
+  // 3. savedCheck.scannedItem - from database (viewing saved check)
   const scannedItem = 
     (analysisState?.status === "success" ? analysisState.item : null) ??
-    legacyScannedItem ??
     currentScan ?? 
     savedCheck?.scannedItem ?? 
     null;
@@ -1920,7 +1840,7 @@ function ResultsSuccess({
   }, [scannedItem]);
 
   // Add recent check when results are displayed (only once) - skip if viewing saved check
-  // Works for both new imageUri flow (scannedItem from analysis) and legacy flow (currentScan from store)
+  // Works for both fresh scans (scannedItem from analysis) and saved checks (from database)
   useEffect(() => {
     // Skip if:
     // - Already added a check this session
@@ -1959,7 +1879,7 @@ function ResultsSuccess({
 
       // Get itemCard category and label for debugging
       const itemCardCategory = itemSummary.category;
-      const itemLabel = scannedItem.descriptiveLabel || getDescriptiveLabel(itemSummary.category);
+      const itemLabel = scannedItem.descriptiveLabel || getCategoryLabel(itemSummary.category);
 
       engineSnapshot = buildEngineSnapshot(
         confidenceResult,
@@ -2062,7 +1982,7 @@ function ResultsSuccess({
   };
 
   // Can save if: 1) fresh scan not yet saved, or 2) viewing unsaved check
-  // Works for both new imageUri flow and legacy currentScan flow
+  // Works for both fresh scans (imageUri flow) and saved checks (checkId flow)
   const canSaveCheck = 
     (!isViewingSavedCheck && !!currentCheckId && !isSaved) ||
     (isViewingSavedCheck && savedCheck?.outcome !== "saved_to_revisit" && !isSaved);
@@ -2951,9 +2871,9 @@ function ResultsSuccess({
     wardrobeCount,
   });
 
-  // Use AI-generated labels and notes if available, otherwise fall back to defaults
-  const itemLabel = capitalizeFirst(scannedItem.descriptiveLabel || getDescriptiveLabel(itemSummary.category));
-  const styleNotes = capitalizeItems(scannedItem.styleNotes || getStyleNotes(itemSummary.category));
+  // Use AI-generated labels and notes if available, otherwise use category name
+  const itemLabel = capitalizeFirst(scannedItem.descriptiveLabel || getCategoryLabel(itemSummary.category));
+  const styleNotes = capitalizeItems(scannedItem.styleNotes || []);
   const styleTags = scannedItem.styleTags || [];
 
   // Generate context-aware explanation based on outcome
