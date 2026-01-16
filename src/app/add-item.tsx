@@ -710,6 +710,7 @@ export default function AddItemScreen() {
   const [isNonFashionItem, setIsNonFashionItem] = useState(false);
   const [isUncertainFashion, setIsUncertainFashion] = useState(false);
   const [creditCheckError, setCreditCheckError] = useState<'network' | 'other' | null>(null);
+  const [saveError, setSaveError] = useState<'network' | 'other' | null>(null);
   const [analysis, setAnalysis] = useState<ClothingAnalysisResult | null>(null);
   const [category, setCategory] = useState<Category | null>(null);
   const [selectedStyles, setSelectedStyles] = useState<StyleVibe[]>([]);
@@ -1093,7 +1094,21 @@ export default function AddItemScreen() {
       console.error("[Storage] Failed to add item:", error);
       setIsSaving(false); // Reset loading state
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      // Could show an error toast here
+      
+      // Check if it's a network error
+      const errMessage = error instanceof Error ? error.message : String(error || "");
+      const isNetworkErr =
+        errMessage.includes("Network request failed") ||
+        errMessage.includes("The Internet connection appears to be offline") ||
+        errMessage.includes("The network connection was lost") ||
+        errMessage.includes("Unable to resolve host") ||
+        errMessage.includes("Failed to fetch") ||
+        errMessage.includes("fetch failed") ||
+        errMessage.includes("ENOTFOUND") ||
+        errMessage.includes("ECONNREFUSED");
+      
+      console.log("[AddItem] Save error:", errMessage, "isNetwork:", isNetworkErr);
+      setSaveError(isNetworkErr ? 'network' : 'other');
     }
   };
 
@@ -1920,6 +1935,93 @@ export default function AddItemScreen() {
           />
         </View>
       </KeyboardAvoidingView>
+
+      {/* Save error modal */}
+      <Modal
+        visible={saveError !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSaveError(null)}
+      >
+        <Pressable 
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+          onPress={() => setSaveError(null)}
+        >
+          <Pressable 
+            onPress={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: colors.bg.primary,
+              borderRadius: 24,
+              padding: spacing.xl,
+              marginHorizontal: spacing.lg,
+              alignItems: "center",
+              maxWidth: 320,
+            }}
+          >
+            {/* Icon */}
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: colors.verdict.okay.bg,
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: spacing.md,
+              }}
+            >
+              {saveError === 'network' ? (
+                <WifiOff size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+              ) : (
+                <AlertCircle size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+              )}
+            </View>
+
+            {/* Title */}
+            <Text
+              style={{
+                fontFamily: "PlayfairDisplay_600SemiBold",
+                fontSize: typography.sizes.h3,
+                color: colors.text.primary,
+                textAlign: "center",
+                marginBottom: spacing.xs,
+              }}
+            >
+              {saveError === 'network' ? 'Connection unavailable' : "Couldn't save item"}
+            </Text>
+
+            {/* Subtitle */}
+            <Text
+              style={{
+                fontFamily: "Inter_400Regular",
+                fontSize: typography.sizes.body,
+                color: colors.text.secondary,
+                textAlign: "center",
+                marginBottom: spacing.lg,
+                lineHeight: 22,
+              }}
+            >
+              {saveError === 'network' 
+                ? 'Please check your internet and try again.' 
+                : 'Please try again in a moment.'}
+            </Text>
+
+            {/* Primary Button */}
+            <ButtonPrimary
+              label="Try again"
+              onPress={() => setSaveError(null)}
+              style={{ width: "100%" }}
+            />
+
+            {/* Secondary Button */}
+            <ButtonTertiary
+              label="Close"
+              onPress={() => setSaveError(null)}
+              style={{ marginTop: spacing.sm }}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
