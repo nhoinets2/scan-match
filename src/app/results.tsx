@@ -98,7 +98,7 @@ import { capitalizeFirst, capitalizeItems, capitalizeSentences } from "@/lib/tex
 import { generateIdempotencyKey } from "@/lib/database";
 import { recordPositiveAction, requestReviewIfAppropriate } from "@/lib/useStoreReview";
 import { useConfidenceEngine, tierToVerdictState, tierToLabel } from "@/lib/useConfidenceEngine";
-import { prepareScanForSave, completeScanSave, isLocalUri, cancelUpload, cleanupScanStorage } from "@/lib/storage";
+import { prepareScanForSave, completeScanSave, isLocalUri, cancelUpload, cleanupScanStorage, queueScanUpload } from "@/lib/storage";
 import { useAuth } from "@/lib/auth-context";
 import { useComboAssembler, runShadowModeComparison } from "@/lib/useComboAssembler";
 import type { AssembledCombo } from "@/lib/combo-assembler";
@@ -1907,19 +1907,36 @@ function ResultsSuccess({
         : scannedItem.styleNotes,
     };
 
-    addRecentCheckMutation.mutate({
-      itemName: capitalizeFirst(scannedItem.descriptiveLabel || "Scanned item"),
-      category: scannedItem.category,
-      // Use resolvedImageUri for fresh source (param > savedCheck > JSONB)
-      imageUri: resolvedImageUri || scannedItem.imageUri,
-      outcome: result.outcome,
-      confidence,
-      confidenceScore,
-      scannedItem: capitalizedScannedItem,
-      // TEMPORARY: Add engine snapshot
-      ...(engineSnapshot && { engineSnapshot }),
-    });
-  }, [scannedItem, resolvedImageUri, wardrobeCount, preferences, isViewingSavedCheck, addRecentCheckMutation, confidenceResult, itemSummary, wardrobe]);
+    // Use async IIFE to handle async mutation + upload queue
+    const imageUriForScan = resolvedImageUri || scannedItem.imageUri;
+    
+    (async () => {
+      try {
+        const savedScan = await addRecentCheckMutation.mutateAsync({
+          itemName: capitalizeFirst(scannedItem.descriptiveLabel || "Scanned item"),
+          category: scannedItem.category,
+          // Use resolvedImageUri for fresh source (param > savedCheck > JSONB)
+          imageUri: imageUriForScan,
+          outcome: result.outcome,
+          confidence,
+          confidenceScore,
+          scannedItem: capitalizedScannedItem,
+          // TEMPORARY: Add engine snapshot
+          ...(engineSnapshot && { engineSnapshot }),
+        });
+        
+        // Queue image upload immediately for cross-device sync
+        // This ensures images are available when viewing scans on other devices
+        if (user?.id && imageUriForScan.startsWith('file://')) {
+          console.log('[Results] Queuing immediate scan upload:', savedScan.id);
+          void queueScanUpload(savedScan.id, imageUriForScan, user.id);
+        }
+      } catch (error) {
+        console.error('[Results] Failed to save scan:', error);
+        // Non-fatal: scan save failure doesn't block the UI
+      }
+    })();
+  }, [scannedItem, resolvedImageUri, wardrobeCount, preferences, isViewingSavedCheck, addRecentCheckMutation, confidenceResult, itemSummary, wardrobe, user?.id]);
 
   // Trigger store review after successful scan save (iOS only)
   useEffect(() => {

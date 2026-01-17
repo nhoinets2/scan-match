@@ -444,7 +444,7 @@ export const useAddRecentCheck = () => {
   return useMutation({
     mutationFn: async (
       check: Omit<RecentCheck, "id" | "createdAt">
-    ): Promise<{ deletedCount: number }> => {
+    ): Promise<{ id: string; imageUri: string }> => {
       if (!user?.id) throw new Error("Not authenticated");
 
       // Build insert data
@@ -464,14 +464,17 @@ export const useAddRecentCheck = () => {
         insertData.engine_snapshot = check.engineSnapshot as unknown as Record<string, unknown>;
       }
 
-      // Insert the scan
+      // Insert the scan and return the new record
       // Quota enforcement (keep newest 20 unsaved) happens via DB trigger
-      const { error } = await supabase.from("recent_checks").insert(insertData);
+      const { data, error } = await supabase
+        .from("recent_checks")
+        .insert(insertData)
+        .select("id, image_uri")
+        .single();
 
       if (error) throw error;
 
-      // Trigger handles trimming; MVP doesn't surface counts
-      return { deletedCount: 0 };
+      return { id: data.id, imageUri: data.image_uri };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recentChecks", user?.id] });
