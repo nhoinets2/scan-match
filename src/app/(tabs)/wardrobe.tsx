@@ -525,11 +525,15 @@ export default function WardrobeScreen() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Pull-to-refresh handler
+  // Pull-to-refresh handler with minimum delay for visual feedback
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
     console.log('[Wardrobe] Pull-to-refresh triggered');
-    await refetch();
+    // Add minimum delay so spinner is visible even if data is cached
+    await Promise.all([
+      refetch(),
+      new Promise(resolve => setTimeout(resolve, 500)),
+    ]);
     setIsRefreshing(false);
     console.log('[Wardrobe] Refresh complete');
   }, [refetch]);

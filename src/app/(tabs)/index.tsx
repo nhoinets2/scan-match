@@ -868,11 +868,16 @@ export default function HomeScreen() {
   const { data: recentChecks = [], refetch: refetchRecentChecks, isFetching: isFetchingRecentChecks } = useRecentChecks();
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Pull-to-refresh handler
+  // Pull-to-refresh handler with minimum delay for visual feedback
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
     console.log('[Home] Pull-to-refresh triggered');
-    await Promise.all([refetchWardrobe(), refetchRecentChecks()]);
+    // Add minimum delay so spinner is visible even if data is cached
+    await Promise.all([
+      refetchWardrobe(),
+      refetchRecentChecks(),
+      new Promise(resolve => setTimeout(resolve, 500)),
+    ]);
     setIsRefreshing(false);
     console.log('[Home] Refresh complete');
   }, [refetchWardrobe, refetchRecentChecks]);
