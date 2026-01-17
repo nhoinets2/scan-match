@@ -4592,7 +4592,7 @@ width: spacing.xs / 2,
               color: colors.text.inverse,
             }}
           >
-            Not saved
+            Scan not saved
           </Text>
         </Animated.View>
       )}
