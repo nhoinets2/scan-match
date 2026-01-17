@@ -12,7 +12,7 @@ import Animated, {
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import Clipboard from "@react-native-clipboard/clipboard";
-import { ArrowLeft, Clock, Copy, X, CloudUpload, RefreshCw } from "lucide-react-native";
+import { ArrowLeft, Clock, Copy, X, CloudUpload, RefreshCw, WifiOff, AlertCircle } from "lucide-react-native";
 import { ImageWithFallback } from "@/components/PlaceholderImage";
 
 import { useRecentChecks, useRemoveRecentCheck, SCAN_RETENTION } from "@/lib/database";
@@ -21,6 +21,8 @@ import { colors, typography, spacing, borderRadius, cards, shadows, button } fro
 import { getTextStyle } from "@/lib/typography-helpers";
 import { OutcomeState, RecentCheck } from "@/lib/types";
 import { ButtonSecondary } from "@/components/ButtonSecondary";
+import { ButtonPrimary } from "@/components/ButtonPrimary";
+import { ButtonTertiary } from "@/components/ButtonTertiary";
 
 // Helper to get status display info
 function getStatusDisplay(outcome: OutcomeState): { label: string; isSaved: boolean } {
@@ -735,6 +737,7 @@ export default function AllChecksScreen() {
   const removeRecentCheckMutation = useRemoveRecentCheck();
   const [itemToDelete, setItemToDelete] = useState<RecentCheck | null>(null);
   const [showToast, setShowToast] = useState(false);
+  const [deleteError, setDeleteError] = useState<'network' | 'other' | null>(null);
   // TEMPORARY: Debug snapshot modal state
   const [showDebugSnapshot, setShowDebugSnapshot] = useState(false);
   const [debugSnapshot, setDebugSnapshot] = useState<any>(null);
@@ -771,11 +774,35 @@ export default function AllChecksScreen() {
   };
 
   // Confirm delete action
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!itemToDelete) return;
-    removeRecentCheckMutation.mutate({ id: itemToDelete.id, imageUri: itemToDelete.imageUri });
+    
+    const itemId = itemToDelete.id;
+    const imageUri = itemToDelete.imageUri;
     setItemToDelete(null);
-    setShowToast(true);
+    
+    try {
+      await removeRecentCheckMutation.mutateAsync({ id: itemId, imageUri });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowToast(true);
+    } catch (error) {
+      console.error('[Delete] Failed to delete scan:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      
+      // Check if it's a network error
+      const errMessage = error instanceof Error ? error.message : String(error || "");
+      const isNetworkErr =
+        errMessage.includes("Network request failed") ||
+        errMessage.includes("The Internet connection appears to be offline") ||
+        errMessage.includes("The network connection was lost") ||
+        errMessage.includes("Unable to resolve host") ||
+        errMessage.includes("Failed to fetch") ||
+        errMessage.includes("fetch failed") ||
+        errMessage.includes("ENOTFOUND") ||
+        errMessage.includes("ECONNREFUSED");
+      
+      setDeleteError(isNetworkErr ? 'network' : 'other');
+    }
   };
 
   // Cancel delete action
@@ -911,6 +938,93 @@ export default function AllChecksScreen() {
           setDebugSnapshot(null);
         }}
       />
+
+      {/* Delete error modal */}
+      <Modal
+        visible={deleteError !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteError(null)}
+      >
+        <Pressable 
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+          onPress={() => setDeleteError(null)}
+        >
+          <Pressable 
+            onPress={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: colors.bg.primary,
+              borderRadius: 24,
+              padding: spacing.xl,
+              marginHorizontal: spacing.lg,
+              alignItems: "center",
+              maxWidth: 320,
+            }}
+          >
+            {/* Icon */}
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: colors.verdict.okay.bg,
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: spacing.md,
+              }}
+            >
+              {deleteError === 'network' ? (
+                <WifiOff size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+              ) : (
+                <AlertCircle size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+              )}
+            </View>
+
+            {/* Title */}
+            <Text
+              style={{
+                fontFamily: "PlayfairDisplay_600SemiBold",
+                fontSize: typography.sizes.h3,
+                color: colors.text.primary,
+                textAlign: "center",
+                marginBottom: spacing.xs,
+              }}
+            >
+              {deleteError === 'network' ? 'Connection unavailable' : "Couldn't remove scan"}
+            </Text>
+
+            {/* Subtitle */}
+            <Text
+              style={{
+                fontFamily: "Inter_400Regular",
+                fontSize: typography.sizes.body,
+                color: colors.text.secondary,
+                textAlign: "center",
+                marginBottom: spacing.lg,
+                lineHeight: 22,
+              }}
+            >
+              {deleteError === 'network' 
+                ? 'Please check your internet and try again.' 
+                : 'Please try again in a moment.'}
+            </Text>
+
+            {/* Primary Button */}
+            <ButtonPrimary
+              label="Try again"
+              onPress={() => setDeleteError(null)}
+              style={{ width: "100%" }}
+            />
+
+            {/* Secondary Button */}
+            <ButtonTertiary
+              label="Close"
+              onPress={() => setDeleteError(null)}
+              style={{ marginTop: spacing.sm }}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }

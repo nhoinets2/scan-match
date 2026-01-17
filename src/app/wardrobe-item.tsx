@@ -22,6 +22,8 @@ import {
   ChevronUp,
   Pencil,
   Trash2,
+  WifiOff,
+  AlertCircle,
 } from "lucide-react-native";
 import { ThumbnailPlaceholderImage } from "@/components/PlaceholderImage";
 
@@ -223,6 +225,7 @@ export default function WardrobeItemScreen() {
   // Modal states
   const [photoViewerUri, setPhotoViewerUri] = useState<string | null>(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [deleteError, setDeleteError] = useState<'network' | 'other' | null>(null);
 
   // Track if changes were made
   const hasChanges = useMemo(() => {
@@ -321,18 +324,38 @@ export default function WardrobeItemScreen() {
   };
 
   // Confirm delete action
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!item) return;
     
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    removeWardrobeItemMutation.mutate({ id: item.id, imageUri: item.imageUri });
     setShowDeleteConfirmation(false);
     
-    // Navigate back to wardrobe list
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.push("/(tabs)/wardrobe");
+    try {
+      await removeWardrobeItemMutation.mutateAsync({ id: item.id, imageUri: item.imageUri });
+      
+      // Success - haptic and navigate
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.push("/(tabs)/wardrobe");
+      }
+    } catch (error) {
+      console.error('[Delete] Failed to delete wardrobe item:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      
+      // Check if it's a network error
+      const errMessage = error instanceof Error ? error.message : String(error || "");
+      const isNetworkErr =
+        errMessage.includes("Network request failed") ||
+        errMessage.includes("The Internet connection appears to be offline") ||
+        errMessage.includes("The network connection was lost") ||
+        errMessage.includes("Unable to resolve host") ||
+        errMessage.includes("Failed to fetch") ||
+        errMessage.includes("fetch failed") ||
+        errMessage.includes("ENOTFOUND") ||
+        errMessage.includes("ECONNREFUSED");
+      
+      setDeleteError(isNetworkErr ? 'network' : 'other');
     }
   };
 
@@ -1159,6 +1182,93 @@ export default function WardrobeItemScreen() {
                 onPress={handleCancelDelete}
               />
             </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Delete error modal */}
+      <Modal
+        visible={deleteError !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteError(null)}
+      >
+        <Pressable 
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+          onPress={() => setDeleteError(null)}
+        >
+          <Pressable 
+            onPress={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: colors.bg.primary,
+              borderRadius: 24,
+              padding: spacing.xl,
+              marginHorizontal: spacing.lg,
+              alignItems: "center",
+              maxWidth: 320,
+            }}
+          >
+            {/* Icon */}
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: colors.verdict.okay.bg,
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: spacing.md,
+              }}
+            >
+              {deleteError === 'network' ? (
+                <WifiOff size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+              ) : (
+                <AlertCircle size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+              )}
+            </View>
+
+            {/* Title */}
+            <Text
+              style={{
+                fontFamily: "PlayfairDisplay_600SemiBold",
+                fontSize: typography.sizes.h3,
+                color: colors.text.primary,
+                textAlign: "center",
+                marginBottom: spacing.xs,
+              }}
+            >
+              {deleteError === 'network' ? 'Connection unavailable' : "Couldn't remove item"}
+            </Text>
+
+            {/* Subtitle */}
+            <Text
+              style={{
+                fontFamily: "Inter_400Regular",
+                fontSize: typography.sizes.body,
+                color: colors.text.secondary,
+                textAlign: "center",
+                marginBottom: spacing.lg,
+                lineHeight: 22,
+              }}
+            >
+              {deleteError === 'network' 
+                ? 'Please check your internet and try again.' 
+                : 'Please try again in a moment.'}
+            </Text>
+
+            {/* Primary Button */}
+            <ButtonPrimary
+              label="Try again"
+              onPress={() => setDeleteError(null)}
+              style={{ width: "100%" }}
+            />
+
+            {/* Secondary Button */}
+            <ButtonTertiary
+              label="Close"
+              onPress={() => setDeleteError(null)}
+              style={{ marginTop: spacing.sm }}
+            />
           </Pressable>
         </Pressable>
       </Modal>

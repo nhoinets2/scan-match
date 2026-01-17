@@ -20,7 +20,7 @@ import Animated, {
   FadeOut,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import { Camera, CloudUpload, RefreshCw } from "lucide-react-native";
+import { Camera, CloudUpload, RefreshCw, WifiOff, AlertCircle } from "lucide-react-native";
 import { ImageWithFallback } from "@/components/PlaceholderImage";
 
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,6 +30,8 @@ import { colors, spacing, typography, borderRadius, cards, shadows, button } fro
 import { getTextStyle } from "@/lib/typography-helpers";
 import { WardrobeItem, CATEGORIES, Category } from "@/lib/types";
 import { ButtonSecondary } from "@/components/ButtonSecondary";
+import { ButtonPrimary } from "@/components/ButtonPrimary";
+import { ButtonTertiary } from "@/components/ButtonTertiary";
 import { capitalizeFirst } from "@/lib/text-utils";
 import { sweepOrphanedLocalImages, isUploadFailed, retryFailedUpload, getPendingUploadLocalUris, hasAnyPendingUploads, getRecentlyCreatedUris, hasPendingUpload, onQueueIdle } from "@/lib/storage";
 
@@ -510,6 +512,7 @@ export default function WardrobeScreen() {
   const [itemToDelete, setItemToDelete] = useState<WardrobeItem | null>(null);
   const [isInitialRender, setIsInitialRender] = useState(true);
   const [showToast, setShowToast] = useState(false);
+  const [deleteError, setDeleteError] = useState<'network' | 'other' | null>(null);
 
   // Auto-hide toast after 2 seconds
   useEffect(() => {
@@ -694,11 +697,35 @@ export default function WardrobeScreen() {
   };
 
   // Confirm delete action
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!itemToDelete) return;
-    removeWardrobeItemMutation.mutate({ id: itemToDelete.id, imageUri: itemToDelete.imageUri });
+    
+    const itemId = itemToDelete.id;
+    const imageUri = itemToDelete.imageUri;
     setItemToDelete(null);
-    setShowToast(true);
+    
+    try {
+      await removeWardrobeItemMutation.mutateAsync({ id: itemId, imageUri });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowToast(true);
+    } catch (error) {
+      console.error('[Delete] Failed to delete wardrobe item:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      
+      // Check if it's a network error
+      const errMessage = error instanceof Error ? error.message : String(error || "");
+      const isNetworkErr =
+        errMessage.includes("Network request failed") ||
+        errMessage.includes("The Internet connection appears to be offline") ||
+        errMessage.includes("The network connection was lost") ||
+        errMessage.includes("Unable to resolve host") ||
+        errMessage.includes("Failed to fetch") ||
+        errMessage.includes("fetch failed") ||
+        errMessage.includes("ENOTFOUND") ||
+        errMessage.includes("ECONNREFUSED");
+      
+      setDeleteError(isNetworkErr ? 'network' : 'other');
+    }
   };
 
   // Cancel delete action
@@ -887,6 +914,93 @@ export default function WardrobeScreen() {
         visible={showToast}
         message="Removed from Wardrobe"
       />
+
+      {/* Delete error modal */}
+      <Modal
+        visible={deleteError !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteError(null)}
+      >
+        <Pressable 
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+          onPress={() => setDeleteError(null)}
+        >
+          <Pressable 
+            onPress={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: colors.bg.primary,
+              borderRadius: 24,
+              padding: spacing.xl,
+              marginHorizontal: spacing.lg,
+              alignItems: "center",
+              maxWidth: 320,
+            }}
+          >
+            {/* Icon */}
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: colors.verdict.okay.bg,
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: spacing.md,
+              }}
+            >
+              {deleteError === 'network' ? (
+                <WifiOff size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+              ) : (
+                <AlertCircle size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+              )}
+            </View>
+
+            {/* Title */}
+            <Text
+              style={{
+                fontFamily: "PlayfairDisplay_600SemiBold",
+                fontSize: typography.sizes.h3,
+                color: colors.text.primary,
+                textAlign: "center",
+                marginBottom: spacing.xs,
+              }}
+            >
+              {deleteError === 'network' ? 'Connection unavailable' : "Couldn't remove item"}
+            </Text>
+
+            {/* Subtitle */}
+            <Text
+              style={{
+                fontFamily: "Inter_400Regular",
+                fontSize: typography.sizes.body,
+                color: colors.text.secondary,
+                textAlign: "center",
+                marginBottom: spacing.lg,
+                lineHeight: 22,
+              }}
+            >
+              {deleteError === 'network' 
+                ? 'Please check your internet and try again.' 
+                : 'Please try again in a moment.'}
+            </Text>
+
+            {/* Primary Button */}
+            <ButtonPrimary
+              label="Try again"
+              onPress={() => setDeleteError(null)}
+              style={{ width: "100%" }}
+            />
+
+            {/* Secondary Button */}
+            <ButtonTertiary
+              label="Close"
+              onPress={() => setDeleteError(null)}
+              style={{ marginTop: spacing.sm }}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
