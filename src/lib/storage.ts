@@ -639,27 +639,27 @@ async function cleanupItemStorage(
     } catch {
       decodedUri = imageUri; // If decode fails, use original
     }
-    
+
     // Sanitize URI - reject if it contains path traversal or invalid characters
     // Multiple paranoid checks for safety:
-    const hasPathTraversal = 
-      decodedUri.includes('..') || 
+    const hasPathTraversal =
+      decodedUri.includes('..') ||
       decodedUri.includes('/./') ||
       decodedUri.endsWith('/') ||
       decodedUri.endsWith('.') ||
       imageUri.includes('..') ||  // Also check original in case decode changed it
       imageUri.includes('%2e%2e') || // URL-encoded ..
       imageUri.includes('%2E%2E');   // URL-encoded .. (uppercase)
-    
+
     // Must end with a valid image extension (not followed by anything)
     const isValidFileUri = /^file:\/\/[^?#]+\.(jpg|jpeg|png|gif|webp|heic)$/i.test(imageUri);
-    
+
     // Additional check: path should not contain suspicious patterns after extension
     const hasPostExtensionContent = /\.(jpg|jpeg|png|gif|webp|heic).+/i.test(imageUri);
-    
+
     // Extra safety: check the path portion only (after file://)
     const pathPortion = imageUri.slice(7); // Remove "file://"
-    const hasWeirdPath = 
+    const hasWeirdPath =
       pathPortion.includes('//') ||  // Double slashes
       pathPortion.includes('\0') ||  // Null bytes
       pathPortion.includes('\n') ||  // Newlines
@@ -667,20 +667,25 @@ async function cleanupItemStorage(
 
     if (hasPathTraversal) {
       console.warn('[Storage] Skipping delete - URI contains path traversal:', imageUri);
+      return; // Early return to prevent deletion attempt
     } else if (!isValidFileUri) {
       console.warn('[Storage] Skipping delete - Invalid file URI format:', imageUri);
+      return; // Early return to prevent deletion attempt
     } else if (hasPostExtensionContent) {
       console.warn('[Storage] Skipping delete - Content after extension:', imageUri);
+      return; // Early return to prevent deletion attempt
     } else if (hasWeirdPath) {
       console.warn('[Storage] Skipping delete - Suspicious path pattern:', imageUri);
-    } else {
-      try {
-        await FileSystem.deleteAsync(imageUri, { idempotent: true });
-        console.log('[Storage] Deleted local file:', imageUri);
-      } catch (error) {
-        console.error('[Storage] Failed to delete local file:', error);
-        // Don't throw - cleanup failure shouldn't block deletion
-      }
+      return; // Early return to prevent deletion attempt
+    }
+
+    // Only reach here if all validation checks pass
+    try {
+      await FileSystem.deleteAsync(imageUri, { idempotent: true });
+      console.log('[Storage] Deleted local file:', imageUri);
+    } catch (error) {
+      console.error('[Storage] Failed to delete local file:', error);
+      // Don't throw - cleanup failure shouldn't block deletion
     }
   } else {
     console.log('[Storage] Skipping delete - not a local file URI');
