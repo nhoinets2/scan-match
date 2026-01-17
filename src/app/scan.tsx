@@ -32,7 +32,7 @@ import {
 
 import { useSnapToMatchStore } from "@/lib/store";
 import { prewarmCacheConnection } from "@/lib/analysis-cache";
-import { colors, typography, spacing, components } from "@/lib/design-tokens";
+import { colors, typography, spacing, components, borderRadius } from "@/lib/design-tokens";
 import { ButtonTertiary } from "@/components/ButtonTertiary";
 import { IconButton } from "@/components/IconButton";
 import { ButtonPrimary } from "@/components/ButtonPrimary";
@@ -76,7 +76,7 @@ function ScanOverlay({ currentTip }: { currentTip: string }) {
   }));
 
   return (
-    <View className="absolute inset-0 items-center justify-center">
+    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}>
       {/* Subtle rounded frame guide */}
       <Animated.View
         style={[
@@ -86,22 +86,28 @@ function ScanOverlay({ currentTip }: { currentTip: string }) {
             height: 340,
             borderWidth: 2,
             borderColor: "rgba(255,255,255,0.12)",
-            borderRadius: 20,
+            borderRadius: borderRadius.card,
             backgroundColor: "transparent",
           },
         ]}
       />
 
       {/* Rotating tip */}
-      <View className="absolute bottom-8 items-center px-8">
+      <View style={{ position: "absolute", bottom: spacing.xl, alignItems: "center", paddingHorizontal: spacing.xl }}>
         <Animated.View
-          style={[tipStyle]}
-          className="bg-black/50 rounded-full px-5 py-2.5"
+          style={[
+            tipStyle,
+            {
+              backgroundColor: "rgba(0,0,0,0.5)",
+              borderRadius: borderRadius.pill,
+              paddingHorizontal: spacing.md + spacing.xs,
+              paddingVertical: spacing.sm + spacing.xs / 2,
+            },
+          ]}
         >
           <Text
             style={{ 
-              fontFamily: "Inter_400Regular", 
-              fontSize: typography.sizes.caption,
+              ...typography.ui.caption,
               color: colors.text.inverse,
               opacity: 0.9,
               textAlign: "center",
@@ -141,18 +147,26 @@ function ProcessingOverlay() {
   return (
     <Animated.View
       entering={FadeIn.duration(300)}
-      className="absolute inset-0 bg-black/80 items-center justify-center"
+      style={{ 
+        position: "absolute", 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: 0, 
+        backgroundColor: "rgba(0,0,0,0.8)", 
+        alignItems: "center", 
+        justifyContent: "center" 
+      }}
     >
-      <View className="items-center">
-        <View className="flex-row mb-6">
+      <View style={{ alignItems: "center" }}>
+        <View style={{ flexDirection: "row", marginBottom: spacing.lg }}>
           <Animated.View style={[dot1Style, { width: spacing.sm + spacing.xs, height: spacing.sm + spacing.xs, borderRadius: (spacing.sm + spacing.xs) / 2, backgroundColor: colors.accent.terracotta, marginHorizontal: spacing.xs }]} />
           <Animated.View style={[dot2Style, { width: spacing.sm + spacing.xs, height: spacing.sm + spacing.xs, borderRadius: (spacing.sm + spacing.xs) / 2, backgroundColor: colors.accent.terracotta, marginHorizontal: spacing.xs }]} />
           <Animated.View style={[dot3Style, { width: spacing.sm + spacing.xs, height: spacing.sm + spacing.xs, borderRadius: (spacing.sm + spacing.xs) / 2, backgroundColor: colors.accent.terracotta, marginHorizontal: spacing.xs }]} />
         </View>
         <Text
           style={{ 
-            fontFamily: "Inter_500Medium", 
-            fontSize: typography.sizes.h3,
+            ...typography.ui.sectionTitle,
             color: colors.text.inverse,
             textAlign: "center",
           }}
@@ -181,70 +195,104 @@ function HelpBottomSheet({
       onRequestClose={onClose}
     >
       <Pressable
-        className="flex-1 bg-black/50"
+        style={{ flex: 1, backgroundColor: colors.overlay.dark }}
         onPress={onClose}
       />
       <View
-        className="bg-bg rounded-t-3xl"
-        style={{ paddingBottom: insets.bottom + 20 }}
+        style={{ 
+          backgroundColor: colors.bg.elevated,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          paddingBottom: insets.bottom + 20 
+        }}
       >
-        <View className="items-center pt-3 pb-4">
-          <View className="w-10 h-1 rounded-full bg-text/20" />
+        <View style={{ alignItems: "center", paddingTop: spacing.sm + spacing.xs / 2, paddingBottom: spacing.md }}>
+          <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.bg.tertiary }} />
         </View>
 
-        <View className="px-6 pb-4">
+        <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.md }}>
           <Text
-            className="text-text mb-4"
-            style={{ fontFamily: "Poppins_600SemiBold", fontSize: typography.styles.h2.fontSize, lineHeight: typography.styles.h2.lineHeight }}
+            style={{
+              ...typography.display.screenTitle,
+              color: colors.text.primary,
+              marginBottom: spacing.md,
+            }}
           >
             How to scan
           </Text>
 
-          <View className="space-y-4">
-            <View className="flex-row items-start">
-              <View className="h-6 w-6 rounded-full bg-accent/10 items-center justify-center mr-3 mt-0.5">
-                <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: typography.sizes.meta, color: colors.accent.terracotta }}>1</Text>
+          <View style={{ gap: spacing.md }}>
+            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+              <View style={{ 
+                width: 24, 
+                height: 24, 
+                borderRadius: 12, 
+                backgroundColor: colors.accent.terracottaLight,
+                alignItems: "center",
+                justifyContent: "center",
+                marginRight: spacing.sm,
+                marginTop: 2,
+              }}>
+                <Text style={{ ...typography.ui.micro, color: colors.accent.terracotta }}>1</Text>
               </View>
-              <View className="flex-1">
-                <Text className="text-text" style={{ fontFamily: "Inter_600SemiBold", fontSize: typography.sizes.body }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ ...typography.ui.bodyMedium, color: colors.text.primary }}>
                   Hold the item up
                 </Text>
-                <Text className="text-text-muted mt-1" style={{ fontFamily: "Inter_400Regular", fontSize: typography.sizes.caption }}>
+                <Text style={{ ...typography.ui.caption, color: colors.text.secondary, marginTop: spacing.xs }}>
                   Lay it flat, hang it up, or hold it against a plain background
                 </Text>
               </View>
             </View>
 
-            <View className="flex-row items-start">
-              <View className="h-6 w-6 rounded-full bg-accent/10 items-center justify-center mr-3 mt-0.5">
-                <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: typography.sizes.meta, color: colors.accent.terracotta }}>2</Text>
+            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+              <View style={{ 
+                width: 24, 
+                height: 24, 
+                borderRadius: 12, 
+                backgroundColor: colors.accent.terracottaLight,
+                alignItems: "center",
+                justifyContent: "center",
+                marginRight: spacing.sm,
+                marginTop: 2,
+              }}>
+                <Text style={{ ...typography.ui.micro, color: colors.accent.terracotta }}>2</Text>
               </View>
-              <View className="flex-1">
-                <Text className="text-text" style={{ fontFamily: "Inter_600SemiBold", fontSize: typography.sizes.body }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ ...typography.ui.bodyMedium, color: colors.text.primary }}>
                   Fit it in the frame
                 </Text>
-                <Text className="text-text-muted mt-1" style={{ fontFamily: "Inter_400Regular", fontSize: typography.sizes.caption }}>
+                <Text style={{ ...typography.ui.caption, color: colors.text.secondary, marginTop: spacing.xs }}>
                   Best results when the full item is visible
                 </Text>
               </View>
             </View>
 
-            <View className="flex-row items-start">
-              <View className="h-6 w-6 rounded-full bg-accent/10 items-center justify-center mr-3 mt-0.5">
-                <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: typography.sizes.meta, color: colors.accent.terracotta }}>3</Text>
+            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+              <View style={{ 
+                width: 24, 
+                height: 24, 
+                borderRadius: 12, 
+                backgroundColor: colors.accent.terracottaLight,
+                alignItems: "center",
+                justifyContent: "center",
+                marginRight: spacing.sm,
+                marginTop: 2,
+              }}>
+                <Text style={{ ...typography.ui.micro, color: colors.accent.terracotta }}>3</Text>
               </View>
-              <View className="flex-1">
-                <Text className="text-text" style={{ fontFamily: "Inter_600SemiBold", fontSize: typography.sizes.body }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ ...typography.ui.bodyMedium, color: colors.text.primary }}>
                   Tap to capture
                 </Text>
-                <Text className="text-text-muted mt-1" style={{ fontFamily: "Inter_400Regular", fontSize: typography.sizes.caption }}>
+                <Text style={{ ...typography.ui.caption, color: colors.text.secondary, marginTop: spacing.xs }}>
                   We'll analyze the colors and style to find matches
                 </Text>
               </View>
             </View>
           </View>
 
-          <View style={{ marginTop: 24 }}>
+          <View style={{ marginTop: spacing.lg }}>
             <ButtonPrimary
               label="Got it"
               onPress={onClose}
@@ -476,11 +524,10 @@ export default function ScanScreen() {
   // Permission handling
   if (!permission) {
     return (
-      <View className="flex-1 bg-black items-center justify-center">
+      <View style={{ flex: 1, backgroundColor: "#000000", alignItems: "center", justifyContent: "center" }}>
         <Text
           style={{
-            fontFamily: "Inter_400Regular",
-            fontSize: typography.sizes.body,
+            ...typography.ui.body,
             color: colors.text.inverse,
           }}
         >
@@ -492,15 +539,21 @@ export default function ScanScreen() {
 
   if (!permission.granted) {
     return (
-      <View className="flex-1 bg-bg items-center justify-center px-8">
-        <View className="h-24 w-24 rounded-full bg-accent/10 items-center justify-center mb-6">
+      <View style={{ flex: 1, backgroundColor: colors.bg.primary, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xl }}>
+        <View style={{ 
+          width: 96, 
+          height: 96, 
+          borderRadius: 48, 
+          backgroundColor: colors.accent.terracottaLight,
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: spacing.lg,
+        }}>
           <Camera size={40} color={colors.accent.terracotta} strokeWidth={1.5} />
         </View>
         <Text
           style={{
-            fontFamily: "Poppins_600SemiBold",
-            fontSize: typography.styles.h2.fontSize,
-            lineHeight: typography.styles.h2.lineHeight,
+            ...typography.display.screenTitle,
             color: colors.text.primary,
             textAlign: "center",
             marginBottom: spacing.xs,
@@ -510,10 +563,8 @@ export default function ScanScreen() {
         </Text>
         <Text
           style={{
-            fontFamily: "Inter_400Regular",
-            fontSize: typography.sizes.body,
+            ...typography.ui.body,
             color: colors.text.secondary,
-            lineHeight: typography.lineHeight.normal * typography.sizes.body,
             textAlign: "center",
             marginBottom: spacing.xl,
           }}
@@ -523,9 +574,9 @@ export default function ScanScreen() {
         <ButtonPrimary
           label="Allow Camera"
           onPress={requestPermission}
-          style={{ marginBottom: 16 }}
+          style={{ marginBottom: spacing.md }}
         />
-        <View style={{ marginTop: 16 }}>
+        <View style={{ marginTop: spacing.md }}>
           <ButtonTertiary
             label="Maybe Later"
             onPress={handleClose}
@@ -536,7 +587,7 @@ export default function ScanScreen() {
   }
 
   return (
-    <View className="flex-1 bg-black">
+    <View style={{ flex: 1, backgroundColor: "#000000" }}>
       <CameraView
         ref={cameraRef}
         style={{ flex: 1 }}
@@ -550,12 +601,18 @@ export default function ScanScreen() {
 
         {/* Top bar - simplified */}
         <View
-          className="absolute top-0 left-0 right-0 px-5"
-          style={{ paddingTop: insets.top + 12 }}
+          style={{ 
+            position: "absolute", 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            paddingHorizontal: spacing.md + spacing.xs,
+            paddingTop: insets.top + spacing.sm + spacing.xs 
+          }}
         >
           <Animated.View entering={FadeInDown.delay(100)}>
             {/* Close and Help buttons */}
-            <View className="flex-row justify-between items-center mb-4">
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.md }}>
               <IconButton
                 icon={X}
                 onPress={handleClose}
@@ -570,12 +627,10 @@ export default function ScanScreen() {
             </View>
 
             {/* Title and subtitle */}
-            <View className="items-center">
+            <View style={{ alignItems: "center" }}>
               <Text
                 style={{ 
-                  fontFamily: "Poppins_600SemiBold", 
-                  fontSize: typography.styles.h1.fontSize,
-                  lineHeight: typography.styles.h1.lineHeight,
+                  ...typography.display.hero,
                   color: colors.text.inverse,
                   textAlign: "center",
                   marginBottom: spacing.xs,
@@ -585,8 +640,7 @@ export default function ScanScreen() {
               </Text>
               <Text
                 style={{ 
-                  fontFamily: "Inter_400Regular", 
-                  fontSize: typography.sizes.body,
+                  ...typography.ui.body,
                   color: colors.text.inverse,
                   opacity: 0.7,
                   textAlign: "center",
@@ -600,24 +654,39 @@ export default function ScanScreen() {
 
         {/* Bottom controls - simplified */}
         <View
-          className="absolute bottom-0 left-0 right-0 items-center"
-          style={{ paddingBottom: insets.bottom + 24 }}
+          style={{ 
+            position: "absolute", 
+            bottom: 0, 
+            left: 0, 
+            right: 0, 
+            alignItems: "center",
+            paddingBottom: insets.bottom + spacing.lg 
+          }}
         >
-          <Animated.View entering={FadeInUp.delay(200)} className="items-center">
+          <Animated.View entering={FadeInUp.delay(200)} style={{ alignItems: "center" }}>
             {/* Shutter button */}
             <Animated.View style={captureButtonStyle}>
               <Pressable
                 onPress={handleCapture}
                 disabled={isCapturing || isProcessing}
-                className="h-20 w-20 rounded-full border-4 border-white items-center justify-center bg-white/10"
-                style={{ opacity: isCapturing || isProcessing ? 0.5 : 1 }}
+                style={{ 
+                  width: 80, 
+                  height: 80, 
+                  borderRadius: 40, 
+                  borderWidth: 4, 
+                  borderColor: "#FFFFFF", 
+                  alignItems: "center", 
+                  justifyContent: "center", 
+                  backgroundColor: "rgba(255,255,255,0.1)",
+                  opacity: isCapturing || isProcessing ? 0.5 : 1 
+                }}
               >
-                <View className="h-16 w-16 rounded-full bg-white" />
+                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#FFFFFF" }} />
               </Pressable>
             </Animated.View>
 
             {/* Secondary actions */}
-            <View style={{ marginTop: 24, alignItems: "center" }}>
+            <View style={{ marginTop: spacing.lg, alignItems: "center" }}>
               <ButtonTertiary
                 label="Upload from photos"
                 onPress={handlePickImage}
@@ -627,7 +696,7 @@ export default function ScanScreen() {
             </View>
 
             {/* Skip option */}
-            <View style={{ marginTop: 16 }}>
+            <View style={{ marginTop: spacing.md }}>
               <ButtonTertiary
                 label="Skip for now"
                 onPress={handleSkip}
@@ -657,14 +726,14 @@ export default function ScanScreen() {
         onRequestClose={() => setCreditCheckError(null)}
       >
         <Pressable 
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+          style={{ flex: 1, backgroundColor: colors.overlay.dark, justifyContent: "center", alignItems: "center" }}
           onPress={() => setCreditCheckError(null)}
         >
           <Pressable 
             onPress={(e) => e.stopPropagation()}
             style={{
               backgroundColor: colors.bg.primary,
-              borderRadius: 24,
+              borderRadius: borderRadius.card,
               padding: spacing.xl,
               marginHorizontal: spacing.lg,
               alignItems: "center",
@@ -693,8 +762,7 @@ export default function ScanScreen() {
             {/* Title */}
             <Text
               style={{
-                fontFamily: "PlayfairDisplay_600SemiBold",
-                fontSize: typography.sizes.h3,
+                ...typography.display.screenTitle,
                 color: colors.text.primary,
                 textAlign: "center",
                 marginBottom: spacing.xs,
@@ -706,12 +774,10 @@ export default function ScanScreen() {
             {/* Subtitle */}
             <Text
               style={{
-                fontFamily: "Inter_400Regular",
-                fontSize: typography.sizes.body,
+                ...typography.ui.body,
                 color: colors.text.secondary,
                 textAlign: "center",
                 marginBottom: spacing.lg,
-                lineHeight: 22,
               }}
             >
               {creditCheckError === 'network' 

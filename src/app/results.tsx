@@ -1072,9 +1072,21 @@ function MatchesBottomSheet({
               overflow: "hidden",
             }}
           >
-            <View style={{ alignItems: "center", paddingTop: spacing.sm, paddingBottom: spacing.xs }}>
+            {/* Drag handle - pressable area to close */}
+            <Pressable 
+              onPress={onClose}
+              style={{ 
+                alignItems: "center", 
+                paddingTop: spacing.md, 
+                paddingBottom: spacing.sm,
+                // Larger touch target for easier closing
+                minHeight: 44,
+                justifyContent: "center",
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 50, right: 50 }}
+            >
               <View style={{ width: spacing.xxl, height: spacing.xs, borderRadius: borderRadius.pill, backgroundColor: colors.bg.tertiary }} />
-            </View>
+            </Pressable>
 
             <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}>
               {/* Header: Title matching other bottom sheets */}
@@ -1155,7 +1167,7 @@ function MatchesBottomSheet({
                 </View>
               </View>
 
-              {/* Matches list - wrapped in a surface card */}
+              {/* Matches list - wrapped in a surface card with maxHeight to enable scrolling */}
               <View
                 style={{
                   backgroundColor: colors.bg.elevated,
@@ -1163,10 +1175,13 @@ function MatchesBottomSheet({
                   borderColor: colors.border.hairline,
                   borderRadius: borderRadius.card,
                   overflow: "hidden",
+                  // Max height allows content to scroll when there are many matches
+                  // ~6 items visible before scrolling (each item ~60px)
+                  maxHeight: 400,
                 }}
               >
                 <ScrollView 
-                  showsVerticalScrollIndicator={false}
+                  showsVerticalScrollIndicator={true}
                   scrollEventThrottle={16}
                   nestedScrollEnabled={true}
                 >
@@ -1177,21 +1192,26 @@ function MatchesBottomSheet({
                     const wardrobeLabel = `${wardrobeColor ? `${wardrobeColor} ` : ""}${wardrobeCategory}`.trim();
 
                     return (
-                      <View
+                      <Pressable
                         key={item.id}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          onItemPress(item, index);
+                        }}
                         style={{
                           flexDirection: "row",
-                        alignItems: "center",
-                        paddingVertical: spacing.lg - spacing.xs,
-                        paddingHorizontal: spacing.md,
-                        borderBottomWidth: index < matches.length - 1 ? 1 : 0,
+                          alignItems: "center",
+                          paddingVertical: spacing.lg - spacing.xs,
+                          paddingHorizontal: spacing.md,
+                          borderBottomWidth: index < matches.length - 1 ? 1 : 0,
                           borderBottomColor: colors.border.hairline,
                         }}
                       >
-                        {/* Thumbnail or icon - separate pressable */}
+                        {/* Thumbnail or icon - separate pressable for image viewing */}
                         {item.imageUri && !itemImageErrors[item.id] ? (
                           <Pressable
-                            onPress={() => {
+                            onPress={(e) => {
+                              e.stopPropagation();
                               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                               setViewingImageUri(item.imageUri);
                             }}
@@ -1221,14 +1241,8 @@ function MatchesBottomSheet({
                           />
                         )}
 
-                        {/* Title and subtitle - separate pressable */}
-                        <Pressable
-                          onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            onItemPress(item, index);
-                          }}
-                          style={{ flex: 1 }}
-                        >
+                        {/* Title and subtitle */}
+                        <View style={{ flex: 1 }}>
                           <Text style={{ ...typography.ui.body, color: colors.text.primary }}>
                             {getMatchTitle(wardrobeLabel, item.id)}
                           </Text>
@@ -1243,19 +1257,11 @@ function MatchesBottomSheet({
                               {match.explanation}
                             </Text>
                           )}
-                        </Pressable>
+                        </View>
                         
-                        {/* Chevron - part of the row pressable */}
-                        <Pressable
-                          onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            onItemPress(item, index);
-                          }}
-                          style={{ paddingLeft: spacing.xs }}
-                        >
-                          <ChevronRight size={spacing.md + 2} color={colors.text.tertiary} strokeWidth={1.5} />
-                        </Pressable>
-                      </View>
+                        {/* Chevron */}
+                        <ChevronRight size={spacing.md + 2} color={colors.text.tertiary} strokeWidth={1.5} />
+                      </Pressable>
                     );
                   })}
                 </ScrollView>
@@ -4727,15 +4733,9 @@ width: spacing.xs / 2,
               totalMatches: confidenceResult.matches.length,
             });
           }
-          // Close modal immediately and navigate
+          // Navigate to wardrobe item
           const itemId = item.id;
-          setShowMatchesSheet(false);
-          // Use requestAnimationFrame to ensure state update completes
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              router.push(`/wardrobe-item?itemId=${encodeURIComponent(String(itemId))}`);
-            });
-          });
+          router.push(`/wardrobe-item?itemId=${encodeURIComponent(String(itemId))}`);
         }}
       />
       )}

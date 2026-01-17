@@ -54,6 +54,21 @@ function getCategoryLabel(categoryId: string): string {
   return category?.label || categoryId;
 }
 
+// Get singular form of category for display (except Shoes and Accessories)
+function getCategorySingular(categoryId: string): string {
+  const singularMap: Record<string, string> = {
+    tops: "Top",
+    bottoms: "Bottom",
+    skirts: "Skirt",
+    dresses: "Dress",
+    outerwear: "Outerwear",
+    shoes: "Shoes",
+    bags: "Bag",
+    accessories: "Accessories",
+  };
+  return singularMap[categoryId] || categoryId;
+}
+
 // Find hex color from color name (case-insensitive)
 function findColorHexByName(name: string): string | null {
   const normalizedName = name.trim().toLowerCase();
@@ -578,7 +593,7 @@ export default function WardrobeItemScreen() {
                   width: spacing.xxl,
                   height: spacing.xxl,
                   borderRadius: borderRadius.pill,
-                  backgroundColor: "rgba(255,255,255,0.1)",
+                  backgroundColor: colors.surface.icon,
                   alignItems: "center",
                   justifyContent: "center",
                 }}
@@ -595,8 +610,8 @@ export default function WardrobeItemScreen() {
                 >
                   {isEditMode 
                     ? "Edit details" 
-                    : displayItem?.detectedLabel 
-                      ? capitalizeFirst(displayItem.detectedLabel)
+                    : displayItem 
+                      ? getCategorySingular(displayItem.category)
                       : "Wardrobe item"}
                 </Text>
               </View>

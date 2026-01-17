@@ -59,6 +59,7 @@ import { colors, spacing, typography, components, borderRadius, cards, shadows, 
 import { getTextStyle } from "@/lib/typography-helpers";
 import { ButtonPrimary } from "@/components/ButtonPrimary";
 import { ButtonTertiary } from "@/components/ButtonTertiary";
+import { IconButton } from "@/components/IconButton";
 import { capitalizeFirst, capitalizeItems } from "@/lib/text-utils";
 import { useProStatus } from "@/lib/useProStatus";
 import { useAuth } from "@/lib/auth-context";
@@ -185,7 +186,7 @@ function CameraOverlay({ currentTip }: { currentTip: string }) {
   }));
 
   return (
-    <View className="absolute inset-0 items-center justify-center">
+    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}>
       {/* Subtle rounded frame guide - same as Scan */}
       <Animated.View
         style={[
@@ -195,17 +196,24 @@ function CameraOverlay({ currentTip }: { currentTip: string }) {
             height: 340,
             borderWidth: 2,
             borderColor: "rgba(255,255,255,0.12)",
-            borderRadius: components.card.borderRadius + spacing.xs,
+            borderRadius: borderRadius.card,
             backgroundColor: "transparent",
           },
         ]}
       />
 
       {/* Rotating tip */}
-      <View className="absolute bottom-8 items-center px-8">
+      <View style={{ position: "absolute", bottom: spacing.xl, alignItems: "center", paddingHorizontal: spacing.xl }}>
         <Animated.View
-          style={[tipStyle]}
-          className="bg-black/50 rounded-full px-5 py-2.5"
+          style={[
+            tipStyle,
+            {
+              backgroundColor: "rgba(0,0,0,0.5)",
+              borderRadius: borderRadius.pill,
+              paddingHorizontal: spacing.md + spacing.xs,
+              paddingVertical: spacing.sm + spacing.xs / 2,
+            },
+          ]}
         >
           <Text
             style={{ 
@@ -250,9 +258,18 @@ function ProcessingOverlay() {
   return (
     <Animated.View
       entering={FadeIn.duration(300)}
-      className="absolute inset-0 bg-black/80 items-center justify-center"
+      style={{ 
+        position: "absolute", 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: 0, 
+        backgroundColor: "rgba(0,0,0,0.8)", 
+        alignItems: "center", 
+        justifyContent: "center" 
+      }}
     >
-      <View className="items-center">
+      <View style={{ alignItems: "center" }}>
         <View style={{ flexDirection: "row", marginBottom: spacing.lg }}>
           <Animated.View style={[dot1Style, { width: spacing.sm + spacing.xs / 2, height: spacing.sm + spacing.xs / 2, borderRadius: borderRadius.pill, backgroundColor: colors.accent.terracotta, marginHorizontal: spacing.xs }]} />
           <Animated.View style={[dot2Style, { width: spacing.sm + spacing.xs / 2, height: spacing.sm + spacing.xs / 2, borderRadius: borderRadius.pill, backgroundColor: colors.accent.terracotta, marginHorizontal: spacing.xs }]} />
@@ -269,6 +286,133 @@ function ProcessingOverlay() {
         </Text>
       </View>
     </Animated.View>
+  );
+}
+
+// Help bottom sheet - explains how to take good photos
+function HelpBottomSheet({
+  visible,
+  onClose
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <Pressable
+        style={{ flex: 1, backgroundColor: colors.overlay.dark }}
+        onPress={onClose}
+      />
+      <View
+        style={{ 
+          backgroundColor: colors.bg.elevated,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          paddingBottom: insets.bottom + 20 
+        }}
+      >
+        <View style={{ alignItems: "center", paddingTop: spacing.sm + spacing.xs / 2, paddingBottom: spacing.md }}>
+          <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.bg.tertiary }} />
+        </View>
+
+        <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.md }}>
+          <Text
+            style={{
+              ...typography.display.screenTitle,
+              color: colors.text.primary,
+              marginBottom: spacing.md,
+            }}
+          >
+            How to scan
+          </Text>
+
+          <View style={{ gap: spacing.md }}>
+            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+              <View style={{ 
+                width: 24, 
+                height: 24, 
+                borderRadius: 12, 
+                backgroundColor: colors.accent.terracottaLight,
+                alignItems: "center",
+                justifyContent: "center",
+                marginRight: spacing.sm,
+                marginTop: 2,
+              }}>
+                <Text style={{ ...typography.ui.micro, color: colors.accent.terracotta }}>1</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ ...typography.ui.bodyMedium, color: colors.text.primary }}>
+                  Hold the item up
+                </Text>
+                <Text style={{ ...typography.ui.caption, color: colors.text.secondary, marginTop: spacing.xs }}>
+                  Lay it flat, hang it up, or hold it against a plain background
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+              <View style={{ 
+                width: 24, 
+                height: 24, 
+                borderRadius: 12, 
+                backgroundColor: colors.accent.terracottaLight,
+                alignItems: "center",
+                justifyContent: "center",
+                marginRight: spacing.sm,
+                marginTop: 2,
+              }}>
+                <Text style={{ ...typography.ui.micro, color: colors.accent.terracotta }}>2</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ ...typography.ui.bodyMedium, color: colors.text.primary }}>
+                  Fit it in the frame
+                </Text>
+                <Text style={{ ...typography.ui.caption, color: colors.text.secondary, marginTop: spacing.xs }}>
+                  Best results when the full item is visible
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+              <View style={{ 
+                width: 24, 
+                height: 24, 
+                borderRadius: 12, 
+                backgroundColor: colors.accent.terracottaLight,
+                alignItems: "center",
+                justifyContent: "center",
+                marginRight: spacing.sm,
+                marginTop: 2,
+              }}>
+                <Text style={{ ...typography.ui.micro, color: colors.accent.terracotta }}>3</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ ...typography.ui.bodyMedium, color: colors.text.primary }}>
+                  Tap to capture
+                </Text>
+                <Text style={{ ...typography.ui.caption, color: colors.text.secondary, marginTop: spacing.xs }}>
+                  We'll analyze the colors and style to find matches
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={{ marginTop: spacing.lg }}>
+            <ButtonPrimary
+              label="Got it"
+              onPress={onClose}
+            />
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -719,6 +863,7 @@ export default function AddItemScreen() {
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [isSaving, setIsSaving] = useState(false); // Loading state for Add to Wardrobe button
   // Idempotency key for current attempt - reused if AI fails and user retries
   const [currentIdempotencyKey, setCurrentIdempotencyKey] = useState<string | null>(null);
@@ -1118,7 +1263,7 @@ export default function AddItemScreen() {
   // Permission handling
   if (!permission) {
     return (
-      <View className="flex-1 bg-black items-center justify-center">
+      <View style={{ flex: 1, backgroundColor: "#000000", alignItems: "center", justifyContent: "center" }}>
         <Text 
           style={{ 
             ...typography.ui.body,
@@ -1134,15 +1279,20 @@ export default function AddItemScreen() {
   if (!permission.granted) {
     return (
       <View 
-        className="flex-1 bg-bg items-center justify-center"
-        style={{ paddingHorizontal: spacing.xl }}
+        style={{ 
+          flex: 1, 
+          backgroundColor: colors.bg.primary, 
+          alignItems: "center", 
+          justifyContent: "center",
+          paddingHorizontal: spacing.xl 
+        }}
       >
         <View 
           style={{
-            width: spacing.lg * 2.67,
-            height: spacing.lg * 2.67,
-            borderRadius: borderRadius.pill,
-            backgroundColor: colors.accent.secondary,
+            width: 96,
+            height: 96,
+            borderRadius: 48,
+            backgroundColor: colors.accent.terracottaLight,
             alignItems: "center",
             justifyContent: "center",
             marginBottom: spacing.lg,
@@ -1152,7 +1302,7 @@ export default function AddItemScreen() {
         </View>
         <Text
           style={{ 
-            ...typography.styles.h2,
+            ...typography.display.screenTitle,
             color: colors.text.primary,
             textAlign: "center",
             marginBottom: spacing.sm,
@@ -1222,7 +1372,7 @@ export default function AddItemScreen() {
   // Camera view (Ready state or Processing state)
   if (screenState === "ready" || screenState === "processing") {
     return (
-      <View className="flex-1 bg-black">
+      <View style={{ flex: 1, backgroundColor: "#000000" }}>
         <DebugOverlay />
         <CameraView
           ref={cameraRef}
@@ -1237,32 +1387,41 @@ export default function AddItemScreen() {
 
           {/* Top bar - matches Scan screen layout */}
           <View
-            className="absolute top-0 left-0 right-0 px-5"
-            style={{ paddingTop: insets.top + spacing.md }}
+            style={{ 
+              position: "absolute", 
+              top: 0, 
+              left: 0, 
+              right: 0, 
+              paddingHorizontal: spacing.md + spacing.xs,
+              paddingTop: insets.top + spacing.md 
+            }}
           >
             <Animated.View entering={FadeInDown.delay(100)}>
-              {/* Close button (left) - no help button for Add Item */}
+              {/* Close and Help buttons */}
               <View style={{
                 flexDirection: "row",
                 justifyContent: "space-between",
                 alignItems: "center",
                 marginBottom: spacing.md,
               }}>
-                <Pressable
+                <IconButton
+                  icon={X}
                   onPress={handleClose}
-                  className="h-10 w-10 rounded-full bg-black/40 items-center justify-center"
-                >
-                  <X size={20} color={colors.text.inverse} />
-                </Pressable>
-                {/* Empty spacer to match layout */}
-                <View className="w-10" />
+                  onDark
+                />
+
+                <IconButton
+                  icon={HelpCircle}
+                  onPress={() => setShowHelp(true)}
+                  onDark
+                />
               </View>
 
               {/* Title and subtitle - different text from Scan */}
               <View style={{ alignItems: "center" }}>
                 <Text
                   style={{ 
-                    ...typography.display.screenTitle,
+                    ...typography.display.hero,
                     color: colors.text.inverse,
                     textAlign: "center",
                     marginBottom: spacing.xs,
@@ -1286,49 +1445,54 @@ export default function AddItemScreen() {
 
           {/* Bottom controls - matches Scan screen layout exactly */}
           <View
-            className="absolute bottom-0 left-0 right-0 items-center"
-            style={{ paddingBottom: insets.bottom + spacing.lg }}
+            style={{ 
+              position: "absolute", 
+              bottom: 0, 
+              left: 0, 
+              right: 0, 
+              alignItems: "center",
+              paddingBottom: insets.bottom + spacing.lg 
+            }}
           >
-            <Animated.View entering={FadeInUp.delay(200)} className="items-center">
+            <Animated.View entering={FadeInUp.delay(200)} style={{ alignItems: "center" }}>
               {/* Shutter button - same size and style */}
               <Animated.View style={captureButtonStyle}>
                 <Pressable
                   onPress={handleCapture}
                   disabled={isCapturing || screenState === "processing"}
-                  className="h-20 w-20 rounded-full border-4 border-white items-center justify-center bg-white/10"
-                  style={{ opacity: isCapturing || screenState === "processing" ? 0.5 : 1 }}
+                  style={{ 
+                    width: 80, 
+                    height: 80, 
+                    borderRadius: 40, 
+                    borderWidth: 4, 
+                    borderColor: "#FFFFFF", 
+                    alignItems: "center", 
+                    justifyContent: "center", 
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                    opacity: isCapturing || screenState === "processing" ? 0.5 : 1 
+                  }}
                 >
-                  <View className="h-16 w-16 rounded-full bg-white" />
+                  <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "#FFFFFF" }} />
                 </Pressable>
               </Animated.View>
 
-              {/* Upload from photos - same placement and style */}
-              <View style={{ 
-                flexDirection: "row", 
-                alignItems: "center",
-                marginTop: spacing.lg,
-              }}>
-                <Pressable
+              {/* Secondary actions */}
+              <View style={{ marginTop: spacing.lg, alignItems: "center" }}>
+                <ButtonTertiary
+                  label="Upload from photos"
                   onPress={handlePickImage}
                   disabled={screenState === "processing"}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingHorizontal: spacing.md,
-                    paddingVertical: spacing.sm,
-                  }}
-                >
-                  <ImageIcon size={18} color={colors.text.inverse} style={{ marginRight: spacing.sm }} />
-                  <Text
-                    style={{
-                      ...typography.ui.bodyMedium,
-                      color: colors.text.inverse,
-                      opacity: 0.8,
-                    }}
-                  >
-                    Upload from photos
-                  </Text>
-                </Pressable>
+                  onDark
+                />
+              </View>
+
+              {/* Skip option */}
+              <View style={{ marginTop: spacing.md }}>
+                <ButtonTertiary
+                  label="Skip for now"
+                  onPress={handleClose}
+                  onDark
+                />
               </View>
             </Animated.View>
           </View>
@@ -1342,6 +1506,12 @@ export default function AddItemScreen() {
           reason="wardrobe_limit"
         />
 
+        {/* Help bottom sheet */}
+        <HelpBottomSheet
+          visible={showHelp}
+          onClose={() => setShowHelp(false)}
+        />
+
         {/* Credit check error modal */}
         <Modal
           visible={creditCheckError !== null}
@@ -1350,14 +1520,14 @@ export default function AddItemScreen() {
           onRequestClose={() => setCreditCheckError(null)}
         >
           <Pressable 
-            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+            style={{ flex: 1, backgroundColor: colors.overlay.dark, justifyContent: "center", alignItems: "center" }}
             onPress={() => setCreditCheckError(null)}
           >
             <Pressable 
               onPress={(e) => e.stopPropagation()}
               style={{
                 backgroundColor: colors.bg.primary,
-                borderRadius: 24,
+                borderRadius: borderRadius.card,
                 padding: spacing.xl,
                 marginHorizontal: spacing.lg,
                 alignItems: "center",
@@ -1386,8 +1556,7 @@ export default function AddItemScreen() {
               {/* Title */}
               <Text
                 style={{
-                  fontFamily: "PlayfairDisplay_600SemiBold",
-                  fontSize: typography.sizes.h3,
+                  ...typography.display.screenTitle,
                   color: colors.text.primary,
                   textAlign: "center",
                   marginBottom: spacing.xs,
@@ -1399,12 +1568,10 @@ export default function AddItemScreen() {
               {/* Subtitle */}
               <Text
                 style={{
-                  fontFamily: "Inter_400Regular",
-                  fontSize: typography.sizes.body,
+                  ...typography.ui.body,
                   color: colors.text.secondary,
                   textAlign: "center",
                   marginBottom: spacing.lg,
-                  lineHeight: 22,
                 }}
               >
                 {creditCheckError === 'network' 
@@ -1722,7 +1889,7 @@ export default function AddItemScreen() {
                   width: spacing.xxl,
                   height: spacing.xxl,
                   borderRadius: borderRadius.pill,
-                  backgroundColor: "rgba(255,255,255,0.1)",
+                  backgroundColor: colors.surface.icon,
                   alignItems: "center",
                   justifyContent: "center",
                 }}
@@ -1732,7 +1899,7 @@ export default function AddItemScreen() {
               <View style={{ alignItems: "center", flex: 1, marginHorizontal: spacing.md }}>
                 <Text
                   style={{
-                    ...typography.styles.h2,
+                    ...typography.display.screenTitle,
                     color: colors.text.primary,
                   }}
                   numberOfLines={1}
@@ -1821,7 +1988,7 @@ export default function AddItemScreen() {
                   ) : analysis ? (
                     <Text
                       style={{
-                        ...typography._internal.h3,
+                        ...typography.ui.cardTitle,
                         color: colors.text.primary,
                       }}
                     >
@@ -1865,7 +2032,7 @@ export default function AddItemScreen() {
                 >
                   <Text
                     style={{
-                      ...typography._internal.meta,
+                      ...typography.ui.caption,
                       color: colors.text.secondary,
                     }}
                   >
@@ -1947,14 +2114,14 @@ export default function AddItemScreen() {
         onRequestClose={() => setSaveError(null)}
       >
         <Pressable 
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+          style={{ flex: 1, backgroundColor: colors.overlay.dark, justifyContent: "center", alignItems: "center" }}
           onPress={() => setSaveError(null)}
         >
           <Pressable 
             onPress={(e) => e.stopPropagation()}
             style={{
               backgroundColor: colors.bg.primary,
-              borderRadius: 24,
+              borderRadius: borderRadius.card,
               padding: spacing.xl,
               marginHorizontal: spacing.lg,
               alignItems: "center",
@@ -1983,8 +2150,7 @@ export default function AddItemScreen() {
             {/* Title */}
             <Text
               style={{
-                fontFamily: "PlayfairDisplay_600SemiBold",
-                fontSize: typography.sizes.h3,
+                ...typography.display.screenTitle,
                 color: colors.text.primary,
                 textAlign: "center",
                 marginBottom: spacing.xs,
@@ -1996,12 +2162,10 @@ export default function AddItemScreen() {
             {/* Subtitle */}
             <Text
               style={{
-                fontFamily: "Inter_400Regular",
-                fontSize: typography.sizes.body,
+                ...typography.ui.body,
                 color: colors.text.secondary,
                 textAlign: "center",
                 marginBottom: spacing.lg,
-                lineHeight: 22,
               }}
             >
               {saveError === 'network' 
