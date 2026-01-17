@@ -1,12 +1,21 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { View, Text, Pressable, Dimensions, ScrollView, Modal, ActivityIndicator, RefreshControl } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  FlatList,
+  Modal,
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  useWindowDimensions,
+} from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import Animated, {
   FadeIn,
-  FadeInDown,
   FadeInUp,
   FadeOut,
 } from "react-native-reanimated";
@@ -49,45 +58,46 @@ const CheckGridItem = React.memo(function CheckGridItem({
   matchCount: string | null;
 }) {
   const statusDisplay = getStatusDisplay(check.outcome);
+  
+  // Cache sync status to avoid duplicate function calls
+  const isPending = hasPendingUpload(check.id);
+  const isFailed = isUploadFailed(check.id);
+  const showSyncStatus = isPending || isFailed;
 
   return (
-    <Animated.View
-      entering={FadeInDown.delay(Math.min(index * 30, 300)).springify()}
-      exiting={FadeOut.duration(150)}
+    <Pressable
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress(check);
+      }}
+      onLongPress={() => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        onLongPress(check);
+      }}
+      delayLongPress={400}
+      style={{
+        width: tileSize,
+        aspectRatio: 1,
+        position: "relative",
+        // V3: cards.standard = border-first
+        backgroundColor: cards.standard.backgroundColor,
+        borderRadius: cards.standard.borderRadius,
+        borderWidth: cards.standard.borderWidth,
+        borderColor: cards.standard.borderColor,
+        overflow: "hidden",
+      }}
     >
-      <Pressable
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          onPress(check);
-        }}
-        onLongPress={() => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          onLongPress(check);
-        }}
-        delayLongPress={400}
-        style={{
-          width: tileSize,
-          aspectRatio: 1,
-          position: "relative",
-          // V3: cards.standard = border-first
-          backgroundColor: cards.standard.backgroundColor,
-          borderRadius: cards.standard.borderRadius,
-          borderWidth: cards.standard.borderWidth,
-          borderColor: cards.standard.borderColor,
-          overflow: "hidden",
-        }}
-      >
         {/* Image */}
         <ImageWithFallback uri={check.imageUri} />
 
         {/* Sync status indicator - based on queue state */}
-        {(hasPendingUpload(check.id) || isUploadFailed(check.id)) && (
+        {showSyncStatus && (
           <View
             style={{
               position: "absolute",
               top: spacing.sm,
               right: spacing.sm,
-              backgroundColor: isUploadFailed(check.id) ? colors.status.error : colors.overlay.dark,
+              backgroundColor: isFailed ? colors.status.error : colors.overlay.dark,
               borderRadius: borderRadius.pill,
               paddingVertical: spacing.xs,
               paddingHorizontal: spacing.sm,
@@ -96,7 +106,7 @@ const CheckGridItem = React.memo(function CheckGridItem({
               gap: spacing.xs / 2,
             }}
           >
-            {isUploadFailed(check.id) ? (
+            {isFailed ? (
               <>
                 <RefreshCw size={12} color={colors.text.inverse} strokeWidth={2} />
                 <Text style={{ ...typography.ui.caption, color: colors.text.inverse, fontFamily: typography.fontFamily.medium }}>
@@ -179,7 +189,6 @@ const CheckGridItem = React.memo(function CheckGridItem({
           </View>
         </View>
       </Pressable>
-    </Animated.View>
   );
 });
 
@@ -396,8 +405,12 @@ function DebugSnapshotModal({
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const snapshotJson = JSON.stringify(snapshot, null, 2);
   const [copied, setCopied] = useState(false);
+
+  // Early return BEFORE expensive JSON.stringify
+  if (!visible || !snapshot) return null;
+
+  const snapshotJson = JSON.stringify(snapshot, null, 2);
 
   const handleCopy = () => {
     Clipboard.setString(snapshotJson);
@@ -405,8 +418,6 @@ function DebugSnapshotModal({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
-  if (!visible || !snapshot) return null;
 
   // Extract key info for formatted summary
   const engines = snapshot.engines || {};
@@ -739,22 +750,25 @@ function StatusPill({ label, color }: { label: string; color: string }) {
 
 export default function AllChecksScreen() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { data: recentChecks = [], refetch, isFetching } = useRecentChecks();
   const removeRecentCheckMutation = useRemoveRecentCheck();
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Pull-to-refresh handler with minimum delay for visual feedback
   const onRefresh = useCallback(async () => {
+    if (__DEV__) console.log('[AllChecks] Pull-to-refresh triggered');
     setIsRefreshing(true);
-    console.log('[AllChecks] Pull-to-refresh triggered');
-    // Add minimum delay so spinner is visible even if data is cached
-    await Promise.all([
-      refetch(),
-      new Promise(resolve => setTimeout(resolve, 500)),
-    ]);
-    setIsRefreshing(false);
-    console.log('[AllChecks] Refresh complete, checks:', recentChecks.length);
-  }, [refetch, recentChecks.length]);
+    try {
+      // Add minimum delay so spinner is visible even if data is cached
+      await Promise.all([
+        refetch(),
+        new Promise(resolve => setTimeout(resolve, 500)),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refetch]);
   const [itemToDelete, setItemToDelete] = useState<RecentCheck | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [deleteError, setDeleteError] = useState<'network' | 'other' | null>(null);
@@ -765,7 +779,7 @@ export default function AllChecksScreen() {
   
   // Debug: Log image URIs when checks change (helps diagnose cross-device sync issues)
   useEffect(() => {
-    if (recentChecks.length > 0) {
+    if (__DEV__ && recentChecks.length > 0) {
       console.log('[AllChecks] Loaded checks with imageUris:', recentChecks.slice(0, 5).map(c => ({
         id: c.id.slice(0, 8),
         outcome: c.outcome,
@@ -775,6 +789,11 @@ export default function AllChecksScreen() {
       })));
     }
   }, [recentChecks]);
+  
+  // Memoize tile size calculation - updates on rotation via useWindowDimensions
+  const tileSize = useMemo(() => {
+    return (width - spacing.md * 2 - spacing.md) / 2;
+  }, [width]);
   
   // Pre-calculate match counts for all checks (avoid per-item hook calls)
   const matchCountMap = useMemo(() => {
@@ -803,9 +822,9 @@ export default function AllChecksScreen() {
   }, [showToast]);
 
   // Show delete confirmation modal
-  const handleDeleteRequest = (check: RecentCheck) => {
+  const handleDeleteRequest = useCallback((check: RecentCheck) => {
     setItemToDelete(check);
-  };
+  }, []);
 
   // Confirm delete action
   const handleConfirmDelete = async () => {
@@ -853,13 +872,28 @@ export default function AllChecksScreen() {
     router.back();
   };
 
-  const handleCheckPress = (check: RecentCheck) => {
+  const handleCheckPress = useCallback((check: RecentCheck) => {
     // Navigate to saved result screen
     router.push({
       pathname: "/results",
       params: { checkId: check.id },
     });
-  };
+  }, []);
+  
+  // Memoized renderItem for FlatList performance
+  const renderItem = useCallback(
+    ({ item, index }: { item: RecentCheck; index: number }) => (
+      <CheckGridItem
+        check={item}
+        index={index}
+        onPress={handleCheckPress}
+        onLongPress={handleDeleteRequest}
+        tileSize={tileSize}
+        matchCount={matchCountMap[item.id]}
+      />
+    ),
+    [tileSize, handleCheckPress, handleDeleteRequest, matchCountMap]
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
@@ -870,45 +904,49 @@ export default function AllChecksScreen() {
           paddingTop: insets.top + spacing.md,
         }}
       >
-        <Animated.View entering={FadeInDown.delay(100).springify()}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Pressable
-              onPress={handleBack}
-              style={{
-                height: spacing.xxl + spacing.sm,
-                width: spacing.xxl + spacing.sm,
-                borderRadius: borderRadius.pill,
-                backgroundColor: colors.surface.icon,
-                alignItems: "center",
-                justifyContent: "center",
-                marginRight: spacing.md,
-              }}
-            >
-              <ArrowLeft size={20} color={colors.text.primary} />
-            </Pressable>
-            <Text
-              style={{
-                ...getTextStyle("h1", colors.text.primary),
-                letterSpacing: 0.3,
-                flex: 1,
-              }}
-            >
-              All scans
-            </Text>
-          </View>
-        </Animated.View>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Pressable
+            onPress={handleBack}
+            style={{
+              height: spacing.xxl + spacing.sm,
+              width: spacing.xxl + spacing.sm,
+              borderRadius: borderRadius.pill,
+              backgroundColor: colors.surface.icon,
+              alignItems: "center",
+              justifyContent: "center",
+              marginRight: spacing.md,
+            }}
+          >
+            <ArrowLeft size={20} color={colors.text.primary} />
+          </Pressable>
+          <Text
+            style={{
+              ...getTextStyle("h1", colors.text.primary),
+              letterSpacing: 0.3,
+              flex: 1,
+            }}
+          >
+            All scans
+          </Text>
+        </View>
       </View>
 
       {/* Grid */}
       {recentChecks.length > 0 ? (
-        <ScrollView
-          showsVerticalScrollIndicator={true}
+        <FlatList
+          key={`checks-${Math.round(tileSize)}`} // Re-layout cleanly on rotation/width change
+          data={recentChecks}
+          numColumns={2}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          showsVerticalScrollIndicator
           indicatorStyle="black"
           contentContainerStyle={{
             paddingHorizontal: spacing.md,
             paddingTop: spacing.lg,
             paddingBottom: 100,
           }}
+          columnWrapperStyle={{ justifyContent: "space-between", marginBottom: spacing.md }}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing || isFetching}
@@ -916,47 +954,32 @@ export default function AllChecksScreen() {
               tintColor={colors.text.secondary}
             />
           }
-        >
-          {/* 2-column grid */}
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
-            {recentChecks.map((check: RecentCheck, index: number) => {
-              // Calculate tile size for 2-column grid with spacing.md padding on each side and spacing.md gap
-              const screenWidth = Dimensions.get("window").width;
-              const tileSize = (screenWidth - spacing.md * 2 - spacing.md) / 2;
-              
-              return (
-                <CheckGridItem
-                  key={check.id}
-                  check={check}
-                  index={index}
-                  onPress={handleCheckPress}
-                  onLongPress={handleDeleteRequest}
-                  tileSize={tileSize}
-                  matchCount={matchCountMap[check.id]}
-                />
-              );
-            })}
-          </View>
-          
-          {/* Retention notice */}
-          <Animated.View 
-            entering={FadeIn.delay(600)}
-            style={{ 
-              marginTop: spacing.lg,
-              paddingHorizontal: spacing.sm,
-            }}
-          >
-            <Text
-              style={{
-                ...typography.ui.caption,
-                color: colors.text.tertiary,
-                textAlign: "center",
+          // Performance optimizations
+          initialNumToRender={8}
+          maxToRenderPerBatch={6}
+          windowSize={5}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews={false} // Keep false for iOS shadows + reanimated entering animations
+          ListFooterComponent={
+            <Animated.View 
+              entering={FadeIn.delay(600)}
+              style={{ 
+                marginTop: spacing.lg,
+                paddingHorizontal: spacing.sm,
               }}
             >
-              Unsaved scans are automatically removed after {SCAN_RETENTION.TTL_DAYS} days.
-            </Text>
-          </Animated.View>
-        </ScrollView>
+              <Text
+                style={{
+                  ...typography.ui.caption,
+                  color: colors.text.tertiary,
+                  textAlign: "center",
+                }}
+              >
+                Unsaved scans are automatically removed after {SCAN_RETENTION.TTL_DAYS} days.
+              </Text>
+            </Animated.View>
+          }
+        />
       ) : (
         <EmptyState />
       )}

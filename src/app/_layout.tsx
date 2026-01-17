@@ -79,7 +79,11 @@ function RootLayoutNav({
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : ScanMatchLightTheme}>
       <AuthGuard>
         <OfflineIndicator />
-        <Stack>
+        <Stack
+          screenOptions={{
+            contentStyle: { backgroundColor: colors.bg.primary },
+          }}
+        >
           <Stack.Screen name="(tabs)" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen
             name="login"
@@ -124,6 +128,7 @@ function RootLayoutNav({
             options={{
               headerShown: false,
               presentation: "card",
+              contentStyle: { backgroundColor: colors.bg.primary },
             }}
           />
           <Stack.Screen

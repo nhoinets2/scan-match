@@ -655,34 +655,31 @@ function RecentCheckListItem({
   const matchCount = useMatchCount(check, wardrobe);
   
   return (
-    <Animated.View
-      entering={FadeInDown.delay(400 + index * 60).springify()}
+    <Pressable
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress(check);
+      }}
+      onLongPress={() => {
+        // Trigger delete on long press
+        if (onLongPressDelete) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          onLongPressDelete(check);
+        }
+      }}
+      delayLongPress={400}
+      style={{
+        width: tileSize,
+        aspectRatio: 1,
+        position: "relative",
+        // V3: cards.standard = border-first
+        backgroundColor: cards.standard.backgroundColor,
+        borderRadius: cards.standard.borderRadius,
+        borderWidth: cards.standard.borderWidth,
+        borderColor: cards.standard.borderColor,
+        overflow: "hidden",
+      }}
     >
-      <Pressable
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          onPress(check);
-        }}
-        onLongPress={() => {
-          // Trigger delete on long press
-          if (onLongPressDelete) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            onLongPressDelete(check);
-          }
-        }}
-        delayLongPress={400}
-        style={{
-          width: tileSize,
-          aspectRatio: 1,
-          position: "relative",
-          // V3: cards.standard = border-first
-          backgroundColor: cards.standard.backgroundColor,
-          borderRadius: cards.standard.borderRadius,
-          borderWidth: cards.standard.borderWidth,
-          borderColor: cards.standard.borderColor,
-          overflow: "hidden",
-        }}
-      >
         {/* Image */}
         <ImageWithFallback uri={check.imageUri} />
 
@@ -789,7 +786,6 @@ function RecentCheckListItem({
           </View>
         </View>
       </Pressable>
-    </Animated.View>
   );
 }
 
