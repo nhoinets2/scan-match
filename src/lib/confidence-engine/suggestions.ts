@@ -69,16 +69,19 @@ export function shouldShowModeB(
 
 /**
  * Select near-matches from pair evaluations.
- * Near-matches are used for Mode B suggestion generation.
+ * Returns ALL qualifying NEAR matches for UI display.
+ * 
+ * NOTE: Mode B suggestions should apply their own limit (e.g., slice to 5)
+ * when generating tips. This function returns the full list so UI can
+ * show all matches in "Worth Trying" tab and "View all" sheet.
  *
  * Selection criteria:
- * 1. Type 2a (soft-capped HIGH) preferred
- * 2. Type 2b (strong MEDIUM) as fallback
- * 3. Limit to top N by raw_score
+ * 1. Type 2a (soft-capped HIGH) preferred - sorted first
+ * 2. Type 2b (strong MEDIUM) as fallback - sorted after 2a
+ * Both sorted by raw_score descending
  */
 export function selectNearMatches(
-  evaluations: PairEvaluation[],
-  limit: number = 5
+  evaluations: PairEvaluation[]
 ): PairEvaluation[] {
   // Filter to only MEDIUM tier evaluations
   const mediumTier = evaluations.filter(
@@ -103,24 +106,29 @@ export function selectNearMatches(
     }
   }
 
-  // Sort each by raw_score (descending)
-  type2a.sort((a, b) => b.raw_score - a.raw_score);
-  type2b.sort((a, b) => b.raw_score - a.raw_score);
+  // Sort each by raw_score (descending) with stable tie-break
+  // Stable tie-break prevents UI flicker when scores are equal
+  const sortByScoreStable = (a: PairEvaluation, b: PairEvaluation) => {
+    const scoreDiff = b.raw_score - a.raw_score;
+    if (scoreDiff !== 0) return scoreDiff;
+    
+    // Tie-break 1: by wardrobe item ID (null-safe)
+    const aItemB = a.item_b_id ?? "";
+    const bItemB = b.item_b_id ?? "";
+    const byItemB = aItemB.localeCompare(bItemB);
+    if (byItemB !== 0) return byItemB;
+    
+    // Tie-break 2: by full pair key (handles edge case of same wardrobe item in different contexts)
+    const aPairKey = `${a.item_a_id ?? ""}-${a.item_b_id ?? ""}`;
+    const bPairKey = `${b.item_a_id ?? ""}-${b.item_b_id ?? ""}`;
+    return aPairKey.localeCompare(bPairKey);
+  };
+  
+  type2a.sort(sortByScoreStable);
+  type2b.sort(sortByScoreStable);
 
-  // Prefer 2a, then fill with 2b
-  const nearMatches: PairEvaluation[] = [];
-
-  for (const evalItem of type2a) {
-    if (nearMatches.length >= limit) break;
-    nearMatches.push(evalItem);
-  }
-
-  for (const evalItem of type2b) {
-    if (nearMatches.length >= limit) break;
-    nearMatches.push(evalItem);
-  }
-
-  return nearMatches;
+  // Return all: 2a first (preferred), then 2b
+  return [...type2a, ...type2b];
 }
 
 // ============================================

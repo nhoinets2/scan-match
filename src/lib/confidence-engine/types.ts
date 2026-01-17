@@ -250,8 +250,15 @@ export interface OutfitEvaluation {
   show_matches_section: boolean;
   outfit_confidence: ConfidenceTier;
   best_match?: PairEvaluation;
-  matches: PairEvaluation[];        // HIGH only, ranked, top K
-  near_matches: PairEvaluation[];   // For Mode B generation
+  matches: PairEvaluation[];        // HIGH only, ranked by score
+  /**
+   * All qualifying NEAR matches (Type 2a + Type 2b). NOT capped.
+   * Sorted: Type 2a first (by score desc), then Type 2b (by score desc).
+   * 
+   * - UI (Worth Trying tab, View all): uses full list
+   * - Mode B suggestions: uses near_matches.slice(0, 5)
+   */
+  near_matches: PairEvaluation[];
   suggestions_mode: SuggestionsMode;
   matched_categories: Category[];   // Categories with MEDIUM+ matches (for Mode A filtering)
 }

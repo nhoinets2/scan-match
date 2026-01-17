@@ -376,8 +376,15 @@ export const MODE_B_CONFIG = {
 // ============================================
 
 export const OUTFIT_CONFIG = {
-  max_matches_shown: 5,
-  max_near_matches: 5,
+  // Individual HIGH matches - show all (no artificial limit on wardrobe items displayed)
+  max_matches_shown: 100,
+  
+  // NOTE: NEAR matches are NOT limited here anymore.
+  // - UI (Worth Trying tab, View all) shows ALL qualifying NEAR matches
+  // - Mode B suggestions apply their own limit (5) in useConfidenceEngine
+  
+  // NOTE: Outfit combination limits are handled separately in useResultsTabs:
+  // - maxOutfitsPerTab: 5 for single tab, 3 for both tabs
 } as const;
 
 // ============================================

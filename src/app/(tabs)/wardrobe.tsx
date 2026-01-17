@@ -4,10 +4,11 @@ import {
   Text,
   ScrollView,
   Pressable,
-  Dimensions,
+  FlatList,
   Modal,
   ActivityIndicator,
   RefreshControl,
+  useWindowDimensions,
 } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -17,7 +18,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Animated, {
   FadeIn,
-  FadeInDown,
   FadeInUp,
   FadeOut,
 } from "react-native-reanimated";
@@ -38,9 +38,6 @@ import { capitalizeFirst } from "@/lib/text-utils";
 import { sweepOrphanedLocalImages, isUploadFailed, retryFailedUpload, getPendingUploadLocalUris, hasAnyPendingUploads, getRecentlyCreatedUris, hasPendingUpload, onQueueIdle } from "@/lib/storage";
 
 const WARDROBE_FILTER_KEY = "wardrobe_filter_selection";
-
-// Screen dimensions
-const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 // Get category label from category id
 function getCategoryLabel(categoryId: string): string {
@@ -67,113 +64,107 @@ function getItemName(item: WardrobeItem): string {
 }
 
 // Grid tile for wardrobe items (matches Recent Scans style)
-function WardrobeGridItem({
+const WardrobeGridItem = React.memo(function WardrobeGridItem({
   item,
   index,
   onPress,
   onLongPress,
   tileSize,
-  isInitialRender,
 }: {
   item: WardrobeItem;
   index: number;
   onPress: (item: WardrobeItem) => void;
   onLongPress: (item: WardrobeItem) => void;
   tileSize: number;
-  isInitialRender?: boolean;
 }) {
   const itemName = getItemName(item);
   const categoryLabel = getCategoryLabel(item.category);
 
-  // Stagger animation based on grid position
-  const enteringAnimation = isInitialRender 
-    ? FadeInDown.delay(300 + index * 50).springify() 
-    : FadeIn.delay(index * 30).duration(200);
+  // Cache upload status to avoid duplicate function calls
+  const isPending = hasPendingUpload(item.id);
+  const isFailed = isUploadFailed(item.id);
+  const showSyncStatus = isPending || isFailed;
 
   return (
-    <Animated.View
-      entering={enteringAnimation}
-      exiting={FadeOut.duration(150)}
+    <Pressable
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress(item);
+      }}
+      onLongPress={() => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        onLongPress(item);
+      }}
+      delayLongPress={400}
+      style={{
+        width: tileSize,
+        aspectRatio: 1,
+        position: "relative",
+        // V3: cards.standard = border-first
+        backgroundColor: cards.standard.backgroundColor,
+        borderRadius: cards.standard.borderRadius,
+        borderWidth: cards.standard.borderWidth,
+        borderColor: cards.standard.borderColor,
+        overflow: "hidden",
+      }}
     >
-      <Pressable
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          onPress(item);
-        }}
-        onLongPress={() => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          onLongPress(item);
-        }}
-        delayLongPress={400}
-        style={{
-          width: tileSize,
-          aspectRatio: 1,
-          position: "relative",
-          // V3: cards.standard = border-first
-          backgroundColor: cards.standard.backgroundColor,
-          borderRadius: cards.standard.borderRadius,
-          borderWidth: cards.standard.borderWidth,
-          borderColor: cards.standard.borderColor,
-          overflow: "hidden",
-        }}
-      >
-        {/* Image */}
-        <ImageWithFallback uri={item.imageUri} />
+      {/* Image */}
+      <ImageWithFallback uri={item.imageUri} />
 
-        {/* Upload status indicator - based on queue state, not URI prefix */}
-        {/* Shows "Syncing" when upload is pending, "Retry" when failed */}
-        {(hasPendingUpload(item.id) || isUploadFailed(item.id)) && (
-          <Pressable
-            onPress={async (e) => {
-              e.stopPropagation();
-              // If upload failed, allow manual retry
-              if (isUploadFailed(item.id)) {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                await retryFailedUpload(item.id);
-              }
-            }}
-            style={{
-              position: "absolute",
-              top: spacing.sm,
-              right: spacing.sm,
-              backgroundColor: isUploadFailed(item.id) ? colors.status.error : colors.overlay.dark,
-              borderRadius: borderRadius.pill,
-              paddingVertical: spacing.xs,
-              paddingHorizontal: isUploadFailed(item.id) ? spacing.sm : spacing.xs,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: spacing.xs / 2,
-            }}
-          >
-            {isUploadFailed(item.id) ? (
-              <>
-                <RefreshCw size={12} color={colors.text.inverse} strokeWidth={2} />
-                <Text 
-                  style={{ 
-                    ...typography.ui.caption,
-                    color: colors.text.inverse, 
-                    fontFamily: typography.fontFamily.medium,
-                  }}
-                >
-                  Retry
-                </Text>
-              </>
-            ) : (
-              <>
-                <CloudUpload size={12} color={colors.text.inverse} strokeWidth={2} />
-                <Text 
-                  style={{ 
-                    ...typography.ui.caption,
-                    color: colors.text.inverse, 
-                    fontFamily: typography.fontFamily.medium,
-                  }}
-                >
-                  Syncing
-                </Text>
-              </>
-            )}
-          </Pressable>
-        )}
+      {/* Upload status indicator - based on queue state, not URI prefix */}
+      {/* Shows "Syncing" when upload is pending, "Retry" when failed */}
+      {showSyncStatus && (
+        <Pressable
+          onPress={async (e) => {
+            e.stopPropagation();
+            // If upload failed, allow manual retry
+            if (isFailed) {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              await retryFailedUpload(item.id);
+            }
+          }}
+          style={{
+            position: "absolute",
+            top: spacing.sm,
+            right: spacing.sm,
+            backgroundColor: isFailed ? colors.status.error : colors.overlay.dark,
+            borderRadius: borderRadius.pill,
+            paddingVertical: spacing.xs,
+            paddingHorizontal: isFailed ? spacing.sm : spacing.xs,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing.xs / 2,
+          }}
+        >
+          {isFailed ? (
+            <>
+              <RefreshCw size={12} color={colors.text.inverse} strokeWidth={2} />
+              <Text 
+                style={{ 
+                  ...typography.ui.caption,
+                  color: colors.text.inverse, 
+                  fontFamily: typography.fontFamily.medium,
+                }}
+              >
+                Retry
+              </Text>
+            </>
+          ) : (
+            <>
+              <CloudUpload size={12} color={colors.text.inverse} strokeWidth={2} />
+              <Text 
+                style={{ 
+                  ...typography.ui.caption,
+                  color: colors.text.inverse, 
+                  fontFamily: typography.fontFamily.medium,
+                }}
+              >
+                Syncing
+              </Text>
+            </>
+          )}
+        </Pressable>
+      )}
 
         {/* Gradient overlay */}
         <LinearGradient
@@ -218,9 +209,8 @@ function WardrobeGridItem({
           </Text>
         </View>
       </Pressable>
-    </Animated.View>
   );
-}
+});
 
 // Empty state
 function EmptyState() {
@@ -512,30 +502,37 @@ function SuccessToast({
 
 export default function WardrobeScreen() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { data: wardrobe = [], refetch, isFetching } = useWardrobe();
   const removeWardrobeItemMutation = useRemoveWardrobeItem();
   const [selectedFilters, setSelectedFilters] = useState<(Category | "all")[]>(["all"]); // multi-select filter state
   const [itemToDelete, setItemToDelete] = useState<WardrobeItem | null>(null);
-  const [isInitialRender, setIsInitialRender] = useState(true);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("Removed from Wardrobe");
   const [deleteError, setDeleteError] = useState<'network' | 'other' | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
+  // Memoize tile size calculation - updates on rotation via useWindowDimensions
+  const tileSize = useMemo(() => {
+    return (width - spacing.md * 2 - spacing.md) / 2;
+  }, [width]);
+  
   // Pull-to-refresh handler with minimum delay for visual feedback
   const onRefresh = useCallback(async () => {
+    if (__DEV__) console.log('[Wardrobe] Pull-to-refresh triggered');
     setIsRefreshing(true);
-    console.log('[Wardrobe] Pull-to-refresh triggered');
-    // Add minimum delay so spinner is visible even if data is cached
-    await Promise.all([
-      refetch(),
-      new Promise(resolve => setTimeout(resolve, 500)),
-    ]);
-    setIsRefreshing(false);
-    console.log('[Wardrobe] Refresh complete');
+    try {
+      // Add minimum delay so spinner is visible even if data is cached
+      await Promise.all([
+        refetch(),
+        new Promise(resolve => setTimeout(resolve, 500)),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
   }, [refetch]);
 
   // Check for add/delete flags when screen gains focus
@@ -604,8 +601,6 @@ export default function WardrobeScreen() {
         // Clear corrupted data
         await AsyncStorage.removeItem(WARDROBE_FILTER_KEY);
       }
-      // Mark initial render as complete after loading
-      setTimeout(() => setIsInitialRender(false), 500);
     };
     loadFilter();
   }, []);
@@ -692,9 +687,10 @@ export default function WardrobeScreen() {
         }
         // Debounce: wait 300ms before triggering (coalesces multiple idle events)
         sweepDebounceTimer.current = setTimeout(() => {
-          console.log('[Wardrobe] Queue became idle, triggering sweep + cache refresh');
+          if (__DEV__) console.log('[Wardrobe] Queue became idle, triggering sweep + cache refresh');
           
           // Invalidate cache so UI gets fresh data with cloud URLs
+          // The image transition effect in ImageWithFallback makes this smooth
           void queryClient.invalidateQueries({ queryKey: ["wardrobe", user?.id] });
           
           runOrphanSweep();
@@ -731,9 +727,9 @@ export default function WardrobeScreen() {
   }, [wardrobe, selectedFilters]);
 
   // Show delete confirmation (triggered by long press)
-  const handleDeleteRequest = (item: WardrobeItem) => {
+  const handleDeleteRequest = useCallback((item: WardrobeItem) => {
     setItemToDelete(item);
-  };
+  }, []);
 
   // Confirm delete action
   const handleConfirmDelete = async () => {
@@ -777,13 +773,27 @@ export default function WardrobeScreen() {
     setItemToDelete(null);
   };
 
-  const handleItemPress = (item: WardrobeItem) => {
+  const handleItemPress = useCallback((item: WardrobeItem) => {
     // Navigate to item detail (lightweight view)
     router.push({
       pathname: "/wardrobe-item",
       params: { itemId: item.id },
     });
-  };
+  }, []);
+
+  // Memoized renderItem for FlatList performance
+  const renderItem = useCallback(
+    ({ item, index }: { item: WardrobeItem; index: number }) => (
+      <WardrobeGridItem
+        item={item}
+        index={index}
+        onPress={handleItemPress}
+        onLongPress={handleDeleteRequest}
+        tileSize={tileSize}
+      />
+    ),
+    [tileSize, handleItemPress, handleDeleteRequest]
+  );
 
   const handleFilterChange = (filter: Category | "all") => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -830,31 +840,29 @@ export default function WardrobeScreen() {
           paddingTop: insets.top + spacing.md,
         }}
       >
-        <Animated.View entering={FadeInDown.delay(100).springify()}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <Text
-              style={[getTextStyle("h1", colors.text.primary), { letterSpacing: 0.3 }]}
-            >
-              Wardrobe
-            </Text>
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push("/add-item");
-              }}
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: borderRadius.pill,
-                backgroundColor: colors.surface.icon,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Camera size={18} color={colors.text.primary} strokeWidth={1.5} />
-            </Pressable>
-          </View>
-        </Animated.View>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <Text
+            style={[getTextStyle("h1", colors.text.primary), { letterSpacing: 0.3 }]}
+          >
+            Wardrobe
+          </Text>
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push("/add-item");
+            }}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: borderRadius.pill,
+              backgroundColor: colors.surface.icon,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Camera size={18} color={colors.text.primary} strokeWidth={1.5} />
+          </Pressable>
+        </View>
       </View>
 
       {wardrobe.length > 0 ? (
@@ -867,83 +875,72 @@ export default function WardrobeScreen() {
               position: "relative",
             }}
           >
-            <Animated.View entering={FadeInDown.delay(150)} style={{ position: "relative" }}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{
-                  paddingHorizontal: spacing.lg,
-                  flexDirection: "row",
-                  alignItems: "center",
-                }}
-              >
-                <FilterChip
-                  label="All"
-                  isSelected={selectedFilters.includes("all")}
-                  onPress={() => handleFilterChange("all")}
-                />
-                {availableCategories.map((category) => (
-                  <FilterChip
-                    key={category.id}
-                    label={category.label}
-                    isSelected={selectedFilters.includes(category.id)}
-                    onPress={() => handleFilterChange(category.id)}
-                  />
-                ))}
-              </ScrollView>
-              {/* Right fade gradient */}
-              <View
-                style={{
-                  position: "absolute",
-                  right: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: 20,
-                  zIndex: 10,
-                  pointerEvents: "none",
-                }}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingHorizontal: spacing.lg,
+                flexDirection: "row",
+                alignItems: "center",
+              }}
+            >
+              <FilterChip
+                label="All"
+                isSelected={selectedFilters.includes("all")}
+                onPress={() => handleFilterChange("all")}
               />
-            </Animated.View>
+              {availableCategories.map((category) => (
+                <FilterChip
+                  key={category.id}
+                  label={category.label}
+                  isSelected={selectedFilters.includes(category.id)}
+                  onPress={() => handleFilterChange(category.id)}
+                />
+              ))}
+            </ScrollView>
+            {/* Right fade gradient */}
+            <View
+              style={{
+                position: "absolute",
+                right: 0,
+                top: 0,
+                bottom: 0,
+                width: 20,
+                zIndex: 10,
+                pointerEvents: "none",
+              }}
+            />
           </View>
 
           {filteredWardrobe.length > 0 ? (
-            <ScrollView
-              showsVerticalScrollIndicator={true}
+            <FlatList
+              key={`wardrobe-${Math.round(tileSize)}`} // Re-layout cleanly on rotation/width change
+              data={filteredWardrobe}
+              numColumns={2}
+              keyExtractor={(item) => item.id}
+              renderItem={renderItem}
+              showsVerticalScrollIndicator
               indicatorStyle="black"
               contentContainerStyle={{
                 paddingHorizontal: spacing.md,
                 paddingTop: spacing.sm,
                 paddingBottom: 100,
               }}
+              columnWrapperStyle={{ justifyContent: "space-between", marginBottom: spacing.md }}
               refreshControl={
                 <RefreshControl
-                  refreshing={isRefreshing || isFetching}
+                  refreshing={isRefreshing}
                   onRefresh={onRefresh}
                   tintColor={colors.text.secondary}
                 />
               }
-            >
-              {/* 2-column grid */}
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
-                {filteredWardrobe.map((item: WardrobeItem, index: number) => {
-                  // Calculate tile size for 2-column grid with spacing.md padding on each side and spacing.md gap
-                  const screenWidth = Dimensions.get("window").width;
-                  const tileSize = (screenWidth - spacing.md * 2 - spacing.md) / 2;
-                  
-                  return (
-                    <WardrobeGridItem
-                      key={item.id}
-                      item={item}
-                      index={index}
-                      onPress={handleItemPress}
-                      onLongPress={handleDeleteRequest}
-                      tileSize={tileSize}
-                      isInitialRender={isInitialRender}
-                    />
-                  );
-                })}
-              </View>
-            </ScrollView>
+              // Performance optimizations
+              initialNumToRender={8}
+              maxToRenderPerBatch={6}
+              windowSize={5}
+              updateCellsBatchingPeriod={50}
+              removeClippedSubviews={false} // Keep false for iOS shadows + animations
+            />
           ) : (
             <FilteredEmptyState onShowAll={handleShowAll} />
           )}

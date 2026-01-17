@@ -45,6 +45,24 @@ export function evaluateOutfit(
   // Get all pair evaluations
   const allEvaluations = evaluateAgainstWardrobe(targetItem, wardrobeItems, ctx);
 
+  // DEBUG: Log evaluation details for comparison with useMatchCount
+  if (__DEV__) {
+    const wardrobeCategories = wardrobeItems.map(item => item.category);
+    const categoryCounts = wardrobeCategories.reduce((acc, cat) => {
+      acc[cat] = (acc[cat] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    console.log('[evaluateOutfit] DEBUG scanned category:', targetItem.category, 'wardrobe categories:', categoryCounts);
+    console.log('[evaluateOutfit] DEBUG wardrobe items count:', wardrobeItems.length, 'evaluations count:', allEvaluations.length);
+    
+    // Show tier distribution
+    const tierCounts = allEvaluations.reduce((acc, e) => {
+      acc[e.confidence_tier] = (acc[e.confidence_tier] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    console.log('[evaluateOutfit] DEBUG tier distribution:', tierCounts);
+  }
+
   // Handle empty wardrobe
   if (allEvaluations.length === 0) {
     return {
@@ -85,11 +103,9 @@ export function evaluateOutfit(
     OUTFIT_CONFIG.max_matches_shown
   );
 
-  // Select near-matches for Mode B
-  const nearMatches = selectNearMatches(
-    allEvaluations,
-    OUTFIT_CONFIG.max_near_matches
-  );
+  // Select ALL near-matches for UI display (Worth Trying tab, View all sheet)
+  // Mode B suggestions will apply their own limit when generating tips
+  const nearMatches = selectNearMatches(allEvaluations);
 
   // Determine suggestions mode (passes full nearMatches for hard tension check)
   const suggestionsMode = determineSuggestionsMode(

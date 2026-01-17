@@ -95,6 +95,9 @@ export const useWardrobe = () => {
       return (data as DbWardrobeItem[]).map(mapDbToWardrobeItem);
     },
     enabled: !!user?.id,
+    // Keep data fresh for 2 seconds - prevents flash during cache invalidation
+    // after upload completes (optimistic update already has correct data)
+    staleTime: 2000,
   });
 };
 
@@ -434,6 +437,9 @@ export const useRecentChecks = () => {
       return (data as DbRecentCheck[]).map(mapDbToRecentCheck);
     },
     enabled: !!user?.id,
+    // Keep data fresh for 2 seconds - prevents flash during navigation back
+    // after save/unsave (optimistic update already has correct data)
+    staleTime: 2000,
   });
 };
 

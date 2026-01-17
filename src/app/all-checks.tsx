@@ -24,11 +24,12 @@ import Clipboard from "@react-native-clipboard/clipboard";
 import { ArrowLeft, Clock, Copy, X, CloudUpload, RefreshCw, WifiOff, AlertCircle } from "lucide-react-native";
 import { ImageWithFallback } from "@/components/PlaceholderImage";
 
-import { useRecentChecks, useRemoveRecentCheck, SCAN_RETENTION } from "@/lib/database";
+import { useRecentChecks, useRemoveRecentCheck, useWardrobe, SCAN_RETENTION } from "@/lib/database";
 import { hasPendingUpload, isUploadFailed } from "@/lib/storage";
 import { colors, typography, spacing, borderRadius, cards, shadows, button } from "@/lib/design-tokens";
 import { getTextStyle } from "@/lib/typography-helpers";
 import { OutcomeState, RecentCheck } from "@/lib/types";
+import { calculateMatchCountsForChecks } from "@/lib/useMatchCount";
 import { ButtonSecondary } from "@/components/ButtonSecondary";
 import { ButtonPrimary } from "@/components/ButtonPrimary";
 import { ButtonTertiary } from "@/components/ButtonTertiary";
@@ -752,6 +753,7 @@ export default function AllChecksScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { data: recentChecks = [], refetch, isFetching } = useRecentChecks();
+  const { data: wardrobe = [] } = useWardrobe();
   const removeRecentCheckMutation = useRemoveRecentCheck();
   const [isRefreshing, setIsRefreshing] = useState(false);
   
@@ -796,20 +798,11 @@ export default function AllChecksScreen() {
   }, [width]);
   
   // Pre-calculate match counts for all checks (avoid per-item hook calls)
-  const matchCountMap = useMemo(() => {
-    const map: Record<string, string | null> = {};
-    for (const check of recentChecks) {
-      // Inline match count calculation to avoid hook overhead
-      const snapshot = check.debugSnapshot;
-      if (snapshot?.engines?.confidence?.matchesHighCount != null) {
-        const count = snapshot.engines.confidence.matchesHighCount;
-        map[check.id] = count > 0 ? `${count} match${count !== 1 ? 'es' : ''}` : null;
-      } else {
-        map[check.id] = null;
-      }
-    }
-    return map;
-  }, [recentChecks]);
+  // Uses canonical calculateMatchCountsForChecks() - never use debugSnapshot for this!
+  const matchCountMap = useMemo(
+    () => calculateMatchCountsForChecks(recentChecks, wardrobe),
+    [recentChecks, wardrobe]
+  );
 
   // Auto-hide toast after 2 seconds
   useEffect(() => {

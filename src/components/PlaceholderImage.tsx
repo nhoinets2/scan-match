@@ -194,11 +194,14 @@ export function ImageWithFallback({
 
   return (
     <Image
-      key={uri} // Force remount when URI changes to clear expo-image cache
       source={{ uri }}
       style={[{ width: "100%", height: "100%" }, style]}
       contentFit={contentFit}
       onError={() => setHasError(true)}
+      // Smooth transition when URI changes (e.g., local → cloud after upload)
+      // This prevents the brief flash/disappearance during the transition
+      transition={200}
+      cachePolicy="memory-disk"
     />
   );
 }
@@ -251,6 +254,9 @@ export function ThumbnailWithFallback({
       ]}
       contentFit="cover"
       onError={() => setHasError(true)}
+      // Smooth transition when URI changes (e.g., local → cloud after upload)
+      transition={200}
+      cachePolicy="memory-disk"
     />
   );
 }

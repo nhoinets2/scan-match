@@ -102,12 +102,28 @@ export interface EngineSnapshot {
   // ============================================
   // LEGACY FIELDS (for backwards compatibility)
   // ============================================
+  /**
+   * ⚠️ WARNING: DO NOT USE FOR UI DISPLAY ⚠️
+   * 
+   * These values are FROZEN at scan time and become STALE when:
+   * - User adds/removes wardrobe items
+   * - Matching algorithm is updated
+   * 
+   * For current match counts, use evaluateAgainstWardrobe() from confidence-engine.ts
+   * See useMatchCount.ts for the canonical pattern.
+   * 
+   * This data is ONLY for:
+   * - DebugSnapshotModal (developer debugging)
+   * - Analytics/logging of historical state
+   */
   engines: {
     confidence: {
       evaluated: boolean;
       debugTier: "HIGH" | "MEDIUM" | "LOW";
       showMatchesSection: boolean;
+      /** @deprecated DO NOT USE - frozen at scan time. Use evaluateAgainstWardrobe() instead */
       matchesHighCount: number;
+      /** @deprecated DO NOT USE - frozen at scan time. Use evaluateAgainstWardrobe() instead */
       nearMatchesCount: number;
       suggestionsMode: "A" | "B";
       modeA: boolean;

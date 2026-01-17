@@ -866,16 +866,18 @@ export default function HomeScreen() {
   
   // Pull-to-refresh handler with minimum delay for visual feedback
   const onRefresh = useCallback(async () => {
+    if (__DEV__) console.log('[Home] Pull-to-refresh triggered');
     setIsRefreshing(true);
-    console.log('[Home] Pull-to-refresh triggered');
-    // Add minimum delay so spinner is visible even if data is cached
-    await Promise.all([
-      refetchWardrobe(),
-      refetchRecentChecks(),
-      new Promise(resolve => setTimeout(resolve, 500)),
-    ]);
-    setIsRefreshing(false);
-    console.log('[Home] Refresh complete');
+    try {
+      // Add minimum delay so spinner is visible even if data is cached
+      await Promise.all([
+        refetchWardrobe(),
+        refetchRecentChecks(),
+        new Promise(resolve => setTimeout(resolve, 500)),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
   }, [refetchWardrobe, refetchRecentChecks]);
   
   // TEMPORARY: Debug snapshot modal state
@@ -1004,12 +1006,18 @@ export default function HomeScreen() {
     setScanItemToDelete(null);
   };
 
+  // Scroll ref for resetting position
+  const scrollRef = useRef<ScrollView>(null);
+  
   // Force re-render when screen gains focus to update relative timestamps
+  // Also reset scroll position to prevent content offset bugs
   const [, setTimestampTick] = useState(0);
   useFocusEffect(
     useCallback(() => {
       // Update timestamp tick to force re-render and recalculate relative times
       setTimestampTick(tick => tick + 1);
+      // Reset scroll to top to prevent content offset bugs from RefreshControl
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
     }, [])
   );
 
@@ -1028,6 +1036,7 @@ export default function HomeScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ 
           paddingBottom: insets.bottom + 100,
@@ -1036,7 +1045,7 @@ export default function HomeScreen() {
         }}
         refreshControl={
           <RefreshControl
-            refreshing={isRefreshing || isFetchingWardrobe || isFetchingRecentChecks}
+            refreshing={isRefreshing}
             onRefresh={onRefresh}
             tintColor={colors.text.secondary}
           />

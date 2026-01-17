@@ -268,7 +268,11 @@ export function useConfidenceEngine(
           modeASuggestions = rawModeA;
         }
       } else if (evaluation.suggestions_mode === 'B' && evaluation.near_matches.length > 0) {
-        const rawModeBSuggestions = generateOutfitModeBSuggestionsV2(evaluation.near_matches, uiVibeForCopy);
+        // Limit near matches for Mode B suggestions to avoid overwhelming tip generation
+        // UI displays all near_matches, but Mode B only uses top 5 for generating tips
+        const MODE_B_NEAR_LIMIT = 5;
+        const nearForModeB = evaluation.near_matches.slice(0, MODE_B_NEAR_LIMIT);
+        const rawModeBSuggestions = generateOutfitModeBSuggestionsV2(nearForModeB, uiVibeForCopy);
         // Only set Mode B if we have actual bullets - never allow { bullets: [] }
         // Empty Mode B should be null, not an empty object
         if (rawModeBSuggestions && rawModeBSuggestions.bullets.length > 0) {

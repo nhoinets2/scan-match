@@ -112,7 +112,9 @@ function RootLayoutNav({
             name="results"
             options={{
               headerShown: false,
-              presentation: "fullScreenModal",
+              presentation: "containedModal",
+              animation: "fade_from_bottom",
+              animationDuration: 200,
             }}
           />
           <Stack.Screen

@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
-  ScrollView,
   Pressable,
-  Dimensions,
+  FlatList,
   Modal,
   ActivityIndicator,
   RefreshControl,
+  useWindowDimensions,
 } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -16,7 +16,6 @@ import { router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import Animated, {
   FadeIn,
-  FadeInDown,
   FadeInUp,
   FadeOut,
 } from "react-native-reanimated";
@@ -33,7 +32,7 @@ import { RecentCheck } from "@/lib/types";
 import { ButtonSecondary } from "@/components/ButtonSecondary";
 import { ButtonPrimary } from "@/components/ButtonPrimary";
 import { ButtonTertiary } from "@/components/ButtonTertiary";
-import { useMatchCount } from "@/lib/useMatchCount";
+import { calculateMatchCountsForChecks } from "@/lib/useMatchCount";
 import { 
   sweepOrphanedLocalImages, 
   isLocalUri, 
@@ -47,7 +46,7 @@ import {
 } from "@/lib/storage";
 
 // Grid tile for saved checks (matches Recent Scans / Wardrobe grid style)
-function SavedCheckGridItem({
+const SavedCheckGridItem = React.memo(function SavedCheckGridItem({
   check,
   index,
   onPress,
@@ -55,6 +54,7 @@ function SavedCheckGridItem({
   tileSize,
   syncStatus,
   onRetry,
+  matchCount,
 }: {
   check: RecentCheck;
   index: number;
@@ -63,11 +63,8 @@ function SavedCheckGridItem({
   tileSize: number;
   syncStatus: 'synced' | 'syncing' | 'failed' | 'retrying';
   onRetry?: (check: RecentCheck) => void;
+  matchCount: string | null;
 }) {
-  // Get current wardrobe and calculate match count
-  const { data: wardrobe = [] } = useWardrobe();
-  const matchCount = useMatchCount(check, wardrobe);
-  
   // Handle tap - if failed, retry; otherwise open
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -79,29 +76,25 @@ function SavedCheckGridItem({
   };
   
   return (
-    <Animated.View
-      entering={FadeInDown.delay(300 + index * 50).springify()}
-      exiting={FadeOut.duration(150)}
+    <Pressable
+      onPress={handlePress}
+      onLongPress={() => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        onLongPress(check);
+      }}
+      delayLongPress={400}
+      style={{
+        width: tileSize,
+        aspectRatio: 1,
+        position: "relative",
+        // V3: cards.standard = border-first
+        backgroundColor: cards.standard.backgroundColor,
+        borderRadius: cards.standard.borderRadius,
+        borderWidth: cards.standard.borderWidth,
+        borderColor: cards.standard.borderColor,
+        overflow: "hidden",
+      }}
     >
-      <Pressable
-        onPress={handlePress}
-        onLongPress={() => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          onLongPress(check);
-        }}
-        delayLongPress={400}
-        style={{
-          width: tileSize,
-          aspectRatio: 1,
-          position: "relative",
-          // V3: cards.standard = border-first
-          backgroundColor: cards.standard.backgroundColor,
-          borderRadius: cards.standard.borderRadius,
-          borderWidth: cards.standard.borderWidth,
-          borderColor: cards.standard.borderColor,
-          overflow: "hidden",
-        }}
-      >
         {/* Image */}
         <ImageWithFallback uri={check.imageUri} />
 
@@ -193,9 +186,8 @@ function SavedCheckGridItem({
           </Text>
         </View>
       </Pressable>
-    </Animated.View>
   );
-}
+});
 
 // Delete Confirmation Modal
 function DeleteConfirmationModal({
@@ -400,9 +392,11 @@ function EmptyState() {
 
 export default function SavedChecksScreen() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { data: recentChecks = [], refetch, isFetching } = useRecentChecks();
+  const { data: wardrobe = [] } = useWardrobe();
   const removeRecentCheckMutation = useRemoveRecentCheck();
   const [itemToDelete, setItemToDelete] = useState<RecentCheck | null>(null);
   const [showToast, setShowToast] = useState(false);
@@ -412,17 +406,24 @@ export default function SavedChecksScreen() {
   const hasSweepedRef = useRef(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
+  // Memoize tile size calculation - updates on rotation via useWindowDimensions
+  const tileSize = useMemo(() => {
+    return (width - spacing.md * 2 - spacing.md) / 2;
+  }, [width]);
+  
   // Pull-to-refresh handler with minimum delay for visual feedback
   const onRefresh = useCallback(async () => {
+    if (__DEV__) console.log('[Saved] Pull-to-refresh triggered');
     setIsRefreshing(true);
-    console.log('[Saved] Pull-to-refresh triggered');
-    // Add minimum delay so spinner is visible even if data is cached
-    await Promise.all([
-      refetch(),
-      new Promise(resolve => setTimeout(resolve, 500)),
-    ]);
-    setIsRefreshing(false);
-    console.log('[Saved] Refresh complete');
+    try {
+      // Add minimum delay so spinner is visible even if data is cached
+      await Promise.all([
+        refetch(),
+        new Promise(resolve => setTimeout(resolve, 500)),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
   }, [refetch]);
 
   // Auto-hide toast after 2 seconds
@@ -444,9 +445,32 @@ export default function SavedChecksScreen() {
   );
 
   // Filter to show only saved checks (outcome = "saved_to_revisit")
-  const savedChecks = recentChecks.filter(
-    (check: RecentCheck) => check.outcome === "saved_to_revisit"
+  const savedChecks = useMemo(() => 
+    recentChecks.filter((check: RecentCheck) => check.outcome === "saved_to_revisit"),
+    [recentChecks]
   );
+  
+  // Pre-calculate match counts for all saved checks (avoid per-item hook calls)
+  // Uses canonical calculateMatchCountsForChecks() - never use debugSnapshot for this!
+  const matchCountMap = useMemo(
+    () => calculateMatchCountsForChecks(savedChecks, wardrobe),
+    [savedChecks, wardrobe]
+  );
+  
+  // Get sync status for a check - called inline during render to get current queue state
+  const getSyncStatus = useCallback((check: RecentCheck): 'synced' | 'syncing' | 'failed' | 'retrying' => {
+    // "Retrying" = user tapped retry AND job is now in queue (not failed anymore)
+    if (retryingIds.has(check.id) && hasPendingUpload(check.id) && !isUploadFailed(check.id)) {
+      return 'retrying';
+    }
+    if (!check.imageUri) return 'synced'; // No image
+    if (!isLocalUri(check.imageUri)) return 'synced'; // Already cloud URL
+    if (isUploadFailed(check.id)) return 'failed';
+    if (hasPendingUpload(check.id)) return 'syncing';
+    // Local file with no pending job = upload completed, waiting for cache refresh
+    // Show synced optimistically (the brief window where job isn't created yet is negligible)
+    return 'synced';
+  }, [retryingIds]);
   
   // Debounce timer for idle-triggered sweep
   const sweepDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -468,7 +492,7 @@ export default function SavedChecksScreen() {
     
     // Skip if uploads are still in progress
     if (hasAnyPendingUploads('scan')) {
-      console.log('[Looks] Skipping orphan sweep - uploads in progress');
+      if (__DEV__) console.log('[Looks] Skipping orphan sweep - uploads in progress');
       return;
     }
     
@@ -476,7 +500,7 @@ export default function SavedChecksScreen() {
     // There could be orphan files from previously deleted scans
     
     hasSweepedRef.current = true;
-    console.log('[Looks] Running orphan sweep');
+    if (__DEV__) console.log('[Looks] Running orphan sweep');
     
       // Collect all local URIs that are in use
       const validLocalUris = new Set<string>(
@@ -522,7 +546,7 @@ export default function SavedChecksScreen() {
         }
         // Debounce: wait 300ms before triggering (coalesces multiple idle events)
         sweepDebounceTimer.current = setTimeout(() => {
-          console.log('[Looks] Queue became idle, triggering sweep + cache refresh');
+          if (__DEV__) console.log('[Looks] Queue became idle, triggering sweep + cache refresh');
           
           // Invalidate cache so UI gets fresh data with cloud URLs
           void queryClient.invalidateQueries({ queryKey: ["recentChecks", user?.id] });
@@ -539,22 +563,8 @@ export default function SavedChecksScreen() {
     };
   }, [runOrphanSweep, queryClient, user?.id]);
   
-  // Get sync status for a check
-  const getSyncStatus = (check: RecentCheck): 'synced' | 'syncing' | 'failed' | 'retrying' => {
-    // "Retrying" = user tapped retry AND job is now in queue (not failed anymore)
-    if (retryingIds.has(check.id) && hasPendingUpload(check.id) && !isUploadFailed(check.id)) {
-      return 'retrying';
-    }
-    if (!check.imageUri) return 'synced'; // No image
-    if (!isLocalUri(check.imageUri)) return 'synced'; // Already cloud URL
-    if (isUploadFailed(check.id)) return 'failed';
-    if (hasPendingUpload(check.id)) return 'syncing';
-    // Local file with no pending job = job hasn't been created yet (save in progress)
-    return 'syncing';
-  };
-  
   // Handle retry for failed uploads
-  const handleRetry = async (check: RecentCheck) => {
+  const handleRetry = useCallback(async (check: RecentCheck) => {
     setRetryingIds((prev) => new Set(prev).add(check.id));
     
     try {
@@ -569,7 +579,7 @@ export default function SavedChecksScreen() {
         return;
       }
     } catch (error) {
-      console.error('[Looks] Retry failed:', error);
+      if (__DEV__) console.error('[Looks] Retry failed:', error);
       setRetryingIds((prev) => {
         const next = new Set(prev);
         next.delete(check.id);
@@ -586,12 +596,12 @@ export default function SavedChecksScreen() {
         return next;
       });
     }, 5000); // 5s - enough time to see "Retrying..." then transition
-  };
+  }, []);
 
   // Show delete confirmation modal
-  const handleDeleteRequest = (check: RecentCheck) => {
+  const handleDeleteRequest = useCallback((check: RecentCheck) => {
     setItemToDelete(check);
-  };
+  }, []);
 
   // Confirm delete action
   const handleConfirmDelete = async () => {
@@ -608,7 +618,7 @@ export default function SavedChecksScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowToast(true);
     } catch (error) {
-      console.error('[Delete] Failed to delete saved scan:', error);
+      if (__DEV__) console.error('[Delete] Failed to delete saved scan:', error);
       setIsDeleting(false);
       // Keep itemToDelete so "Try again" can reopen confirmation
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -635,13 +645,13 @@ export default function SavedChecksScreen() {
     setItemToDelete(null);
   };
 
-  const handleCheckPress = (check: RecentCheck) => {
+  const handleCheckPress = useCallback((check: RecentCheck) => {
     // Navigate to saved result screen with checkId
     router.push({
       pathname: "/results",
       params: { checkId: check.id, from: "saved-checks" },
     });
-  };
+  }, []);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
@@ -652,55 +662,56 @@ export default function SavedChecksScreen() {
           paddingTop: insets.top + spacing.md,
         }}
       >
-        <Animated.View entering={FadeInDown.delay(100).springify()}>
-          <Text
-            style={[getTextStyle("h1", colors.text.primary), { letterSpacing: 0.3 }]}
-          >
-            Saved
-          </Text>
-        </Animated.View>
+        <Text
+          style={[getTextStyle("h1", colors.text.primary), { letterSpacing: 0.3 }]}
+        >
+          Saved
+        </Text>
       </View>
 
       {/* Grid */}
       {savedChecks.length > 0 ? (
-        <ScrollView
-          showsVerticalScrollIndicator={true}
+        <FlatList
+          key={`saved-${Math.round(tileSize)}`} // Re-layout cleanly on rotation/width change
+          data={savedChecks}
+          numColumns={2}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item, index }) => (
+            <View style={{ width: tileSize, marginBottom: spacing.md }}>
+              <SavedCheckGridItem
+                check={item}
+                index={index}
+                onPress={handleCheckPress}
+                onLongPress={handleDeleteRequest}
+                syncStatus={getSyncStatus(item)}
+                onRetry={handleRetry}
+                tileSize={tileSize}
+                matchCount={matchCountMap[item.id]}
+              />
+            </View>
+          )}
+          extraData={retryingIds} // Ensures tiles update when retry status changes
+          showsVerticalScrollIndicator
           indicatorStyle="black"
           contentContainerStyle={{
             paddingHorizontal: spacing.md,
             paddingTop: spacing.lg,
             paddingBottom: 100,
           }}
+          columnWrapperStyle={{ justifyContent: "space-between" }}
           refreshControl={
             <RefreshControl
-              refreshing={isRefreshing || isFetching}
+              refreshing={isRefreshing}
               onRefresh={onRefresh}
               tintColor={colors.text.secondary}
             />
           }
-        >
-          {/* 2-column grid */}
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
-            {savedChecks.map((check: RecentCheck, index: number) => {
-              // Calculate tile size for 2-column grid with spacing.md padding on each side and spacing.md gap
-              const screenWidth = Dimensions.get("window").width;
-              const tileSize = (screenWidth - spacing.md * 2 - spacing.md) / 2;
-              
-              return (
-                <SavedCheckGridItem
-                  key={check.id}
-                  check={check}
-                  index={index}
-                  onPress={handleCheckPress}
-                  onLongPress={handleDeleteRequest}
-                  syncStatus={getSyncStatus(check)}
-                  onRetry={handleRetry}
-                  tileSize={tileSize}
-                />
-              );
-            })}
-          </View>
-        </ScrollView>
+          initialNumToRender={8}
+          maxToRenderPerBatch={6}
+          windowSize={5}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews={false} // Safer for iOS shadows + reanimated
+        />
       ) : (
         <EmptyState />
       )}
