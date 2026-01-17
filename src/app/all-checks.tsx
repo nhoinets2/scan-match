@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { View, Text, Pressable, Dimensions, ScrollView, Modal, ActivityIndicator } from "react-native";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { View, Text, Pressable, Dimensions, ScrollView, Modal, ActivityIndicator, RefreshControl } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -739,8 +739,18 @@ function StatusPill({ label, color }: { label: string; color: string }) {
 
 export default function AllChecksScreen() {
   const insets = useSafeAreaInsets();
-  const { data: recentChecks = [] } = useRecentChecks();
+  const { data: recentChecks = [], refetch, isFetching } = useRecentChecks();
   const removeRecentCheckMutation = useRemoveRecentCheck();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Pull-to-refresh handler
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    console.log('[AllChecks] Pull-to-refresh triggered');
+    await refetch();
+    setIsRefreshing(false);
+    console.log('[AllChecks] Refresh complete, checks:', recentChecks.length);
+  }, [refetch, recentChecks.length]);
   const [itemToDelete, setItemToDelete] = useState<RecentCheck | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [deleteError, setDeleteError] = useState<'network' | 'other' | null>(null);
@@ -748,6 +758,19 @@ export default function AllChecksScreen() {
   // TEMPORARY: Debug snapshot modal state
   const [showDebugSnapshot, setShowDebugSnapshot] = useState(false);
   const [debugSnapshot, setDebugSnapshot] = useState<any>(null);
+  
+  // Debug: Log image URIs when checks change (helps diagnose cross-device sync issues)
+  useEffect(() => {
+    if (recentChecks.length > 0) {
+      console.log('[AllChecks] Loaded checks with imageUris:', recentChecks.slice(0, 5).map(c => ({
+        id: c.id.slice(0, 8),
+        outcome: c.outcome,
+        imageUri: c.imageUri?.slice(0, 60) + (c.imageUri?.length > 60 ? '...' : ''),
+        isCloud: c.imageUri?.startsWith('http'),
+        isLocal: c.imageUri?.startsWith('file://'),
+      })));
+    }
+  }, [recentChecks]);
   
   // Pre-calculate match counts for all checks (avoid per-item hook calls)
   const matchCountMap = useMemo(() => {
@@ -882,6 +905,13 @@ export default function AllChecksScreen() {
             paddingTop: spacing.lg,
             paddingBottom: 100,
           }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing || isFetching}
+              onRefresh={onRefresh}
+              tintColor={colors.text.secondary}
+            />
+          }
         >
           {/* 2-column grid */}
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
