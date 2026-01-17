@@ -347,11 +347,13 @@ export default function WardrobeItemScreen() {
       setIsDeleting(false);
       setDeletingItem(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Navigate to wardrobe with deleted param to trigger toast
-      router.replace({
-        pathname: "/(tabs)/wardrobe",
-        params: { deleted: "true" },
-      });
+      // Set global flag for wardrobe page to show toast, then go back
+      globalThis.__wardrobeItemDeleted = true;
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.push("/(tabs)/wardrobe");
+      }
     } catch (error) {
       console.error('[Delete] Failed to delete wardrobe item:', error);
       setIsDeleting(false);
