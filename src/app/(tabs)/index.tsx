@@ -53,6 +53,8 @@ import { getTextStyle } from "@/lib/typography-helpers";
 import { OutcomeState, RecentCheck, WardrobeItem, CATEGORIES } from "@/lib/types";
 import { useMatchCount } from "@/lib/useMatchCount";
 import { hasPendingUpload, isUploadFailed } from "@/lib/storage";
+import { ButtonPrimary } from "@/components/ButtonPrimary";
+import { ButtonTertiary } from "@/components/ButtonTertiary";
 
 // Screen dimensions
 
@@ -1386,7 +1388,13 @@ export default function HomeScreen() {
         }}
       >
         <Pressable 
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+          style={{ 
+            flex: 1, 
+            backgroundColor: "rgba(0,0,0,0.7)", 
+            justifyContent: "center", 
+            alignItems: "center",
+            padding: spacing.lg,
+          }}
           onPress={() => {
             setWardrobeDeleteError(null);
             setWardrobeItemToDelete(null);
@@ -1398,8 +1406,8 @@ export default function HomeScreen() {
               backgroundColor: colors.bg.primary,
               borderRadius: 24,
               padding: spacing.xl,
-              marginHorizontal: spacing.lg,
               alignItems: "center",
+              width: "100%",
               maxWidth: 320,
             }}
           >
@@ -1452,34 +1460,21 @@ export default function HomeScreen() {
             </Text>
 
             {/* Primary Button - reopen confirmation modal */}
-            <Pressable
+            <ButtonPrimary
+              label="Try again"
               onPress={() => setWardrobeDeleteError(null)}
-              style={{
-                backgroundColor: button.primary.backgroundColor,
-                borderRadius: borderRadius.pill,
-                height: 52,
-                alignItems: "center",
-                justifyContent: "center",
-                width: "100%",
-              }}
-            >
-              <Text style={{ ...typography.button.primary, color: colors.text.inverse }}>
-                Try again
-              </Text>
-            </Pressable>
+              style={{ width: "100%" }}
+            />
 
             {/* Secondary Button - close everything */}
-            <Pressable
+            <ButtonTertiary
+              label="Close"
               onPress={() => {
                 setWardrobeDeleteError(null);
                 setWardrobeItemToDelete(null);
               }}
               style={{ marginTop: spacing.sm }}
-            >
-              <Text style={{ ...typography.button.tertiary, color: colors.text.secondary }}>
-                Close
-              </Text>
-            </Pressable>
+            />
           </Pressable>
         </Pressable>
       </Modal>
@@ -1642,7 +1637,13 @@ export default function HomeScreen() {
         }}
       >
         <Pressable 
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+          style={{ 
+            flex: 1, 
+            backgroundColor: "rgba(0,0,0,0.7)", 
+            justifyContent: "center", 
+            alignItems: "center",
+            padding: spacing.lg,
+          }}
           onPress={() => {
             setScanDeleteError(null);
             setScanItemToDelete(null);
@@ -1654,8 +1655,8 @@ export default function HomeScreen() {
               backgroundColor: colors.bg.primary,
               borderRadius: 24,
               padding: spacing.xl,
-              marginHorizontal: spacing.lg,
               alignItems: "center",
+              width: "100%",
               maxWidth: 320,
             }}
           >
@@ -1708,34 +1709,21 @@ export default function HomeScreen() {
             </Text>
 
             {/* Primary Button - reopen confirmation modal */}
-            <Pressable
+            <ButtonPrimary
+              label="Try again"
               onPress={() => setScanDeleteError(null)}
-              style={{
-                backgroundColor: button.primary.backgroundColor,
-                borderRadius: borderRadius.pill,
-                height: 52,
-                alignItems: "center",
-                justifyContent: "center",
-                width: "100%",
-              }}
-            >
-              <Text style={{ ...typography.button.primary, color: colors.text.inverse }}>
-                Try again
-              </Text>
-            </Pressable>
+              style={{ width: "100%" }}
+            />
 
             {/* Secondary Button - close everything */}
-            <Pressable
+            <ButtonTertiary
+              label="Close"
               onPress={() => {
                 setScanDeleteError(null);
                 setScanItemToDelete(null);
               }}
               style={{ marginTop: spacing.sm }}
-            >
-              <Text style={{ ...typography.button.tertiary, color: colors.text.secondary }}>
-                Close
-              </Text>
-            </Pressable>
+            />
           </Pressable>
         </Pressable>
       </Modal>

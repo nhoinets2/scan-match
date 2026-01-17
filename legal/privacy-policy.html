@@ -98,10 +98,10 @@
 </head>
 <body>
     <h1>Privacy Policy</h1>
-    <p class="last-updated">Last Updated: January 11, 2025</p>
+    <p class="last-updated">Last Updated: January 16, 2026</p>
 
     <div class="summary-box">
-        <p><strong>Summary:</strong> Scan & Match collects your account information, wardrobe photos, and style preferences to help you make better shopping decisions. We use AI to analyze your photos. We do not sell your personal data.</p>
+        <p><strong>Summary:</strong> Scan & Match collects your account information, wardrobe photos, style preferences, and subscription data to help you make better shopping decisions. We use AI to analyze your photos and RevenueCat to process subscriptions. We do not sell your personal data.</p>
     </div>
 
     <h2>1. Introduction</h2>
@@ -129,7 +129,7 @@
         </tr>
         <tr>
             <td>Style Preferences</td>
-            <td>Style vibes (casual, minimal, office, etc.), size preferences (top, bottom, shoes), fit preference (slim, regular, oversized)</td>
+            <td>Style vibes (casual, minimal, office, etc.), size preferences (top, bottom, shoes), fit preference (slim, relaxed, oversized), color preferences</td>
             <td>Provide personalized outfit recommendations</td>
         </tr>
         <tr>
@@ -149,7 +149,32 @@
         </tr>
     </table>
 
-    <h3>2.2 Information Collected Automatically</h3>
+    <h3>2.2 Subscription and Payment Information</h3>
+    <table>
+        <tr>
+            <th>Data Type</th>
+            <th>Examples</th>
+            <th>Purpose</th>
+        </tr>
+        <tr>
+            <td>Subscription Status</td>
+            <td>Free or Pro tier, subscription type (monthly/annual), expiration date</td>
+            <td>Manage your subscription and access to features</td>
+        </tr>
+        <tr>
+            <td>Usage Data</td>
+            <td>Number of scans used, wardrobe items added</td>
+            <td>Track usage against free tier limits</td>
+        </tr>
+        <tr>
+            <td>Transaction Records</td>
+            <td>Purchase date, subscription period, renewal status</td>
+            <td>Subscription management and customer support</td>
+        </tr>
+    </table>
+    <p><strong>Note:</strong> We do not directly collect or store your payment card details. All payment processing is handled securely by Apple (App Store) or Google (Play Store) and managed through RevenueCat. We only receive confirmation of your subscription status.</p>
+
+    <h3>2.3 Information Collected Automatically</h3>
     <table>
         <tr>
             <th>Data Type</th>
@@ -168,16 +193,23 @@
         </tr>
         <tr>
             <td>Analytics Events</td>
-            <td>First match viewed, wardrobe additions, feature interactions</td>
+            <td>First match viewed, wardrobe additions, feature interactions, subscription events</td>
             <td>Understand user behavior and improve features</td>
         </tr>
     </table>
 
-    <h3>2.3 Information from Third Parties</h3>
+    <h3>2.4 Information from Third Parties</h3>
     <p>If you sign in using Apple or Google, we receive:</p>
     <ul>
         <li><strong>Apple Sign In:</strong> Your Apple ID, email (or private relay email), and name (if you choose to share it)</li>
         <li><strong>Google Sign In:</strong> Your Google account email, name, and profile picture</li>
+    </ul>
+    <p>If you subscribe to Pro, we receive from RevenueCat:</p>
+    <ul>
+        <li>Subscription status and entitlements</li>
+        <li>Subscription type and expiration date</li>
+        <li>Auto-renewal status</li>
+        <li>Anonymous customer identifier</li>
     </ul>
 
     <h2>3. How We Use Your Information</h2>
@@ -186,7 +218,8 @@
         <li><strong>Provide Core Services:</strong> Analyze clothing items, match against your wardrobe, generate outfit suggestions</li>
         <li><strong>Personalization:</strong> Tailor recommendations based on your style preferences and wardrobe</li>
         <li><strong>Account Management:</strong> Create and manage your account, authenticate users</li>
-        <li><strong>Communication:</strong> Send password resets, account notifications, and service updates</li>
+        <li><strong>Subscription Management:</strong> Process subscriptions, manage access to Pro features, track free tier usage limits</li>
+        <li><strong>Communication:</strong> Send password resets, account notifications, subscription confirmations, and service updates</li>
         <li><strong>Analytics:</strong> Understand how users interact with the App to improve features</li>
         <li><strong>Security:</strong> Detect and prevent fraud, abuse, and security incidents</li>
     </ul>
@@ -209,7 +242,8 @@
     <ul>
         <li><strong>Supabase:</strong> Database hosting and user authentication</li>
         <li><strong>OpenAI:</strong> Image analysis and AI features</li>
-        <li><strong>Apple/Google:</strong> Social authentication (if you choose to use it)</li>
+        <li><strong>RevenueCat:</strong> Subscription management and in-app purchase processing</li>
+        <li><strong>Apple/Google:</strong> Social authentication and payment processing (if you choose to use it)</li>
     </ul>
 
     <h3>5.2 Legal Requirements</h3>
@@ -234,9 +268,11 @@
         <li><strong>Account Data:</strong> Retained until you delete your account</li>
         <li><strong>Wardrobe Items:</strong> Retained until you delete them or your account</li>
         <li><strong>Scan History:</strong> Retained until you delete individual checks or your account</li>
+        <li><strong>Subscription Data:</strong> Retained for the duration of your subscription plus any legally required period for financial records</li>
+        <li><strong>Usage Counts:</strong> Retained to track lifetime usage against free tier limits</li>
         <li><strong>Analytics Data:</strong> Retained in aggregated, anonymized form</li>
     </ul>
-    <p>When you delete your account, we will delete or anonymize your personal data within 30 days, except where retention is required by law.</p>
+    <p>When you delete your account, we will delete or anonymize your personal data within 30 days, except where retention is required by law or for legitimate business purposes (such as maintaining financial records).</p>
 
     <h2>8. Your Rights and Choices</h2>
     <p>Depending on your location, you may have the following rights:</p>
@@ -250,13 +286,20 @@
     <p>To exercise these rights, contact us at the email below or use the account settings in the App.</p>
 
     <h3>8.1 Account Deletion</h3>
-    <p>You can delete your account at any time through the App's settings (Account > Delete Account). This will permanently remove your account, wardrobe items, preferences, saved looks, and scan history.</p>
+    <p>You can delete your account at any time through the App's settings (Account > Delete Account). This will permanently remove your account, wardrobe items, preferences, saved looks, scan history, and usage data. Note that deleting your account does not automatically cancel any active subscription – you must cancel your subscription separately through the App Store or Play Store.</p>
+
+    <h3>8.2 Subscription Management</h3>
+    <p>You can manage your subscription preferences through:</p>
+    <ul>
+        <li><strong>iOS:</strong> Settings > [Your Name] > Subscriptions</li>
+        <li><strong>Android:</strong> Google Play Store > Menu > Subscriptions</li>
+    </ul>
 
     <h2>9. Children's Privacy</h2>
     <p>Scan & Match is not intended for children under 13. We do not knowingly collect personal information from children under 13. If we discover that a child under 13 has provided us with personal information, we will delete it promptly. If you believe a child has provided us with personal data, please contact us.</p>
 
     <h2>10. International Data Transfers</h2>
-    <p>Your information may be transferred to and processed in countries other than your own. We ensure appropriate safeguards are in place for such transfers, including standard contractual clauses where applicable.</p>
+    <p>Your information may be transferred to and processed in countries other than your own, including the United States where our service providers (Supabase, OpenAI, RevenueCat) operate. We ensure appropriate safeguards are in place for such transfers, including standard contractual clauses where applicable.</p>
 
     <h2>11. California Privacy Rights</h2>
     <p>If you are a California resident, you have additional rights under the California Consumer Privacy Act (CCPA):</p>
@@ -276,7 +319,7 @@
         <li>Right to withdraw consent at any time</li>
         <li>Right to lodge a complaint with a supervisory authority</li>
     </ul>
-    <p>Our legal basis for processing includes: consent, contract performance, and legitimate interests in providing and improving our services.</p>
+    <p>Our legal basis for processing includes: consent, contract performance (including subscription services), and legitimate interests in providing and improving our services.</p>
 
     <h2>13. Changes to This Privacy Policy</h2>
     <p>We may update this Privacy Policy from time to time. We will notify you of significant changes by posting the new policy in the App and updating the "Last Updated" date. Your continued use of the App after changes become effective constitutes acceptance of the revised policy.</p>
@@ -284,8 +327,8 @@
     <h2>14. Contact Us</h2>
     <div class="contact-box">
         <p>If you have questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us:</p>
-        <p><strong>Email:</strong> <a href="mailto:privacy@fitmatch.app">privacy@fitmatch.app</a></p>
-        <p><strong>General Support:</strong> <a href="mailto:support@fitmatch.app">support@fitmatch.app</a></p>
+        <p><strong>Email:</strong> <a href="mailto:privacy@snaptomatch.app">privacy@snaptomatch.app</a></p>
+        <p><strong>General Support:</strong> <a href="mailto:support@snaptomatch.app">support@snaptomatch.app</a></p>
     </div>
 </body>
 </html>
