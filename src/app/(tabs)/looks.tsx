@@ -318,7 +318,7 @@ function SuccessToast({
       exiting={FadeOut.duration(200)}
       style={{
         position: "absolute",
-        bottom: 100,
+        bottom: 140,
         left: 24,
         right: 24,
         zIndex: 1000,
