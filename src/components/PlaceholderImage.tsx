@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, StyleSheet, ViewStyle } from "react-native";
 import { Image, ImageStyle } from "expo-image";
 import { ImageOff } from "lucide-react-native";
@@ -179,6 +179,11 @@ export function ImageWithFallback({
 }) {
   const [hasError, setHasError] = useState(false);
 
+  // Reset error state when URI changes (e.g., from local to cloud URL after upload)
+  useEffect(() => {
+    setHasError(false);
+  }, [uri]);
+
   if (!uri || hasError) {
     return <GridPlaceholderImage />;
   }
@@ -208,6 +213,11 @@ export function ThumbnailWithFallback({
   style?: ViewStyle;
 }) {
   const [hasError, setHasError] = useState(false);
+
+  // Reset error state when URI changes (e.g., from local to cloud URL after upload)
+  useEffect(() => {
+    setHasError(false);
+  }, [uri]);
 
   if (!uri || hasError) {
     return (
