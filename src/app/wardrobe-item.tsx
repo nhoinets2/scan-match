@@ -329,14 +329,18 @@ export default function WardrobeItemScreen() {
 
   // Confirm delete action
   const handleConfirmDelete = async () => {
-    if (!item || isDeleting) return;
+    // Use displayItem to support retry after error (when item might still be null from optimistic update)
+    const itemToDelete = item ?? deletingItem;
+    if (!itemToDelete || isDeleting) return;
     
-    // Store item data before delete so we can keep showing modal
-    setDeletingItem(item);
+    // Store item data before delete so we can keep showing content
+    if (!deletingItem) {
+      setDeletingItem(itemToDelete);
+    }
     setIsDeleting(true);
     
     try {
-      await removeWardrobeItemMutation.mutateAsync({ id: item.id, imageUri: item.imageUri });
+      await removeWardrobeItemMutation.mutateAsync({ id: itemToDelete.id, imageUri: itemToDelete.imageUri });
       
       // Success - haptic and navigate
       setShowDeleteConfirmation(false);
@@ -352,7 +356,7 @@ export default function WardrobeItemScreen() {
       console.error('[Delete] Failed to delete wardrobe item:', error);
       setIsDeleting(false);
       setShowDeleteConfirmation(false);
-      setDeletingItem(null);
+      // Don't clear deletingItem here - we need it for displayItem while error modal is shown
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       
       // Check if it's a network error
@@ -429,74 +433,11 @@ export default function WardrobeItemScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  // Use stored item data for delete modal when item is removed from cache
-  const itemForDeleteModal = item || deletingItem;
+  // Use stored item data when item is removed from cache during deletion
+  const displayItem = item ?? deletingItem;
   
-  // If deleting and item was removed from cache, show loading modal directly
-  if (!item && isDeleting) {
-    return (
-      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" }}>
-        <View
-          style={{
-            backgroundColor: colors.bg.primary,
-            borderRadius: borderRadius.card,
-            padding: spacing.lg,
-            marginHorizontal: spacing.lg,
-            maxWidth: 320,
-            alignItems: "center",
-          }}
-        >
-          {/* Title */}
-          <Text
-            style={{
-              ...typography._internal.h3,
-              color: colors.text.primary,
-              textAlign: "center",
-              marginBottom: spacing.sm,
-            }}
-          >
-            Remove {itemForDeleteModal?.detectedLabel ? capitalizeFirst(itemForDeleteModal.detectedLabel) : "item"}?
-          </Text>
-
-          {/* Body */}
-          <Text
-            style={{
-              ...typography.ui.body,
-              color: colors.text.secondary,
-              textAlign: "center",
-              marginBottom: spacing.xl,
-            }}
-          >
-            This may affect existing scans and outfit suggestions.
-          </Text>
-
-          {/* Loading button */}
-          <View style={{ gap: spacing.sm, width: "100%" }}>
-            <Pressable
-              disabled
-              style={{
-                backgroundColor: colors.state.destructive,
-                borderRadius: borderRadius.pill,
-                height: 52,
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: 0.7,
-              }}
-            >
-              <ActivityIndicator color={colors.text.inverse} />
-            </Pressable>
-
-            <ButtonSecondary
-              label="Cancel"
-              disabled
-            />
-          </View>
-        </View>
-      </View>
-    );
-  }
-  
-  if (!item) {
+  // Only show "Item not found" if we truly have no item data at all
+  if (!displayItem) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg.primary, alignItems: "center", justifyContent: "center" }}>
         <Text
@@ -602,8 +543,8 @@ export default function WardrobeItemScreen() {
     );
   }
 
-  const categoryLabel = item ? getCategoryLabel(item.category) : "";
-  const displayStyleTags = isEditMode ? editStyleTags : (item?.userStyleTags ?? []);
+  const categoryLabel = displayItem ? getCategoryLabel(displayItem.category) : "";
+  const displayStyleTags = isEditMode ? editStyleTags : (displayItem?.userStyleTags ?? []);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
@@ -652,8 +593,8 @@ export default function WardrobeItemScreen() {
                 >
                   {isEditMode 
                     ? "Edit details" 
-                    : item?.detectedLabel 
-                      ? capitalizeFirst(item.detectedLabel)
+                    : displayItem?.detectedLabel 
+                      ? capitalizeFirst(displayItem.detectedLabel)
                       : "Wardrobe item"}
                 </Text>
               </View>
@@ -718,16 +659,16 @@ export default function WardrobeItemScreen() {
                 }}
               >
                 {/* Thumbnail - tappable to open photo viewer */}
-                {item.imageUri && !imageError ? (
+                {displayItem.imageUri && !imageError ? (
                   <Pressable
                     onPress={(e) => {
                       e.stopPropagation();
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setPhotoViewerUri(item.imageUri);
+                      setPhotoViewerUri(displayItem.imageUri);
                     }}
                   >
                     <Image
-                      source={{ uri: item.imageUri }}
+                      source={{ uri: displayItem.imageUri }}
                       style={{ width: spacing.xxl + spacing.md - 4, height: spacing.xxl + spacing.md - 4, borderRadius: borderRadius.image }}
                       contentFit="cover"
                       onError={() => setImageError(true)}
@@ -744,11 +685,11 @@ export default function WardrobeItemScreen() {
                       color: colors.text.primary,
                     }}
                   >
-                    {capitalizeFirst(item.detectedLabel || categoryLabel)}
+                    {capitalizeFirst(displayItem.detectedLabel || categoryLabel)}
                   </Text>
                 </View>
                 {/* Chevron */}
-                {item.styleNotes && item.styleNotes.length > 0 && (
+                {displayItem.styleNotes && displayItem.styleNotes.length > 0 && (
                   <ChevronDown
                     size={20}
                     color={colors.text.secondary}
@@ -759,7 +700,7 @@ export default function WardrobeItemScreen() {
                 )}
               </View>
               {/* Expanded description */}
-              {isSummaryExpanded && item.styleNotes && item.styleNotes.length > 0 && (
+              {isSummaryExpanded && displayItem.styleNotes && displayItem.styleNotes.length > 0 && (
                 <Animated.View
                   entering={FadeIn.duration(200)}
                   exiting={FadeOut.duration(200)}
@@ -778,7 +719,7 @@ export default function WardrobeItemScreen() {
                       color: colors.text.secondary,
                     }}
                   >
-                    {capitalizeItems(item.styleNotes).join(" · ")}
+                    {capitalizeItems(displayItem.styleNotes).join(" · ")}
                   </Text>
                 </Animated.View>
               )}
@@ -919,7 +860,7 @@ export default function WardrobeItemScreen() {
             )}
 
               {/* Brand - plain text (hidden if empty) */}
-              {item.brand && (
+              {displayItem.brand && (
                 <View style={{ marginBottom: spacing.md + spacing.xs }}>
                   <Text
                     style={{
@@ -933,7 +874,7 @@ export default function WardrobeItemScreen() {
                   <Text
                     style={getTextStyle("body", colors.text.primary)}
                   >
-                    {item.brand}
+                    {displayItem.brand}
                   </Text>
                 </View>
               )}
@@ -1306,7 +1247,7 @@ export default function WardrobeItemScreen() {
                 marginBottom: spacing.sm,
               }}
             >
-              Remove {itemForDeleteModal?.detectedLabel ? capitalizeFirst(itemForDeleteModal.detectedLabel) : "item"}?
+              Remove {displayItem?.detectedLabel ? capitalizeFirst(displayItem.detectedLabel) : "item"}?
             </Text>
 
             {/* Body */}
@@ -1366,11 +1307,17 @@ export default function WardrobeItemScreen() {
         visible={deleteError !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setDeleteError(null)}
+        onRequestClose={() => {
+          setDeleteError(null);
+          setDeletingItem(null);
+        }}
       >
         <Pressable 
           style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
-          onPress={() => setDeleteError(null)}
+          onPress={() => {
+            setDeleteError(null);
+            setDeletingItem(null);
+          }}
         >
           <Pressable 
             onPress={(e) => e.stopPropagation()}
@@ -1431,17 +1378,24 @@ export default function WardrobeItemScreen() {
                 : 'Please try again in a moment.'}
             </Text>
 
-            {/* Primary Button */}
+            {/* Primary Button - retry delete */}
             <ButtonPrimary
               label="Try again"
-              onPress={() => setDeleteError(null)}
+              onPress={() => {
+                setDeleteError(null);
+                setShowDeleteConfirmation(true);
+              }}
               style={{ width: "100%" }}
             />
 
-            {/* Secondary Button */}
+            {/* Secondary Button - go back */}
             <ButtonTertiary
               label="Close"
-              onPress={() => setDeleteError(null)}
+              onPress={() => {
+                setDeleteError(null);
+                setDeletingItem(null);
+                handleClose();
+              }}
               style={{ marginTop: spacing.sm }}
             />
           </Pressable>
