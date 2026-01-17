@@ -632,19 +632,38 @@ async function cleanupItemStorage(
   
   // 2) Delete local file if it's local
   if (imageUri?.startsWith('file://')) {
+    // Decode URI in case of URL-encoded path traversal attempts
+    let decodedUri: string;
+    try {
+      decodedUri = decodeURIComponent(imageUri);
+    } catch {
+      decodedUri = imageUri; // If decode fails, use original
+    }
+    
     // Sanitize URI - reject if it contains path traversal or invalid characters
-    // Multiple checks for safety:
+    // Multiple paranoid checks for safety:
     const hasPathTraversal = 
-      imageUri.includes('..') || 
-      imageUri.includes('/./') ||
-      imageUri.endsWith('/') ||
-      imageUri.endsWith('.');
+      decodedUri.includes('..') || 
+      decodedUri.includes('/./') ||
+      decodedUri.endsWith('/') ||
+      decodedUri.endsWith('.') ||
+      imageUri.includes('..') ||  // Also check original in case decode changed it
+      imageUri.includes('%2e%2e') || // URL-encoded ..
+      imageUri.includes('%2E%2E');   // URL-encoded .. (uppercase)
     
     // Must end with a valid image extension (not followed by anything)
     const isValidFileUri = /^file:\/\/[^?#]+\.(jpg|jpeg|png|gif|webp|heic)$/i.test(imageUri);
     
     // Additional check: path should not contain suspicious patterns after extension
-    const hasPostExtensionContent = /\.(jpg|jpeg|png|gif|webp|heic)[^a-z]/i.test(imageUri);
+    const hasPostExtensionContent = /\.(jpg|jpeg|png|gif|webp|heic).+/i.test(imageUri);
+    
+    // Extra safety: check the path portion only (after file://)
+    const pathPortion = imageUri.slice(7); // Remove "file://"
+    const hasWeirdPath = 
+      pathPortion.includes('//') ||  // Double slashes
+      pathPortion.includes('\0') ||  // Null bytes
+      pathPortion.includes('\n') ||  // Newlines
+      !pathPortion.match(/^\/[a-zA-Z0-9_\-\/.]+\.(jpg|jpeg|png|gif|webp|heic)$/i);
 
     if (hasPathTraversal) {
       console.warn('[Storage] Skipping delete - URI contains path traversal:', imageUri);
@@ -652,6 +671,8 @@ async function cleanupItemStorage(
       console.warn('[Storage] Skipping delete - Invalid file URI format:', imageUri);
     } else if (hasPostExtensionContent) {
       console.warn('[Storage] Skipping delete - Content after extension:', imageUri);
+    } else if (hasWeirdPath) {
+      console.warn('[Storage] Skipping delete - Suspicious path pattern:', imageUri);
     } else {
       try {
         await FileSystem.deleteAsync(imageUri, { idempotent: true });
