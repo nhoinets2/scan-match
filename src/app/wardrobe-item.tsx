@@ -9,6 +9,7 @@ import {
   Platform,
   Modal,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Image } from "expo-image";
 import { BlurView } from "expo-blur";
@@ -226,6 +227,9 @@ export default function WardrobeItemScreen() {
   const [photoViewerUri, setPhotoViewerUri] = useState<string | null>(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [deleteError, setDeleteError] = useState<'network' | 'other' | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  // Store item data when delete starts so we can show modal even after optimistic removal
+  const [deletingItem, setDeletingItem] = useState<WardrobeItem | null>(null);
 
   // Track if changes were made
   const hasChanges = useMemo(() => {
@@ -325,14 +329,19 @@ export default function WardrobeItemScreen() {
 
   // Confirm delete action
   const handleConfirmDelete = async () => {
-    if (!item) return;
+    if (!item || isDeleting) return;
     
-    setShowDeleteConfirmation(false);
+    // Store item data before delete so we can keep showing modal
+    setDeletingItem(item);
+    setIsDeleting(true);
     
     try {
       await removeWardrobeItemMutation.mutateAsync({ id: item.id, imageUri: item.imageUri });
       
       // Success - haptic and navigate
+      setShowDeleteConfirmation(false);
+      setIsDeleting(false);
+      setDeletingItem(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       if (router.canGoBack()) {
         router.back();
@@ -341,6 +350,9 @@ export default function WardrobeItemScreen() {
       }
     } catch (error) {
       console.error('[Delete] Failed to delete wardrobe item:', error);
+      setIsDeleting(false);
+      setShowDeleteConfirmation(false);
+      setDeletingItem(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       
       // Check if it's a network error
@@ -417,6 +429,73 @@ export default function WardrobeItemScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
+  // Use stored item data for delete modal when item is removed from cache
+  const itemForDeleteModal = item || deletingItem;
+  
+  // If deleting and item was removed from cache, show loading modal directly
+  if (!item && isDeleting) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" }}>
+        <View
+          style={{
+            backgroundColor: colors.bg.primary,
+            borderRadius: borderRadius.card,
+            padding: spacing.lg,
+            marginHorizontal: spacing.lg,
+            maxWidth: 320,
+            alignItems: "center",
+          }}
+        >
+          {/* Title */}
+          <Text
+            style={{
+              ...typography._internal.h3,
+              color: colors.text.primary,
+              textAlign: "center",
+              marginBottom: spacing.sm,
+            }}
+          >
+            Remove {itemForDeleteModal?.detectedLabel ? capitalizeFirst(itemForDeleteModal.detectedLabel) : "item"}?
+          </Text>
+
+          {/* Body */}
+          <Text
+            style={{
+              ...typography.ui.body,
+              color: colors.text.secondary,
+              textAlign: "center",
+              marginBottom: spacing.xl,
+            }}
+          >
+            This may affect existing scans and outfit suggestions.
+          </Text>
+
+          {/* Loading button */}
+          <View style={{ gap: spacing.sm, width: "100%" }}>
+            <Pressable
+              disabled
+              style={{
+                backgroundColor: colors.state.destructive,
+                borderRadius: borderRadius.pill,
+                height: 52,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: 0.7,
+              }}
+            >
+              <ActivityIndicator color={colors.text.inverse} />
+            </Pressable>
+
+            <ButtonSecondary
+              label="Cancel"
+              disabled
+            />
+          </View>
+        </View>
+      </View>
+    );
+  }
+  
   if (!item) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg.primary, alignItems: "center", justifyContent: "center" }}>
@@ -430,12 +509,101 @@ export default function WardrobeItemScreen() {
           onPress={handleClose}
           style={{ marginTop: spacing.md }}
         />
+        
+        {/* Delete error modal - show even when item is null */}
+        <Modal
+          visible={deleteError !== null}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            setDeleteError(null);
+            handleClose();
+          }}
+        >
+          <Pressable 
+            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+            onPress={() => {
+              setDeleteError(null);
+              handleClose();
+            }}
+          >
+            <Pressable 
+              onPress={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: colors.bg.primary,
+                borderRadius: 24,
+                padding: spacing.xl,
+                marginHorizontal: spacing.lg,
+                alignItems: "center",
+                maxWidth: 320,
+              }}
+            >
+              {/* Icon */}
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  backgroundColor: colors.verdict.okay.bg,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: spacing.md,
+                }}
+              >
+                {deleteError === 'network' ? (
+                  <WifiOff size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+                ) : (
+                  <AlertCircle size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+                )}
+              </View>
+
+              {/* Title */}
+              <Text
+                style={{
+                  fontFamily: "PlayfairDisplay_600SemiBold",
+                  fontSize: typography.sizes.h3,
+                  color: colors.text.primary,
+                  textAlign: "center",
+                  marginBottom: spacing.xs,
+                }}
+              >
+                {deleteError === 'network' ? 'Connection unavailable' : "Couldn't remove item"}
+              </Text>
+
+              {/* Subtitle */}
+              <Text
+                style={{
+                  fontFamily: "Inter_400Regular",
+                  fontSize: typography.sizes.body,
+                  color: colors.text.secondary,
+                  textAlign: "center",
+                  marginBottom: spacing.lg,
+                  lineHeight: 22,
+                }}
+              >
+                {deleteError === 'network' 
+                  ? 'Please check your internet and try again.' 
+                  : 'Please try again in a moment.'}
+              </Text>
+
+              {/* Button - just Close since we can't retry without item */}
+              <ButtonPrimary
+                label="Close"
+                onPress={() => {
+                  setDeleteError(null);
+                  handleClose();
+                }}
+                style={{ width: "100%" }}
+              />
+            </Pressable>
+          </Pressable>
+        </Modal>
       </View>
     );
   }
 
-  const categoryLabel = getCategoryLabel(item.category);
-  const displayStyleTags = isEditMode ? editStyleTags : (item.userStyleTags ?? []);
+  const categoryLabel = item ? getCategoryLabel(item.category) : "";
+  const displayStyleTags = isEditMode ? editStyleTags : (item?.userStyleTags ?? []);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
@@ -1101,12 +1269,12 @@ export default function WardrobeItemScreen() {
         onClose={() => setPhotoViewerUri(null)}
       />
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal - keep visible during delete operation */}
       <Modal
-        visible={showDeleteConfirmation}
+        visible={showDeleteConfirmation || isDeleting}
         transparent
         animationType="fade"
-        onRequestClose={handleCancelDelete}
+        onRequestClose={isDeleting ? undefined : handleCancelDelete}
       >
         <Pressable
           onPress={handleCancelDelete}
@@ -1138,7 +1306,7 @@ export default function WardrobeItemScreen() {
                 marginBottom: spacing.sm,
               }}
             >
-              Remove {item?.detectedLabel ? capitalizeFirst(item.detectedLabel) : "item"}?
+              Remove {itemForDeleteModal?.detectedLabel ? capitalizeFirst(itemForDeleteModal.detectedLabel) : "item"}?
             </Text>
 
             {/* Body */}
@@ -1158,28 +1326,35 @@ export default function WardrobeItemScreen() {
               {/* Primary destructive */}
               <Pressable
                 onPress={handleConfirmDelete}
+                disabled={isDeleting}
                 style={{
                   backgroundColor: colors.state.destructive,
                   borderRadius: borderRadius.pill,
                   height: 52,
                   alignItems: "center",
                   justifyContent: "center",
+                  opacity: isDeleting ? 0.7 : 1,
                 }}
               >
-                <Text
-                  style={{
-                    ...typography.button.primary,
-                    color: colors.text.inverse,
-                  }}
-                >
-                  Remove
-                </Text>
+                {isDeleting ? (
+                  <ActivityIndicator color={colors.text.inverse} />
+                ) : (
+                  <Text
+                    style={{
+                      ...typography.button.primary,
+                      color: colors.text.inverse,
+                    }}
+                  >
+                    Remove
+                  </Text>
+                )}
               </Pressable>
 
               {/* Secondary cancel */}
               <ButtonSecondary
                 label="Cancel"
                 onPress={handleCancelDelete}
+                disabled={isDeleting}
               />
             </View>
           </Pressable>

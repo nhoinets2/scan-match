@@ -214,6 +214,17 @@ export const useRemoveWardrobeItem = () => {
 
   return useMutation({
     mutationFn: async ({ id, imageUri }: { id: string; imageUri?: string }) => {
+      // ============================================
+      // DEV: SIMULATE NETWORK ERROR FOR TESTING
+      // ============================================
+      const SIMULATE_NETWORK_ERROR = true;
+      if (SIMULATE_NETWORK_ERROR) {
+        console.log("[DEV] Simulating network error during wardrobe item delete...");
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        throw new Error("Network request failed");
+      }
+      // ============================================
+
       if (!user?.id) throw new Error("Not authenticated");
 
       // 1) Clean up storage (cancel pending uploads, delete local file)
@@ -508,6 +519,17 @@ export const useRemoveRecentCheck = () => {
 
   return useMutation({
     mutationFn: async ({ id, imageUri }: { id: string; imageUri?: string }) => {
+      // ============================================
+      // DEV: SIMULATE NETWORK ERROR FOR TESTING
+      // ============================================
+      const SIMULATE_NETWORK_ERROR = true;
+      if (SIMULATE_NETWORK_ERROR) {
+        console.log("[DEV] Simulating network error during scan delete...");
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        throw new Error("Network request failed");
+      }
+      // ============================================
+
       if (!user?.id) throw new Error("Not authenticated");
 
       // 1) Clean up storage (cancel pending uploads, delete local file)
