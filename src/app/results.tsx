@@ -1606,6 +1606,7 @@ function ResultsSuccess({
   const [showFavoriteStoresModal, setShowFavoriteStoresModal] = useState(false);
   const [showStoreSavedToast, setShowStoreSavedToast] = useState(false);
   const [showScanSavedToast, setShowScanSavedToast] = useState(false);
+  const [showScanUnsavedToast, setShowScanUnsavedToast] = useState(false);
   const [saveError, setSaveError] = useState<'network' | 'other' | null>(null);
   const { data: storePreference } = useStorePreference();
   const updateStorePreference = useUpdateStorePreference();
@@ -2510,6 +2511,10 @@ function ResultsSuccess({
         updateRecentCheckOutcomeMutation.mutate(
           { id: idToUnsave, outcome: originalOutcome }
         );
+        
+        // Show unsaved toast
+        setShowScanUnsavedToast(true);
+        setTimeout(() => setShowScanUnsavedToast(false), 2000);
       }
     } else {
       // Save - optimistic visual feedback only (bookmark filled)
@@ -4559,6 +4564,35 @@ width: spacing.xs / 2,
             }}
           >
             Scan saved
+          </Text>
+        </Animated.View>
+      )}
+
+      {/* Scan unsaved toast */}
+      {showScanUnsavedToast && (
+        <Animated.View
+          entering={FadeInUp.duration(300)}
+          exiting={FadeOut.duration(200)}
+          style={{
+            position: "absolute",
+            bottom: insets.bottom + 100,
+            left: 24,
+            right: 24,
+            backgroundColor: button.primary.backgroundColor,
+            borderRadius: borderRadius.image,
+            paddingVertical: 14,
+            paddingHorizontal: 20,
+            alignItems: "center",
+            zIndex: 1000,
+          }}
+        >
+          <Text
+            style={{
+              ...typography.ui.bodyMedium,
+              color: colors.text.inverse,
+            }}
+          >
+            Not saved
           </Text>
         </Animated.View>
       )}
