@@ -519,15 +519,21 @@ export default function WardrobeScreen() {
   const [itemToDelete, setItemToDelete] = useState<WardrobeItem | null>(null);
   const [isInitialRender, setIsInitialRender] = useState(true);
   const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("Removed from Wardrobe");
   const [deleteError, setDeleteError] = useState<'network' | 'other' | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Check for deletion flag when screen gains focus (from wardrobe-item deletion)
+  // Check for add/delete flags when screen gains focus
   useFocusEffect(
     useCallback(() => {
       if (globalThis.__wardrobeItemDeleted) {
+        setToastMessage("Removed from Wardrobe");
         setShowToast(true);
         globalThis.__wardrobeItemDeleted = false;
+      } else if (globalThis.__wardrobeItemAdded) {
+        setToastMessage("Added to Wardrobe");
+        setShowToast(true);
+        globalThis.__wardrobeItemAdded = false;
       }
     }, [])
   );
@@ -727,6 +733,7 @@ export default function WardrobeScreen() {
       setItemToDelete(null);
       setIsDeleting(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setToastMessage("Removed from Wardrobe");
       setShowToast(true);
     } catch (error) {
       console.error('[Delete] Failed to delete wardrobe item:', error);
@@ -935,7 +942,7 @@ export default function WardrobeScreen() {
       {/* Success Toast */}
       <SuccessToast
         visible={showToast}
-        message="Removed from Wardrobe"
+        message={toastMessage}
       />
 
       {/* Delete error modal */}

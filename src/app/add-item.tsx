@@ -1082,6 +1082,9 @@ export default function AddItemScreen() {
       console.log("[Storage] Queuing background upload for:", savedItem.id);
       void queueBackgroundUpload(savedItem.id, localImageUri, user.id);
 
+      // Set global flag for wardrobe page to show "Added to Wardrobe" toast
+      globalThis.__wardrobeItemAdded = true;
+
       // Navigate back to previous screen (wardrobe tab if came from there)
       // Using back() instead of replace() to avoid duplicate screens in stack
       if (router.canGoBack()) {
