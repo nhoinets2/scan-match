@@ -7,6 +7,7 @@ import {
   Dimensions,
   Modal,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -401,7 +402,7 @@ export default function SavedChecksScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { data: recentChecks = [] } = useRecentChecks();
+  const { data: recentChecks = [], refetch, isFetching } = useRecentChecks();
   const removeRecentCheckMutation = useRemoveRecentCheck();
   const [itemToDelete, setItemToDelete] = useState<RecentCheck | null>(null);
   const [showToast, setShowToast] = useState(false);
@@ -409,6 +410,16 @@ export default function SavedChecksScreen() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
   const hasSweepedRef = useRef(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Pull-to-refresh handler
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    console.log('[Saved] Pull-to-refresh triggered');
+    await refetch();
+    setIsRefreshing(false);
+    console.log('[Saved] Refresh complete');
+  }, [refetch]);
 
   // Auto-hide toast after 2 seconds
   useEffect(() => {
@@ -656,6 +667,13 @@ export default function SavedChecksScreen() {
             paddingTop: spacing.lg,
             paddingBottom: 100,
           }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing || isFetching}
+              onRefresh={onRefresh}
+              tintColor={colors.text.secondary}
+            />
+          }
         >
           {/* 2-column grid */}
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>

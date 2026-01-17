@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { View, Text, ScrollView, Pressable, Dimensions, Modal, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, Pressable, Dimensions, Modal, ActivityIndicator, RefreshControl } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -864,8 +864,18 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const wardrobeCount = useWardrobeCount();
-  const { data: wardrobe = [] } = useWardrobe();
-  const { data: recentChecks = [] } = useRecentChecks();
+  const { data: wardrobe = [], refetch: refetchWardrobe, isFetching: isFetchingWardrobe } = useWardrobe();
+  const { data: recentChecks = [], refetch: refetchRecentChecks, isFetching: isFetchingRecentChecks } = useRecentChecks();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Pull-to-refresh handler
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    console.log('[Home] Pull-to-refresh triggered');
+    await Promise.all([refetchWardrobe(), refetchRecentChecks()]);
+    setIsRefreshing(false);
+    console.log('[Home] Refresh complete');
+  }, [refetchWardrobe, refetchRecentChecks]);
   
   // TEMPORARY: Debug snapshot modal state
   const [showDebugSnapshot, setShowDebugSnapshot] = useState(false);
@@ -1023,6 +1033,13 @@ export default function HomeScreen() {
           flexGrow: shouldCenterContent ? 1 : undefined,
           justifyContent: shouldCenterContent ? "center" : undefined,
         }}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing || isFetchingWardrobe || isFetchingRecentChecks}
+            onRefresh={onRefresh}
+            tintColor={colors.text.secondary}
+          />
+        }
       >
         {/* Header */}
         <View style={{ paddingHorizontal: 24, paddingTop: shouldCenterContent ? insets.top + 16 : insets.top + 16 }}>

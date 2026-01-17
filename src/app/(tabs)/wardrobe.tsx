@@ -7,6 +7,7 @@ import {
   Dimensions,
   Modal,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -513,7 +514,7 @@ export default function WardrobeScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { data: wardrobe = [] } = useWardrobe();
+  const { data: wardrobe = [], refetch, isFetching } = useWardrobe();
   const removeWardrobeItemMutation = useRemoveWardrobeItem();
   const [selectedFilters, setSelectedFilters] = useState<(Category | "all")[]>(["all"]); // multi-select filter state
   const [itemToDelete, setItemToDelete] = useState<WardrobeItem | null>(null);
@@ -522,6 +523,16 @@ export default function WardrobeScreen() {
   const [toastMessage, setToastMessage] = useState("Removed from Wardrobe");
   const [deleteError, setDeleteError] = useState<'network' | 'other' | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Pull-to-refresh handler
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    console.log('[Wardrobe] Pull-to-refresh triggered');
+    await refetch();
+    setIsRefreshing(false);
+    console.log('[Wardrobe] Refresh complete');
+  }, [refetch]);
 
   // Check for add/delete flags when screen gains focus
   useFocusEffect(
@@ -900,6 +911,13 @@ export default function WardrobeScreen() {
                 paddingTop: spacing.sm,
                 paddingBottom: 100,
               }}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing || isFetching}
+                  onRefresh={onRefresh}
+                  tintColor={colors.text.secondary}
+                />
+              }
             >
               {/* 2-column grid */}
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
