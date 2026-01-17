@@ -11,7 +11,7 @@ import {
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Animated, {
@@ -513,6 +513,7 @@ export default function WardrobeScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const params = useLocalSearchParams<{ deleted?: string }>();
   const { data: wardrobe = [] } = useWardrobe();
   const removeWardrobeItemMutation = useRemoveWardrobeItem();
   const [selectedFilters, setSelectedFilters] = useState<(Category | "all")[]>(["all"]); // multi-select filter state
@@ -521,6 +522,15 @@ export default function WardrobeScreen() {
   const [showToast, setShowToast] = useState(false);
   const [deleteError, setDeleteError] = useState<'network' | 'other' | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Show toast when navigated back from item deletion
+  useEffect(() => {
+    if (params.deleted === 'true') {
+      setShowToast(true);
+      // Clear the param to prevent showing toast on subsequent renders
+      router.setParams({ deleted: undefined });
+    }
+  }, [params.deleted]);
 
   // Auto-hide toast after 2 seconds
   useEffect(() => {
