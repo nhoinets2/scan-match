@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { View, Text, ScrollView, Pressable, Dimensions, Modal } from "react-native";
+import { View, Text, ScrollView, Pressable, Dimensions, Modal, ActivityIndicator } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -33,6 +33,8 @@ import {
   Puzzle,
   CloudUpload,
   RefreshCw,
+  WifiOff,
+  AlertCircle,
 } from "lucide-react-native";
 import { ImageWithFallback } from "@/components/PlaceholderImage";
 import Clipboard from "@react-native-clipboard/clipboard";
@@ -871,6 +873,8 @@ export default function HomeScreen() {
   const removeWardrobeItemMutation = useRemoveWardrobeItem();
   const [wardrobeItemToDelete, setWardrobeItemToDelete] = useState<WardrobeItem | null>(null);
   const [showWardrobeToast, setShowWardrobeToast] = useState(false);
+  const [wardrobeDeleteError, setWardrobeDeleteError] = useState<'network' | 'other' | null>(null);
+  const [isWardrobeDeleting, setIsWardrobeDeleting] = useState(false);
 
   // Auto-hide wardrobe toast after 2 seconds
   useEffect(() => {
@@ -887,14 +891,42 @@ export default function HomeScreen() {
     setWardrobeItemToDelete(item);
   };
 
-  const handleWardrobeConfirmDelete = () => {
-    if (!wardrobeItemToDelete) return;
-    removeWardrobeItemMutation.mutate({ id: wardrobeItemToDelete.id, imageUri: wardrobeItemToDelete.imageUri });
-    setWardrobeItemToDelete(null);
-    setShowWardrobeToast(true);
+  const handleWardrobeConfirmDelete = async () => {
+    if (!wardrobeItemToDelete || isWardrobeDeleting) return;
+    
+    setIsWardrobeDeleting(true);
+    
+    try {
+      await removeWardrobeItemMutation.mutateAsync({ id: wardrobeItemToDelete.id, imageUri: wardrobeItemToDelete.imageUri });
+      
+      // Success
+      setWardrobeItemToDelete(null);
+      setIsWardrobeDeleting(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowWardrobeToast(true);
+    } catch (error) {
+      console.error('[Delete] Failed to delete wardrobe item:', error);
+      setIsWardrobeDeleting(false);
+      // Keep wardrobeItemToDelete so "Try again" can work
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      
+      const errMessage = error instanceof Error ? error.message : String(error || "");
+      const isNetworkErr =
+        errMessage.includes("Network request failed") ||
+        errMessage.includes("The Internet connection appears to be offline") ||
+        errMessage.includes("The network connection was lost") ||
+        errMessage.includes("Unable to resolve host") ||
+        errMessage.includes("Failed to fetch") ||
+        errMessage.includes("fetch failed") ||
+        errMessage.includes("ENOTFOUND") ||
+        errMessage.includes("ECONNREFUSED");
+      
+      setWardrobeDeleteError(isNetworkErr ? 'network' : 'other');
+    }
   };
 
   const handleWardrobeCancelDelete = () => {
+    if (isWardrobeDeleting) return;
     setWardrobeItemToDelete(null);
   };
 
@@ -902,6 +934,8 @@ export default function HomeScreen() {
   const removeRecentCheckMutation = useRemoveRecentCheck();
   const [scanItemToDelete, setScanItemToDelete] = useState<RecentCheck | null>(null);
   const [showScanToast, setShowScanToast] = useState(false);
+  const [scanDeleteError, setScanDeleteError] = useState<'network' | 'other' | null>(null);
+  const [isScanDeleting, setIsScanDeleting] = useState(false);
 
   // Auto-hide scan toast after 2 seconds
   useEffect(() => {
@@ -918,14 +952,42 @@ export default function HomeScreen() {
     setScanItemToDelete(check);
   };
 
-  const handleScanConfirmDelete = () => {
-    if (!scanItemToDelete) return;
-    removeRecentCheckMutation.mutate({ id: scanItemToDelete.id, imageUri: scanItemToDelete.imageUri });
-    setScanItemToDelete(null);
-    setShowScanToast(true);
+  const handleScanConfirmDelete = async () => {
+    if (!scanItemToDelete || isScanDeleting) return;
+    
+    setIsScanDeleting(true);
+    
+    try {
+      await removeRecentCheckMutation.mutateAsync({ id: scanItemToDelete.id, imageUri: scanItemToDelete.imageUri });
+      
+      // Success
+      setScanItemToDelete(null);
+      setIsScanDeleting(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowScanToast(true);
+    } catch (error) {
+      console.error('[Delete] Failed to delete scan:', error);
+      setIsScanDeleting(false);
+      // Keep scanItemToDelete so "Try again" can work
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      
+      const errMessage = error instanceof Error ? error.message : String(error || "");
+      const isNetworkErr =
+        errMessage.includes("Network request failed") ||
+        errMessage.includes("The Internet connection appears to be offline") ||
+        errMessage.includes("The network connection was lost") ||
+        errMessage.includes("Unable to resolve host") ||
+        errMessage.includes("Failed to fetch") ||
+        errMessage.includes("fetch failed") ||
+        errMessage.includes("ENOTFOUND") ||
+        errMessage.includes("ECONNREFUSED");
+      
+      setScanDeleteError(isNetworkErr ? 'network' : 'other');
+    }
   };
 
   const handleScanCancelDelete = () => {
+    if (isScanDeleting) return;
     setScanItemToDelete(null);
   };
 
@@ -1203,15 +1265,15 @@ export default function HomeScreen() {
         }}
       />
 
-      {/* Wardrobe Item Delete Confirmation Modal */}
+      {/* Wardrobe Item Delete Confirmation Modal - hide when error modal is showing */}
       <Modal
-        visible={!!wardrobeItemToDelete}
+        visible={!!wardrobeItemToDelete && wardrobeDeleteError === null}
         transparent
         animationType="fade"
-        onRequestClose={handleWardrobeCancelDelete}
+        onRequestClose={isWardrobeDeleting ? undefined : handleWardrobeCancelDelete}
       >
         <Pressable
-          onPress={handleWardrobeCancelDelete}
+          onPress={isWardrobeDeleting ? undefined : handleWardrobeCancelDelete}
           style={{
             flex: 1,
             backgroundColor: colors.overlay.dark,
@@ -1259,31 +1321,35 @@ export default function HomeScreen() {
             <View style={{ gap: spacing.sm }}>
               {/* Primary destructive */}
               <Pressable
-                onPress={() => {
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                  handleWardrobeConfirmDelete();
-                }}
+                onPress={handleWardrobeConfirmDelete}
+                disabled={isWardrobeDeleting}
                 style={{
                   backgroundColor: colors.state.destructive,
                   borderRadius: borderRadius.pill,
                   height: 52,
                   alignItems: "center",
                   justifyContent: "center",
+                  opacity: isWardrobeDeleting ? 0.7 : 1,
                 }}
               >
-                <Text
-                  style={{
-                    ...typography.button.primary,
-                    color: colors.text.inverse,
-                  }}
-                >
-                  Remove
-                </Text>
+                {isWardrobeDeleting ? (
+                  <ActivityIndicator color={colors.text.inverse} />
+                ) : (
+                  <Text
+                    style={{
+                      ...typography.button.primary,
+                      color: colors.text.inverse,
+                    }}
+                  >
+                    Remove
+                  </Text>
+                )}
               </Pressable>
 
               {/* Secondary cancel */}
               <Pressable
                 onPress={handleWardrobeCancelDelete}
+                disabled={isWardrobeDeleting}
                 style={{
                   backgroundColor: colors.bg.secondary,
                   borderRadius: borderRadius.pill,
@@ -1292,6 +1358,7 @@ export default function HomeScreen() {
                   justifyContent: "center",
                   borderWidth: 1,
                   borderColor: colors.border.hairline,
+                  opacity: isWardrobeDeleting ? 0.5 : 1,
                 }}
               >
                 <Text
@@ -1304,6 +1371,115 @@ export default function HomeScreen() {
                 </Text>
               </Pressable>
             </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Wardrobe Delete Error Modal */}
+      <Modal
+        visible={wardrobeDeleteError !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setWardrobeDeleteError(null);
+          setWardrobeItemToDelete(null);
+        }}
+      >
+        <Pressable 
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+          onPress={() => {
+            setWardrobeDeleteError(null);
+            setWardrobeItemToDelete(null);
+          }}
+        >
+          <Pressable 
+            onPress={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: colors.bg.primary,
+              borderRadius: 24,
+              padding: spacing.xl,
+              marginHorizontal: spacing.lg,
+              alignItems: "center",
+              maxWidth: 320,
+            }}
+          >
+            {/* Icon */}
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: colors.verdict.okay.bg,
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: spacing.md,
+              }}
+            >
+              {wardrobeDeleteError === 'network' ? (
+                <WifiOff size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+              ) : (
+                <AlertCircle size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+              )}
+            </View>
+
+            {/* Title */}
+            <Text
+              style={{
+                fontFamily: "PlayfairDisplay_600SemiBold",
+                fontSize: typography.sizes.h3,
+                color: colors.text.primary,
+                textAlign: "center",
+                marginBottom: spacing.xs,
+              }}
+            >
+              {wardrobeDeleteError === 'network' ? 'Connection unavailable' : "Couldn't remove item"}
+            </Text>
+
+            {/* Subtitle */}
+            <Text
+              style={{
+                fontFamily: "Inter_400Regular",
+                fontSize: typography.sizes.body,
+                color: colors.text.secondary,
+                textAlign: "center",
+                marginBottom: spacing.lg,
+                lineHeight: 22,
+              }}
+            >
+              {wardrobeDeleteError === 'network' 
+                ? 'Please check your internet and try again.' 
+                : 'Please try again in a moment.'}
+            </Text>
+
+            {/* Primary Button - reopen confirmation modal */}
+            <Pressable
+              onPress={() => setWardrobeDeleteError(null)}
+              style={{
+                backgroundColor: button.primary.backgroundColor,
+                borderRadius: borderRadius.pill,
+                height: 52,
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+              }}
+            >
+              <Text style={{ ...typography.button.primary, color: colors.text.inverse }}>
+                Try again
+              </Text>
+            </Pressable>
+
+            {/* Secondary Button - close everything */}
+            <Pressable
+              onPress={() => {
+                setWardrobeDeleteError(null);
+                setWardrobeItemToDelete(null);
+              }}
+              style={{ marginTop: spacing.sm }}
+            >
+              <Text style={{ ...typography.button.tertiary, color: colors.text.secondary }}>
+                Close
+              </Text>
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
@@ -1345,15 +1521,15 @@ export default function HomeScreen() {
         </Animated.View>
       )}
 
-      {/* Scan Item Delete Confirmation Modal */}
+      {/* Scan Item Delete Confirmation Modal - hide when error modal is showing */}
       <Modal
-        visible={!!scanItemToDelete}
+        visible={!!scanItemToDelete && scanDeleteError === null}
         transparent
         animationType="fade"
-        onRequestClose={handleScanCancelDelete}
+        onRequestClose={isScanDeleting ? undefined : handleScanCancelDelete}
       >
         <Pressable
-          onPress={handleScanCancelDelete}
+          onPress={isScanDeleting ? undefined : handleScanCancelDelete}
           style={{
             flex: 1,
             backgroundColor: colors.overlay.dark,
@@ -1401,31 +1577,35 @@ export default function HomeScreen() {
             <View style={{ gap: spacing.sm }}>
               {/* Primary destructive */}
               <Pressable
-                onPress={() => {
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                  handleScanConfirmDelete();
-                }}
+                onPress={handleScanConfirmDelete}
+                disabled={isScanDeleting}
                 style={{
                   backgroundColor: colors.state.destructive,
                   borderRadius: borderRadius.pill,
                   height: 52,
                   alignItems: "center",
                   justifyContent: "center",
+                  opacity: isScanDeleting ? 0.7 : 1,
                 }}
               >
-                <Text
-                  style={{
-                    ...typography.button.primary,
-                    color: colors.text.inverse,
-                  }}
-                >
-                  Remove
-                </Text>
+                {isScanDeleting ? (
+                  <ActivityIndicator color={colors.text.inverse} />
+                ) : (
+                  <Text
+                    style={{
+                      ...typography.button.primary,
+                      color: colors.text.inverse,
+                    }}
+                  >
+                    Remove
+                  </Text>
+                )}
               </Pressable>
 
               {/* Secondary cancel */}
               <Pressable
                 onPress={handleScanCancelDelete}
+                disabled={isScanDeleting}
                 style={{
                   backgroundColor: colors.bg.secondary,
                   borderRadius: borderRadius.pill,
@@ -1434,6 +1614,7 @@ export default function HomeScreen() {
                   justifyContent: "center",
                   borderWidth: 1,
                   borderColor: colors.border.hairline,
+                  opacity: isScanDeleting ? 0.5 : 1,
                 }}
               >
                 <Text
@@ -1446,6 +1627,115 @@ export default function HomeScreen() {
                 </Text>
               </Pressable>
             </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Scan Delete Error Modal */}
+      <Modal
+        visible={scanDeleteError !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setScanDeleteError(null);
+          setScanItemToDelete(null);
+        }}
+      >
+        <Pressable 
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+          onPress={() => {
+            setScanDeleteError(null);
+            setScanItemToDelete(null);
+          }}
+        >
+          <Pressable 
+            onPress={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: colors.bg.primary,
+              borderRadius: 24,
+              padding: spacing.xl,
+              marginHorizontal: spacing.lg,
+              alignItems: "center",
+              maxWidth: 320,
+            }}
+          >
+            {/* Icon */}
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: colors.verdict.okay.bg,
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: spacing.md,
+              }}
+            >
+              {scanDeleteError === 'network' ? (
+                <WifiOff size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+              ) : (
+                <AlertCircle size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+              )}
+            </View>
+
+            {/* Title */}
+            <Text
+              style={{
+                fontFamily: "PlayfairDisplay_600SemiBold",
+                fontSize: typography.sizes.h3,
+                color: colors.text.primary,
+                textAlign: "center",
+                marginBottom: spacing.xs,
+              }}
+            >
+              {scanDeleteError === 'network' ? 'Connection unavailable' : "Couldn't remove scan"}
+            </Text>
+
+            {/* Subtitle */}
+            <Text
+              style={{
+                fontFamily: "Inter_400Regular",
+                fontSize: typography.sizes.body,
+                color: colors.text.secondary,
+                textAlign: "center",
+                marginBottom: spacing.lg,
+                lineHeight: 22,
+              }}
+            >
+              {scanDeleteError === 'network' 
+                ? 'Please check your internet and try again.' 
+                : 'Please try again in a moment.'}
+            </Text>
+
+            {/* Primary Button - reopen confirmation modal */}
+            <Pressable
+              onPress={() => setScanDeleteError(null)}
+              style={{
+                backgroundColor: button.primary.backgroundColor,
+                borderRadius: borderRadius.pill,
+                height: 52,
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+              }}
+            >
+              <Text style={{ ...typography.button.primary, color: colors.text.inverse }}>
+                Try again
+              </Text>
+            </Pressable>
+
+            {/* Secondary Button - close everything */}
+            <Pressable
+              onPress={() => {
+                setScanDeleteError(null);
+                setScanItemToDelete(null);
+              }}
+              style={{ marginTop: spacing.sm }}
+            >
+              <Text style={{ ...typography.button.tertiary, color: colors.text.secondary }}>
+                Close
+              </Text>
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>

@@ -214,17 +214,6 @@ export const useRemoveWardrobeItem = () => {
 
   return useMutation({
     mutationFn: async ({ id, imageUri }: { id: string; imageUri?: string }) => {
-      // ============================================
-      // DEV: SIMULATE NETWORK ERROR FOR TESTING
-      // ============================================
-      const SIMULATE_NETWORK_ERROR = true;
-      if (SIMULATE_NETWORK_ERROR) {
-        console.log("[DEV] Simulating network error during wardrobe item delete...");
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        throw new Error("Network request failed");
-      }
-      // ============================================
-
       if (!user?.id) throw new Error("Not authenticated");
 
       // 1) Clean up storage (cancel pending uploads, delete local file)
@@ -239,33 +228,10 @@ export const useRemoveWardrobeItem = () => {
 
       if (error) throw error;
     },
-    // Optimistic update: immediately remove from cache
-    onMutate: async ({ id }: { id: string; imageUri?: string }) => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ["wardrobe", user?.id] });
-
-      // Snapshot the previous value
-      const previousWardrobe = queryClient.getQueryData<WardrobeItem[]>(["wardrobe", user?.id]);
-
-      // Optimistically update to remove the item
-      if (previousWardrobe) {
-        queryClient.setQueryData<WardrobeItem[]>(
-          ["wardrobe", user?.id],
-          previousWardrobe.filter(item => item.id !== id)
-        );
-      }
-
-      // Return context with the snapshot
-      return { previousWardrobe };
-    },
-    // If mutation fails, rollback
-    onError: (err, { id }, context) => {
-      if (context?.previousWardrobe) {
-        queryClient.setQueryData(["wardrobe", user?.id], context.previousWardrobe);
-      }
-    },
-    // Always refetch after error or success
-    onSettled: () => {
+    // No optimistic update - item stays visible until delete succeeds
+    // This prevents jarring disappear/reappear on error
+    onSuccess: () => {
+      // Only update cache after successful deletion
       queryClient.invalidateQueries({ queryKey: ["wardrobe", user?.id] });
     },
   });
@@ -519,17 +485,6 @@ export const useRemoveRecentCheck = () => {
 
   return useMutation({
     mutationFn: async ({ id, imageUri }: { id: string; imageUri?: string }) => {
-      // ============================================
-      // DEV: SIMULATE NETWORK ERROR FOR TESTING
-      // ============================================
-      const SIMULATE_NETWORK_ERROR = true;
-      if (SIMULATE_NETWORK_ERROR) {
-        console.log("[DEV] Simulating network error during scan delete...");
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        throw new Error("Network request failed");
-      }
-      // ============================================
-
       if (!user?.id) throw new Error("Not authenticated");
 
       // 1) Clean up storage (cancel pending uploads, delete local file)
@@ -544,33 +499,10 @@ export const useRemoveRecentCheck = () => {
 
       if (error) throw error;
     },
-    // Optimistic update: immediately remove from cache
-    onMutate: async ({ id }) => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ["recentChecks", user?.id] });
-
-      // Snapshot the previous value
-      const previousChecks = queryClient.getQueryData<RecentCheck[]>(["recentChecks", user?.id]);
-
-      // Optimistically update to remove the item
-      if (previousChecks) {
-        queryClient.setQueryData<RecentCheck[]>(
-          ["recentChecks", user?.id],
-          previousChecks.filter(check => check.id !== id)
-        );
-      }
-
-      // Return context with the snapshot
-      return { previousChecks };
-    },
-    // If mutation fails, rollback
-    onError: (err, { id }, context) => {
-      if (context?.previousChecks) {
-        queryClient.setQueryData(["recentChecks", user?.id], context.previousChecks);
-      }
-    },
-    // Always refetch after error or success
-    onSettled: () => {
+    // No optimistic update - item stays visible until delete succeeds
+    // This prevents jarring disappear/reappear on error
+    onSuccess: () => {
+      // Only update cache after successful deletion
       queryClient.invalidateQueries({ queryKey: ["recentChecks", user?.id] });
     },
   });

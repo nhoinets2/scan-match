@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { View, Text, Pressable, Dimensions, ScrollView, Modal } from "react-native";
+import { View, Text, Pressable, Dimensions, ScrollView, Modal, ActivityIndicator } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -186,10 +186,12 @@ const CheckGridItem = React.memo(function CheckGridItem({
 // Delete Confirmation Modal
 function DeleteConfirmationModal({
   visible,
+  isDeleting,
   onConfirm,
   onCancel,
 }: {
   visible: boolean;
+  isDeleting: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -198,10 +200,10 @@ function DeleteConfirmationModal({
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onCancel}
+      onRequestClose={isDeleting ? undefined : onCancel}
     >
       <Pressable
-        onPress={onCancel}
+        onPress={isDeleting ? undefined : onCancel}
         style={{
           flex: 1,
           backgroundColor: colors.overlay.dark,
@@ -249,32 +251,36 @@ function DeleteConfirmationModal({
           <View style={{ gap: spacing.sm }}>
             {/* Primary destructive */}
             <Pressable
-              onPress={() => {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                onConfirm();
-              }}
+              onPress={onConfirm}
+              disabled={isDeleting}
               style={{
                 backgroundColor: colors.state.destructive,
                 borderRadius: borderRadius.pill,
                 height: button.height.primary,
                 alignItems: "center",
                 justifyContent: "center",
+                opacity: isDeleting ? 0.7 : 1,
               }}
             >
-              <Text
-                style={{
-                  ...typography.button.primary,
-                  color: colors.text.inverse,
-                }}
-              >
-                Remove
-              </Text>
+              {isDeleting ? (
+                <ActivityIndicator color={colors.text.inverse} />
+              ) : (
+                <Text
+                  style={{
+                    ...typography.button.primary,
+                    color: colors.text.inverse,
+                  }}
+                >
+                  Remove
+                </Text>
+              )}
             </Pressable>
 
             {/* Secondary cancel */}
             <ButtonSecondary
               label="Cancel"
               onPress={onCancel}
+              disabled={isDeleting}
             />
           </View>
         </Pressable>
@@ -738,6 +744,7 @@ export default function AllChecksScreen() {
   const [itemToDelete, setItemToDelete] = useState<RecentCheck | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [deleteError, setDeleteError] = useState<'network' | 'other' | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   // TEMPORARY: Debug snapshot modal state
   const [showDebugSnapshot, setShowDebugSnapshot] = useState(false);
   const [debugSnapshot, setDebugSnapshot] = useState<any>(null);
@@ -775,18 +782,22 @@ export default function AllChecksScreen() {
 
   // Confirm delete action
   const handleConfirmDelete = async () => {
-    if (!itemToDelete) return;
+    if (!itemToDelete || isDeleting) return;
     
-    const itemId = itemToDelete.id;
-    const imageUri = itemToDelete.imageUri;
-    setItemToDelete(null);
+    setIsDeleting(true);
     
     try {
-      await removeRecentCheckMutation.mutateAsync({ id: itemId, imageUri });
+      await removeRecentCheckMutation.mutateAsync({ id: itemToDelete.id, imageUri: itemToDelete.imageUri });
+      
+      // Success - close modal, show toast
+      setItemToDelete(null);
+      setIsDeleting(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowToast(true);
     } catch (error) {
       console.error('[Delete] Failed to delete scan:', error);
+      setIsDeleting(false);
+      // Keep itemToDelete so "Try again" can reopen confirmation
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       
       // Check if it's a network error
@@ -916,9 +927,10 @@ export default function AllChecksScreen() {
         <EmptyState />
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal - hide when error modal is showing */}
       <DeleteConfirmationModal
-        visible={!!itemToDelete}
+        visible={!!itemToDelete && deleteError === null}
+        isDeleting={isDeleting}
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
       />
@@ -1009,17 +1021,20 @@ export default function AllChecksScreen() {
                 : 'Please try again in a moment.'}
             </Text>
 
-            {/* Primary Button */}
+            {/* Primary Button - reopen confirmation modal */}
             <ButtonPrimary
               label="Try again"
               onPress={() => setDeleteError(null)}
               style={{ width: "100%" }}
             />
 
-            {/* Secondary Button */}
+            {/* Secondary Button - close everything */}
             <ButtonTertiary
               label="Close"
-              onPress={() => setDeleteError(null)}
+              onPress={() => {
+                setDeleteError(null);
+                setItemToDelete(null);
+              }}
               style={{ marginTop: spacing.sm }}
             />
           </Pressable>
