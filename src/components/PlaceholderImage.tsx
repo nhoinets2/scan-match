@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, StyleSheet, ViewStyle } from "react-native";
 import { Image, ImageStyle } from "expo-image";
 import { ImageOff } from "lucide-react-native";
@@ -178,10 +178,14 @@ export function ImageWithFallback({
   contentFit?: "cover" | "contain" | "fill" | "none" | "scale-down";
 }) {
   const [hasError, setHasError] = useState(false);
+  const prevUriRef = useRef(uri);
 
-  // Reset error state when URI changes (e.g., from local to cloud URL after upload)
+  // Reset error state when URI actually changes (e.g., from local to cloud URL after upload)
   useEffect(() => {
-    setHasError(false);
+    if (uri !== prevUriRef.current) {
+      prevUriRef.current = uri;
+      setHasError(false);
+    }
   }, [uri]);
 
   if (!uri || hasError) {
@@ -190,6 +194,7 @@ export function ImageWithFallback({
 
   return (
     <Image
+      key={uri} // Force remount when URI changes to clear expo-image cache
       source={{ uri }}
       style={[{ width: "100%", height: "100%" }, style]}
       contentFit={contentFit}
@@ -213,10 +218,14 @@ export function ThumbnailWithFallback({
   style?: ViewStyle;
 }) {
   const [hasError, setHasError] = useState(false);
+  const prevUriRef = useRef(uri);
 
-  // Reset error state when URI changes (e.g., from local to cloud URL after upload)
+  // Reset error state when URI actually changes (e.g., from local to cloud URL after upload)
   useEffect(() => {
-    setHasError(false);
+    if (uri !== prevUriRef.current) {
+      prevUriRef.current = uri;
+      setHasError(false);
+    }
   }, [uri]);
 
   if (!uri || hasError) {
