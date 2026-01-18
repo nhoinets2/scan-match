@@ -347,28 +347,33 @@ export default function WardrobeItemScreen() {
     // Use displayItem to support retry after error (when item might still be null from optimistic update)
     const itemToDelete = item ?? deletingItem;
     if (!itemToDelete || isDeleting) return;
-    
+
     // Store item data before delete so we can keep showing content
     if (!deletingItem) {
       setDeletingItem(itemToDelete);
     }
     setIsDeleting(true);
-    
+
     try {
       await removeWardrobeItemMutation.mutateAsync({ id: itemToDelete.id, imageUri: itemToDelete.imageUri });
-      
-      // Success - haptic and navigate
-      setShowDeleteConfirmation(false);
-      setIsDeleting(false);
-      setDeletingItem(null);
+
+      // Success - haptic feedback
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Set global flag for wardrobe page to show toast, then go back
+
+      // Set global flag for wardrobe page to show toast
       (globalThis as typeof globalThis & { __wardrobeItemDeleted?: boolean }).__wardrobeItemDeleted = true;
-      if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.push("/(tabs)/wardrobe");
-      }
+
+      // Navigate FIRST before resetting state to avoid UI freeze
+      // Use replace to go directly to wardrobe tab instead of router.back()
+      // This prevents issues when navigating back to a screen that references the deleted item
+      router.replace("/(tabs)/wardrobe");
+
+      // Reset state after navigation is initiated (use setTimeout to ensure navigation starts first)
+      setTimeout(() => {
+        setShowDeleteConfirmation(false);
+        setIsDeleting(false);
+        setDeletingItem(null);
+      }, 100);
     } catch (error) {
       console.error('[Delete] Failed to delete wardrobe item:', error);
       setIsDeleting(false);
@@ -486,17 +491,17 @@ export default function WardrobeItemScreen() {
           animationType="fade"
           onRequestClose={() => {
             setDeleteError(null);
-            handleClose();
+            router.replace("/(tabs)/wardrobe");
           }}
         >
-          <Pressable 
+          <Pressable
             style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
             onPress={() => {
               setDeleteError(null);
-              handleClose();
+              router.replace("/(tabs)/wardrobe");
             }}
           >
-            <Pressable 
+            <Pressable
               onPress={(e) => e.stopPropagation()}
               style={{
                 backgroundColor: colors.bg.primary,
@@ -557,7 +562,7 @@ export default function WardrobeItemScreen() {
                 label="Close"
                 onPress={() => {
                   setDeleteError(null);
-                  handleClose();
+                  router.replace("/(tabs)/wardrobe");
                 }}
                 style={{ width: "100%" }}
               />
@@ -1419,7 +1424,8 @@ export default function WardrobeItemScreen() {
               onPress={() => {
                 setDeleteError(null);
                 setDeletingItem(null);
-                handleClose();
+                // Use replace instead of back to avoid navigating to a screen that references the deleted item
+                router.replace("/(tabs)/wardrobe");
               }}
               style={{ marginTop: spacing.sm }}
             />
