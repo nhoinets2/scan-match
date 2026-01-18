@@ -1556,10 +1556,10 @@ export default function AddItemScreen() {
               {/* Title */}
               <Text
                 style={{
-                  ...typography.ui.sectionTitle,
+                  ...typography.ui.cardTitle,
                   color: colors.text.primary,
                   textAlign: "center",
-                  marginBottom: spacing.xs,
+                  marginBottom: spacing.sm,
                 }}
               >
                 {creditCheckError === 'network' ? 'Connection unavailable' : "Couldn't check credits"}
