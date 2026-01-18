@@ -379,20 +379,26 @@ export default function WardrobeItemScreen() {
       // Set global flag for wardrobe page to show toast
       (globalThis as typeof globalThis & { __wardrobeItemDeleted?: boolean }).__wardrobeItemDeleted = true;
 
-      // Navigate FIRST, before invalidating queries
-      // This prevents the results screen and home page from re-rendering with stale data
+      // Navigate FIRST, before any cache updates
       console.log('[Delete] Navigation starting...');
       navigateBack();
 
-      // Invalidate wardrobe query AFTER navigation animation fully completes
-      // Use InteractionManager + significant delay to ensure all screens unmount
-      // Modal animations can take 300-500ms each, and we're dismissing 2 screens
+      // Update cache AFTER navigation using setQueryData instead of invalidate
+      // setQueryData directly modifies the cache without triggering a refetch,
+      // which prevents the expensive recalculations that cause the freeze
       InteractionManager.runAfterInteractions(() => {
-        // Extra delay to ensure screens are fully unmounted (not just hidden)
         setTimeout(() => {
-          console.log('[Delete] Invalidating wardrobe cache...');
-          queryClient.invalidateQueries({ queryKey: ["wardrobe"] });
-        }, 500);
+          console.log('[Delete] Updating wardrobe cache directly...');
+          // Use setQueryData with a filter function to update all wardrobe queries
+          // This is more efficient than invalidate because it doesn't trigger a refetch
+          queryClient.setQueriesData<WardrobeItem[]>(
+            { queryKey: ["wardrobe"] },
+            (oldData) => {
+              if (!oldData) return oldData;
+              return oldData.filter(item => item.id !== itemToDelete.id);
+            }
+          );
+        }, 300);
       });
     } catch (error) {
       console.error('[Delete] Failed to delete wardrobe item:', error);
