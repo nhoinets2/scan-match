@@ -63,12 +63,25 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [user, segments, isAuthLoading, isOnboardingLoading, onboardingComplete, navigationState?.key, rootNavigation]);
 
-  // Show loading screen while auth is loading initially
-  // Don't show loading screen for onboarding check if user is already in the main app
+  const inAuthGroup = segments[0] === "login" || segments[0] === "signup";
   const inMainApp = segments[0] === "(tabs)";
-  const shouldShowLoading = isAuthLoading || (user && isOnboardingLoading && !inMainApp);
-  
-  if (shouldShowLoading) {
+
+  // Show loading screen while auth is loading
+  if (isAuthLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg.primary }} />
+    );
+  }
+
+  // User not logged in but not on auth screens yet - show blank while redirecting
+  if (!user && !inAuthGroup) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg.primary }} />
+    );
+  }
+
+  // User logged in but onboarding status loading (and not already in main app)
+  if (user && isOnboardingLoading && !inMainApp) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg.primary }} />
     );
