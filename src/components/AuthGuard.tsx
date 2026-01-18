@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { router, useSegments, useRootNavigationState, useNavigationContainerRef } from "expo-router";
-import { View } from "react-native";
+import { View, ActivityIndicator } from "react-native";
+import { BlurView } from "expo-blur";
 import { useAuth } from "@/lib/auth-context";
 import { useOnboardingComplete } from "@/lib/database";
 import { colors } from "@/lib/design-tokens";
@@ -80,10 +81,58 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // User logged in and on auth screens - show loading overlay while waiting to redirect
+  // This covers the case when user just signed in and we're checking onboarding status
+  if (user && inAuthGroup) {
+    return (
+      <>
+        {children}
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+          }}
+        >
+          <BlurView
+            intensity={50}
+            tint="light"
+            style={{
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <ActivityIndicator size="large" color={colors.accent.terracotta} />
+          </BlurView>
+        </View>
+      </>
+    );
+  }
+
   // User logged in but onboarding status loading (and not already in main app)
+  // Show loading overlay with blur
   if (user && isOnboardingLoading && !inMainApp) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg.primary }} />
+      <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
+        <BlurView
+          intensity={20}
+          tint="light"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <ActivityIndicator size="large" color={colors.accent.terracotta} />
+        </BlurView>
+      </View>
     );
   }
 
