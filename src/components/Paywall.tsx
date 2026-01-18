@@ -56,11 +56,11 @@ import {
 
 // Legal URLs
 const LEGAL_URLS = {
-  terms: "https://snaptomatch.app/terms",
-  privacy: "https://snaptomatch.app/privacy",
+  terms: "https://scantomatch.com/terms-and-conditions.html",
+  privacy: "https://scantomatch.com/privacy-policy.html",
 } as const;
 
-type PaywallReason = "in_store_limit" | "wardrobe_limit";
+type PaywallReason = "in_store_limit" | "wardrobe_limit" | "upgrade";
 
 interface PaywallProps {
   visible: boolean;
@@ -332,9 +332,10 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
   };
 
   // Dynamic header based on reason
-  const titleConfig = {
+  const titleConfig: Record<PaywallReason, string | null> = {
     in_store_limit: "You've used your 5 free scans",
     wardrobe_limit: "You've hit your wardrobe limit",
+    upgrade: null, // No title for upgrade flow, just show subtitle
   };
 
   const title = titleConfig[reason];
@@ -414,22 +415,25 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
               marginBottom: spacing.xl,
             }}
           >
+            {title && (
+              <Text
+                style={{
+                  ...typography.display.screenTitle,
+                  color: colors.text.inverse,
+                  textAlign: "center",
+                  marginBottom: spacing.md,
+                }}
+              >
+                {title}
+              </Text>
+            )}
             <Text
               style={{
-                ...typography.display.screenTitle,
+                ...typography.ui.cardTitle,
                 color: colors.text.inverse,
                 textAlign: "center",
-                marginBottom: spacing.xs,
-              }}
-            >
-              {title}
-            </Text>
-            <Text
-              style={{
-                ...typography.ui.body,
-                color: "rgba(255, 255, 255, 0.8)",
-                textAlign: "center",
-                maxWidth: 300,
+                maxWidth: 320,
+                lineHeight: 26,
               }}
             >
               {subtitle}
@@ -552,24 +556,26 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
                       color: button.primaryInverse.textColor,
                     }}
                   >
-                    Start free trial
+                    {selectedPlan === "annual" ? "Start free trial" : "Subscribe"}
                   </Text>
                 )}
               </Pressable>
             </View>
           </Animated.View>
 
-          {/* Trial terms */}
-          <Text
-            style={{
-              ...typography.ui.micro,
-              color: "rgba(255, 255, 255, 0.6)",
-              textAlign: "center",
-              marginTop: spacing.sm,
-            }}
-          >
-            7 days free, then {annualPrice}/year. Cancel anytime before trial ends.
-          </Text>
+          {/* Trial terms - only show for annual plan */}
+          {selectedPlan === "annual" && (
+            <Text
+              style={{
+                ...typography.ui.micro,
+                color: "rgba(255, 255, 255, 0.6)",
+                textAlign: "center",
+                marginTop: spacing.sm,
+              }}
+            >
+              7 days free, then {annualPrice}/year. Cancel anytime before trial ends.
+            </Text>
+          )}
 
           {/* Restore purchases */}
           <Pressable
@@ -577,7 +583,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
             disabled={isRestoring}
             style={{
               alignItems: "center",
-              marginTop: spacing.md,
+              marginTop: selectedPlan === "annual" ? spacing.md : spacing.lg,
               paddingVertical: spacing.sm,
             }}
           >
@@ -620,7 +626,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
                     textDecorationLine: "underline",
                   }}
                 >
-                  Terms
+                  {reason === "upgrade" ? "Terms of Service" : "Terms"}
                 </Text>
               </Pressable>
               <Text
@@ -640,7 +646,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
                     textDecorationLine: "underline",
                   }}
                 >
-                  Privacy
+                  {reason === "upgrade" ? "Privacy Policy" : "Privacy"}
                 </Text>
               </Pressable>
             </View>

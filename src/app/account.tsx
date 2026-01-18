@@ -8,12 +8,12 @@ import {
   ScrollView,
   Alert,
   Platform,
-  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { BlurView } from "expo-blur";
 import { router } from "expo-router";
-import Animated, { FadeIn, FadeInDown, FadeOut } from "react-native-reanimated";
-import { ChevronLeft, ChevronRight, KeyRound, FileText, Shield, Mail, LogOut, Settings, HelpCircle, AlertCircle, Star, Crown, Info, X } from "lucide-react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import { ChevronLeft, ChevronRight, KeyRound, FileText, Shield, Mail, LogOut, Settings, HelpCircle, AlertCircle, Star, Crown } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 
 import { useAuth } from "@/lib/auth-context";
@@ -132,168 +132,6 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-// Quota info popup component
-function QuotaInfoPopup({
-  visible,
-  onClose,
-}: {
-  visible: boolean;
-  onClose: () => void;
-}) {
-  if (!visible) return null;
-
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      accessibilityViewIsModal
-    >
-      <Pressable
-        style={{
-          flex: 1,
-          backgroundColor: "rgba(0,0,0,0.5)",
-          justifyContent: "center",
-          alignItems: "center",
-          padding: spacing.lg,
-        }}
-        onPress={onClose}
-        accessibilityLabel="Close popup"
-        accessibilityRole="button"
-      >
-        <Animated.View
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(150)}
-          style={{
-            backgroundColor: colors.bg.primary,
-            borderRadius: borderRadius.card,
-            padding: spacing.lg,
-            maxWidth: 320,
-            width: "100%",
-            // Shadow for elevation
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.15,
-            shadowRadius: 12,
-            elevation: 8,
-          }}
-          // Prevent tap-through to backdrop
-          onStartShouldSetResponder={() => true}
-        >
-          {/* Header */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: spacing.md,
-            }}
-          >
-            <Text
-              style={{
-                ...typography.ui.sectionTitle,
-                color: colors.text.primary,
-              }}
-              accessibilityRole="header"
-            >
-              How credits work
-            </Text>
-            <Pressable
-              onPress={onClose}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 14,
-                backgroundColor: colors.surface.icon,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Close"
-            >
-              <X size={14} color={colors.text.secondary} strokeWidth={2} />
-            </Pressable>
-          </View>
-
-          {/* Info items */}
-          <View style={{ gap: spacing.md }}>
-            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-              <View
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: 3,
-                  backgroundColor: colors.accent.terracotta,
-                  marginTop: 7,
-                  marginRight: spacing.sm,
-                }}
-                accessibilityElementsHidden
-              />
-              <Text
-                style={{
-                  ...typography.ui.body,
-                  color: colors.text.secondary,
-                  flex: 1,
-                }}
-              >
-                Each scan or wardrobe add uses 1 credit when you start.
-              </Text>
-            </View>
-
-            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-              <View
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: 3,
-                  backgroundColor: colors.accent.terracotta,
-                  marginTop: 7,
-                  marginRight: spacing.sm,
-                }}
-                accessibilityElementsHidden
-              />
-              <Text
-                style={{
-                  ...typography.ui.body,
-                  color: colors.text.secondary,
-                  flex: 1,
-                }}
-              >
-                Deleting items doesn't restore credits.
-              </Text>
-            </View>
-
-            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-              <View
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: 3,
-                  backgroundColor: colors.accent.terracotta,
-                  marginTop: 7,
-                  marginRight: spacing.sm,
-                }}
-                accessibilityElementsHidden
-              />
-              <Text
-                style={{
-                  ...typography.ui.body,
-                  color: colors.text.secondary,
-                  flex: 1,
-                }}
-              >
-                Credits are tied to your account across devices.
-              </Text>
-            </View>
-          </View>
-        </Animated.View>
-      </Pressable>
-    </Modal>
-  );
-}
-
 export default function AccountScreen() {
   const { user, signOut } = useAuth();
   const { isPro, isLoading: isLoadingPro, refetch: refetchProStatus } = useProStatus();
@@ -306,7 +144,6 @@ export default function AccountScreen() {
   } = useUsageQuota();
   const [loading, setLoading] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
-  const [showQuotaInfo, setShowQuotaInfo] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -431,13 +268,12 @@ export default function AccountScreen() {
                 }}
               />
 
-              {/* Subscription status row - Long press to preview paywall */}
+              {/* Subscription status row - navigates to manage subscription */}
               <Pressable
-                onLongPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                  setShowPaywall(true);
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push("/manage-subscription");
                 }}
-                delayLongPress={500}
               >
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <View
@@ -478,34 +314,33 @@ export default function AccountScreen() {
                         Unlimited access
                       </Text>
                     ) : (
-                      // Free users: show remaining credits with info icon
-                      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
+                      // Free users: show used credits
+                      <>
                         <Text
                           style={{
                             ...typography.ui.caption,
                             color: colors.text.secondary,
+                            marginTop: 2,
+                          }}
+                        >
+                          Used credits:
+                        </Text>
+                        <Text
+                          style={{
+                            ...typography.ui.caption,
+                            color: colors.text.secondary,
+                            marginTop: 2,
                           }}
                         >
                           {isLoadingQuota 
-                            ? `—/${USAGE_LIMITS.FREE_WARDROBE_ADDS} wardrobe adds • —/${USAGE_LIMITS.FREE_SCANS} scans`
-                            : `${remainingWardrobeAdds}/${USAGE_LIMITS.FREE_WARDROBE_ADDS} wardrobe adds • ${remainingScans}/${USAGE_LIMITS.FREE_SCANS} scans`
+                            ? `— of ${USAGE_LIMITS.FREE_WARDROBE_ADDS} wardrobe adds • — of ${USAGE_LIMITS.FREE_SCANS} scans`
+                            : `${wardrobeAddsUsed} of ${USAGE_LIMITS.FREE_WARDROBE_ADDS} wardrobe adds • ${scansUsed} of ${USAGE_LIMITS.FREE_SCANS} scans`
                           }
                         </Text>
-                        <Pressable
-                          onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            setShowQuotaInfo(true);
-                          }}
-                          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                          style={{ marginLeft: spacing.xs }}
-                          accessibilityRole="button"
-                          accessibilityLabel="How credits work"
-                        >
-                          <Info size={14} color={colors.text.tertiary} strokeWidth={2} />
-                        </Pressable>
-                      </View>
+                      </>
                     )}
                   </View>
+                  <ChevronRight size={18} color={colors.text.secondary} />
                 </View>
               </Pressable>
             </View>
@@ -583,12 +418,12 @@ export default function AccountScreen() {
             <SettingsRow
               icon={<Shield size={18} color={colors.text.secondary} />}
               title="Privacy Policy"
-              onPress={() => openLink("https://example.com/privacy")}
+              onPress={() => openLink("https://scantomatch.com/privacy-policy.html")}
             />
             <SettingsRow
               icon={<FileText size={18} color={colors.text.secondary} />}
               title="Terms of Service"
-              onPress={() => openLink("https://example.com/terms")}
+              onPress={() => openLink("https://scantomatch.com/terms-and-conditions.html")}
               showSeparator={false}
             />
           </Animated.View>
@@ -611,7 +446,7 @@ export default function AccountScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* Paywall Preview - Long press subscription info to show */}
+      {/* Paywall Preview */}
       <Paywall
         visible={showPaywall}
         onClose={() => setShowPaywall(false)}
@@ -622,11 +457,57 @@ export default function AccountScreen() {
         reason="wardrobe_limit"
       />
 
-      {/* Quota Info Popup */}
-      <QuotaInfoPopup
-        visible={showQuotaInfo}
-        onClose={() => setShowQuotaInfo(false)}
-      />
+      {/* Sign Out Loading Overlay */}
+      {loading && (
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <BlurView
+            intensity={20}
+            tint="light"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+            }}
+          />
+          <View
+            style={{
+              backgroundColor: colors.bg.primary,
+              borderRadius: borderRadius.card,
+              padding: spacing.xl,
+              alignItems: "center",
+              justifyContent: "center",
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 12,
+              elevation: 5,
+            }}
+          >
+            <ActivityIndicator size="large" color={colors.accent.terracotta} />
+            <Text
+              style={{
+                ...typography.ui.bodyMedium,
+                color: colors.text.primary,
+                marginTop: spacing.md,
+              }}
+            >
+              Signing out...
+            </Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }

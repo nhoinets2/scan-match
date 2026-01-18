@@ -147,6 +147,13 @@ function RootLayoutNav({
             }}
           />
           <Stack.Screen
+            name="manage-subscription"
+            options={{
+              headerShown: false,
+              presentation: "modal",
+            }}
+          />
+          <Stack.Screen
             name="preferences"
             options={{
               headerShown: false,
@@ -155,13 +162,6 @@ function RootLayoutNav({
           />
           <Stack.Screen
             name="change-password"
-            options={{
-              headerShown: false,
-              presentation: "modal",
-            }}
-          />
-          <Stack.Screen
-            name="reset-password"
             options={{
               headerShown: false,
               presentation: "modal",

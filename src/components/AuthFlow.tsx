@@ -11,8 +11,9 @@ import {
   ActivityIndicator,
   ImageBackground,
   Dimensions,
-  Image,
+  Linking,
 } from "react-native";
+import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import Animated, {
@@ -191,7 +192,7 @@ function AuthContent({
   props: AuthFlowProps;
   handleAction: (action: () => Promise<void>) => void;
   clearForm: () => void;
-  setMode: (mode: "landing" | "login" | "signup" | "checkEmail") => void;
+  setMode: (mode: "landing" | "login" | "signup" | "checkEmail" | "forgotPassword") => void;
 }) {
   const { animatedIndex } = useBottomSheetInternal();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -447,7 +448,20 @@ function AuthContent({
           marginHorizontal: spacing.md,
         }}
       >
-        By continuing, you agree to our Terms and Privacy Policy
+        By continuing, you agree to our{" "}
+        <Text
+          onPress={() => Linking.openURL("https://scantomatch.com/terms-and-conditions.html")}
+          style={{ textDecorationLine: "underline" }}
+        >
+          Terms
+        </Text>
+        {" "}and{" "}
+        <Text
+          onPress={() => Linking.openURL("https://scantomatch.com/privacy-policy.html")}
+          style={{ textDecorationLine: "underline" }}
+        >
+          Privacy Policy
+        </Text>
       </Text>
       </Animated.View>
     </View>
@@ -463,7 +477,7 @@ function LandingHandle(_props: BottomSheetHandleProps) {
 const GRADIENT_WARM = colors.accent.terracotta;
 const GRADIENT_COOL = "#1A5DB8"; // Cool blue for gradient - intentional standalone color
 
-type AuthMode = "landing" | "login" | "signup" | "checkEmail";
+type AuthMode = "landing" | "login" | "signup" | "checkEmail" | "forgotPassword";
 type OAuthProvider = "google" | "apple";
 
 type AuthFlowProps = {
@@ -685,6 +699,10 @@ export default function AuthFlow(props: AuthFlowProps) {
   const [password2, setPassword2] = useState("");
   const [showPw, setShowPw] = useState(false);
 
+  // Preload landing page image on mount to prevent blinking
+  React.useEffect(() => {
+    Image.prefetch(HERO_LANDING_IMAGE);
+  }, []);
 
   async function handleAction(action: () => Promise<void>) {
     try {
@@ -706,30 +724,35 @@ export default function AuthFlow(props: AuthFlowProps) {
     if (mode === "checkEmail") {
       clearForm();
       setMode("login");
+    } else if (mode === "forgotPassword") {
+      clearForm();
+      setMode("login");
     } else {
       clearForm();
       setMode("landing");
     }
   }
 
-  // Edge-swipe gesture for back navigation
+  // Edge-swipe gesture for back navigation - very sensitive
   const startX = useSharedValue(0);
   const edgeSwipeGesture = Gesture.Pan()
     .onStart((event) => {
       startX.value = event.x; // Capture starting X position
     })
-    .activeOffsetX([10, Infinity]) // Only activate on rightward swipe
-    .failOffsetY([-15, 15]) // Fail if too much vertical movement
+    .activeOffsetX([2, Infinity]) // Very sensitive - activates after just 2px movement
+    .failOffsetY([-50, 50]) // Allow significant vertical movement
+    .minDistance(0) // No minimum distance required
     .onEnd((event) => {
-      const EDGE_THRESHOLD = 50; // Consider swipes from left edge (first 50px)
-      const SWIPE_THRESHOLD = 100; // Minimum swipe distance
-      const VELOCITY_THRESHOLD = 500; // Minimum velocity for quick swipes
+      const EDGE_THRESHOLD = 120; // Wide edge area - first 120px of screen
+      const SWIPE_THRESHOLD = 40; // Very short swipe distance required (reduced from 60px)
+      const VELOCITY_THRESHOLD = 200; // Low velocity threshold for quick swipes (reduced from 300)
 
       // Check if swipe started from left edge and moved right
       if (
         startX.value < EDGE_THRESHOLD &&
         (event.translationX > SWIPE_THRESHOLD || event.velocityX > VELOCITY_THRESHOLD)
       ) {
+        runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
         runOnJS(goBack)();
       }
     });
@@ -809,6 +832,7 @@ export default function AuthFlow(props: AuthFlowProps) {
         <ImageBackground
           source={{
             uri: "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=800&q=80",
+            cache: "force-cache",
           }}
           style={{ flex: 1 }}
           blurRadius={25}
@@ -961,7 +985,10 @@ export default function AuthFlow(props: AuthFlowProps) {
           <Image
             source={HERO_LANDING_IMAGE}
             style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }}
-            resizeMode="cover"
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            priority="high"
+            recyclingKey="landing-hero"
           />
 
           {/* 1) Contrast gradient for white text readability */}
@@ -1089,6 +1116,7 @@ export default function AuthFlow(props: AuthFlowProps) {
         <ImageBackground
           source={{
             uri: "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=800&q=80",
+            cache: "force-cache",
           }}
           style={{ flex: 1 }}
           blurRadius={25}
@@ -1267,7 +1295,7 @@ export default function AuthFlow(props: AuthFlowProps) {
                       <Pressable
                         onPress={() => {
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          router.push("/reset-password");
+                          setMode("forgotPassword");
                         }}
                         style={{
                           alignSelf: "flex-start",
@@ -1480,7 +1508,20 @@ export default function AuthFlow(props: AuthFlowProps) {
                       paddingBottom: spacing.xs,
                       }}
                     >
-                      By continuing, you agree to our Terms and Privacy Policy
+                      By continuing, you agree to our{" "}
+                      <Text
+                        onPress={() => Linking.openURL("https://scantomatch.com/terms-and-conditions.html")}
+                        style={{ textDecorationLine: "underline" }}
+                      >
+                        Terms
+                      </Text>
+                      {" "}and{" "}
+                      <Text
+                        onPress={() => Linking.openURL("https://scantomatch.com/privacy-policy.html")}
+                        style={{ textDecorationLine: "underline" }}
+                      >
+                        Privacy Policy
+                      </Text>
                     </Text>
                 </View>
               </KeyboardAvoidingView>
@@ -1501,6 +1542,7 @@ export default function AuthFlow(props: AuthFlowProps) {
         <ImageBackground
           source={{
             uri: "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=800&q=80",
+            cache: "force-cache",
           }}
           style={{ flex: 1 }}
           blurRadius={25}
@@ -1890,8 +1932,223 @@ export default function AuthFlow(props: AuthFlowProps) {
                       paddingBottom: spacing.xs,
                       }}
                     >
-                      By continuing, you agree to our Terms and Privacy Policy
+                      By continuing, you agree to our{" "}
+                      <Text
+                        onPress={() => Linking.openURL("https://scantomatch.com/terms-and-conditions.html")}
+                        style={{ textDecorationLine: "underline" }}
+                      >
+                        Terms
+                      </Text>
+                      {" "}and{" "}
+                      <Text
+                        onPress={() => Linking.openURL("https://scantomatch.com/privacy-policy.html")}
+                        style={{ textDecorationLine: "underline" }}
+                      >
+                        Privacy Policy
+                      </Text>
                     </Text>
+                </View>
+              </KeyboardAvoidingView>
+              </GestureDetector>
+            </SafeAreaView>
+          </View>
+        </ImageBackground>
+      </View>
+    );
+  }
+
+  // ============================================
+  // FORGOT PASSWORD SCREEN
+  // ============================================
+  if (mode === "forgotPassword") {
+    const canSubmit = email.trim().length > 0 && !loading;
+    
+    return (
+      <View style={{ flex: 1 }}>
+        <ImageBackground
+          source={{
+            uri: "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=800&q=80",
+            cache: "force-cache",
+          }}
+          style={{ flex: 1 }}
+          blurRadius={25}
+        >
+          {/* Dark overlay for readability */}
+          <View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: colors.overlay.light,
+            }}
+          />
+          <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
+            <SafeAreaView style={{ flex: 1 }}>
+              <GestureDetector gesture={edgeSwipeGesture}>
+              <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.select({ ios: "padding", android: undefined })}
+              >
+                  <View style={{ flex: 1, paddingBottom: spacing.xs }}>
+                  <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg }}>
+                  {/* Back Button */}
+                  <Pressable
+                    onPress={goBack}
+                    hitSlop={spacing.md}
+                    style={{ marginBottom: spacing.xl }}
+                  >
+                    <ChevronLeft size={spacing.xl - spacing.xs} color={colors.text.primary} />
+                  </Pressable>
+
+                  {/* Header - Centered, minimal */}
+                  <Animated.View
+                    entering={FadeInDown.duration(500)}
+                    style={{ alignItems: "center", marginBottom: spacing.lg }}
+                  >
+                    <Text
+                      style={{
+                        ...typography.display.screenTitle,
+                        color: colors.text.primary,
+                        textAlign: "center",
+                        marginBottom: spacing.xs,
+                      }}
+                    >
+                      Reset password
+                    </Text>
+                    <Text
+                      style={{
+                        ...typography.ui.label,
+                        color: colors.text.secondary,
+                        textAlign: "center",
+                        maxWidth: spacing.xxl * 5 + spacing.md + spacing.xs,
+                      }}
+                    >
+                      Enter your email address and we'll send you a link to reset your password.
+                    </Text>
+                  </Animated.View>
+
+                  {/* Glass Card Form */}
+                  <ScrollView 
+                    keyboardShouldPersistTaps="handled"
+                    contentContainerStyle={{ paddingBottom: spacing.xl }}
+                    showsVerticalScrollIndicator={false}
+                  >
+                    <Animated.View
+                      entering={FadeInDown.delay(150).duration(500)}
+                      style={{
+                        backgroundColor: colors.bg.elevated,
+                        borderRadius: borderRadius.card,
+                        padding: spacing.md,
+                        borderWidth: 1,
+                        borderColor: colors.border.subtle,
+                      }}
+                    >
+                      {/* Email Input */}
+                      <View style={{ marginBottom: spacing.md }}>
+                        <Text
+                          style={{
+                            ...typography.ui.label,
+                            color: colors.text.primary,
+                            marginBottom: spacing.xs,
+                          }}
+                        >
+                          Email
+                        </Text>
+                        <View
+                          style={{
+                            height: button.height.secondary,
+                            borderRadius: borderRadius.input,
+                            backgroundColor: colors.bg.secondary,
+                            paddingHorizontal: spacing.md,
+                            justifyContent: "center",
+                            borderWidth: 1,
+                            borderColor: colors.border.hairline,
+                          }}
+                        >
+                          <TextInput
+                            value={email}
+                            onChangeText={setEmail}
+                            placeholder="you@example.com"
+                            placeholderTextColor={colors.text.tertiary}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            autoFocus
+                            editable={!loading}
+                            style={{
+                              ...typography.ui.bodyMedium,
+                              color: colors.text.primary,
+                            }}
+                          />
+                        </View>
+                      </View>
+
+                      {/* Error - Subtle, not shouting */}
+                      {error && (
+                        <Animated.View
+                          entering={FadeIn.duration(200)}
+                          style={{
+                            backgroundColor: colors.state.destructiveBg,
+                            borderRadius: borderRadius.image,
+                            padding: spacing.md,
+                            marginBottom: spacing.md,
+                          }}
+                        >
+                          <Text style={{ ...typography.ui.body, color: colors.state.destructive }}>
+                            {error}
+                          </Text>
+                        </Animated.View>
+                      )}
+
+                      {/* Submit Button */}
+                      <AnimatedButton
+                        variant="primary"
+                        onPress={() =>
+                          handleAction(async () => {
+                            await props.onResetPassword(email.trim());
+                            setMode("checkEmail");
+                          })
+                        }
+                        disabled={!canSubmit || loading}
+                        loading={loading}
+                      >
+                        Send reset link
+                      </AnimatedButton>
+                    </Animated.View>
+
+                    {/* Spacer - minimal gap to keep legal at bottom */}
+                    <View style={{ flex: 1, minHeight: spacing.sm }} />
+
+                    {/* Legal Text - Outside the card */}
+                    <Text
+                      style={{
+                        ...typography.ui.micro,
+                        color: colors.text.tertiary,
+                        textAlign: "center",
+                        marginTop: spacing.md,
+                        marginHorizontal: spacing.lg,
+                        paddingBottom: spacing.xs,
+                      }}
+                    >
+                      By continuing, you agree to our{" "}
+                      <Text
+                        onPress={() => Linking.openURL("https://scantomatch.com/terms-and-conditions.html")}
+                        style={{ textDecorationLine: "underline" }}
+                      >
+                        Terms
+                      </Text>
+                      {" "}and{" "}
+                      <Text
+                        onPress={() => Linking.openURL("https://scantomatch.com/privacy-policy.html")}
+                        style={{ textDecorationLine: "underline" }}
+                      >
+                        Privacy Policy
+                      </Text>
+                    </Text>
+                  </ScrollView>
+                </View>
                 </View>
               </KeyboardAvoidingView>
               </GestureDetector>
@@ -1911,6 +2168,7 @@ export default function AuthFlow(props: AuthFlowProps) {
         <ImageBackground
           source={{
             uri: "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=800&q=80",
+            cache: "force-cache",
           }}
           style={{ flex: 1 }}
           blurRadius={12}
