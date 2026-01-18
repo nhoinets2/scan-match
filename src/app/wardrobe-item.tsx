@@ -375,9 +375,10 @@ export default function WardrobeItemScreen() {
       setShowDeleteConfirmation(false);
       // Don't clear deletingItem here - we need it for displayItem while error modal is shown
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      
+
       // Check if it's a network error
       const errMessage = error instanceof Error ? error.message : String(error || "");
+      const errLower = errMessage.toLowerCase();
       const isNetworkErr =
         errMessage.includes("Network request failed") ||
         errMessage.includes("The Internet connection appears to be offline") ||
@@ -386,8 +387,18 @@ export default function WardrobeItemScreen() {
         errMessage.includes("Failed to fetch") ||
         errMessage.includes("fetch failed") ||
         errMessage.includes("ENOTFOUND") ||
-        errMessage.includes("ECONNREFUSED");
-      
+        errMessage.includes("ECONNREFUSED") ||
+        errMessage.includes("Could not connect to the server") ||
+        errMessage.includes("A server with the specified hostname could not be found") ||
+        errMessage.includes("A data connection is not currently allowed") ||
+        errMessage.includes("not connected to the internet") ||
+        errLower.includes("offline") ||
+        errLower.includes("no internet") ||
+        errLower.includes("network error") ||
+        errLower.includes("network is unreachable") ||
+        errLower.includes("socket is not connected") ||
+        errLower.includes("timed out");
+
       setDeleteError(isNetworkErr ? 'network' : 'other');
     }
   };
@@ -518,11 +529,10 @@ export default function WardrobeItemScreen() {
               {/* Title */}
               <Text
                 style={{
-                  fontFamily: "PlayfairDisplay_600SemiBold",
-                  fontSize: typography.sizes.h3,
+                  ...typography.ui.cardTitle,
                   color: colors.text.primary,
                   textAlign: "center",
-                  marginBottom: spacing.xs,
+                  marginBottom: spacing.sm,
                 }}
               >
                 {deleteError === 'network' ? 'Connection unavailable' : "Couldn't remove item"}
@@ -531,16 +541,14 @@ export default function WardrobeItemScreen() {
               {/* Subtitle */}
               <Text
                 style={{
-                  fontFamily: "Inter_400Regular",
-                  fontSize: typography.sizes.body,
+                  ...typography.ui.body,
                   color: colors.text.secondary,
                   textAlign: "center",
                   marginBottom: spacing.lg,
-                  lineHeight: 22,
                 }}
               >
-                {deleteError === 'network' 
-                  ? 'Please check your internet and try again.' 
+                {deleteError === 'network'
+                  ? 'Please check your internet and try again.'
                   : 'Please try again in a moment.'}
               </Text>
 
@@ -1369,11 +1377,11 @@ export default function WardrobeItemScreen() {
             {/* Title */}
             <Text
               style={{
-                fontFamily: "PlayfairDisplay_600SemiBold",
-                fontSize: typography.sizes.h3,
+                fontFamily: typography.ui.cardTitle.fontFamily,
+                fontSize: typography.ui.cardTitle.fontSize,
                 color: colors.text.primary,
                 textAlign: "center",
-                marginBottom: spacing.xs,
+                marginBottom: spacing.sm,
               }}
             >
               {deleteError === 'network' ? 'Connection unavailable' : "Couldn't remove item"}
@@ -1382,16 +1390,16 @@ export default function WardrobeItemScreen() {
             {/* Subtitle */}
             <Text
               style={{
-                fontFamily: "Inter_400Regular",
-                fontSize: typography.sizes.body,
+                fontFamily: typography.ui.body.fontFamily,
+                fontSize: typography.ui.body.fontSize,
                 color: colors.text.secondary,
                 textAlign: "center",
                 marginBottom: spacing.lg,
                 lineHeight: 22,
               }}
             >
-              {deleteError === 'network' 
-                ? 'Please check your internet and try again.' 
+              {deleteError === 'network'
+                ? 'Please check your internet and try again.'
                 : 'Please try again in a moment.'}
             </Text>
 
