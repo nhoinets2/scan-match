@@ -165,13 +165,13 @@ function ProcessingOverlay() {
           <Animated.View style={[dot3Style, { width: spacing.sm + spacing.xs, height: spacing.sm + spacing.xs, borderRadius: (spacing.sm + spacing.xs) / 2, backgroundColor: colors.accent.terracotta, marginHorizontal: spacing.xs }]} />
         </View>
         <Text
-          style={{ 
+          style={{
             ...typography.ui.sectionTitle,
             color: colors.text.inverse,
             textAlign: "center",
           }}
         >
-          Checking how this might work for you...
+          Checking scan access...
         </Text>
       </View>
     </Animated.View>
