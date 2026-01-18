@@ -363,7 +363,7 @@ export default function WardrobeItemScreen() {
       setDeletingItem(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // Set global flag for wardrobe page to show toast, then go back
-      globalThis.__wardrobeItemDeleted = true;
+      (globalThis as typeof globalThis & { __wardrobeItemDeleted?: boolean }).__wardrobeItemDeleted = true;
       if (router.canGoBack()) {
         router.back();
       } else {

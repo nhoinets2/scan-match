@@ -538,14 +538,15 @@ export default function WardrobeScreen() {
   // Check for add/delete flags when screen gains focus
   useFocusEffect(
     useCallback(() => {
-      if (globalThis.__wardrobeItemDeleted) {
+      const g = globalThis as typeof globalThis & { __wardrobeItemDeleted?: boolean; __wardrobeItemAdded?: boolean };
+      if (g.__wardrobeItemDeleted) {
         setToastMessage("Removed from Wardrobe");
         setShowToast(true);
-        globalThis.__wardrobeItemDeleted = false;
-      } else if (globalThis.__wardrobeItemAdded) {
+        g.__wardrobeItemDeleted = false;
+      } else if (g.__wardrobeItemAdded) {
         setToastMessage("Added to Wardrobe");
         setShowToast(true);
-        globalThis.__wardrobeItemAdded = false;
+        g.__wardrobeItemAdded = false;
       }
     }, [])
   );

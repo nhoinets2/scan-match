@@ -172,11 +172,11 @@ interface ResultsSuccessProps {
   isViewingSavedCheck: boolean;
   currentCheckId: string | null;
   currentScan: ScannedItemType | null;
-  
+
   // Mutations (stable references from parent)
-  addRecentCheckMutation: UseMutationResult<RecentCheck, Error, any, unknown>;
-  updateRecentCheckOutcomeMutation: UseMutationResult<void, Error, any, unknown>;
-  
+  addRecentCheckMutation: UseMutationResult<{ id: string; imageUri: string }, Error, Omit<RecentCheck, "id" | "createdAt">, unknown>;
+  updateRecentCheckOutcomeMutation: UseMutationResult<{ id: string; outcome: OutcomeState; imageUri: string | undefined }, Error, { id: string; outcome: OutcomeState; imageUri?: string }, unknown>;
+
   // Actions
   clearScan: () => void;
 
@@ -683,7 +683,6 @@ function ResultsFailed({
               <ButtonPrimary
                 label="Try again"
                 onPress={onRetry}
-                icon={RefreshCw}
               />
               <ButtonTertiary
                 label="Scan another item"
@@ -715,7 +714,6 @@ function MissingScanData({ insets }: { insets: { top: number; bottom: number } }
           <IconButton
             icon={X}
             onPress={() => router.back()}
-            accessibilityLabel="Close"
           />
           <View style={{ width: 40 }} />
         </View>

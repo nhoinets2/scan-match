@@ -750,7 +750,7 @@ Respond with ONLY the JSON object.`;
       const errorText = await response.text();
       console.log(`[Perf] OpenAI API error after ${Date.now() - apiStart}ms (status: ${response.status}):`, errorText);
       clearTimeout(timeoutId);
-      const error = classifyAnalyzeError(new Error(errorText), response);
+      const error = classifyAnalyzeError(new Error(errorText), response as unknown as Response);
       logFailureTelemetry(error);
       return { ok: false, error };
     }

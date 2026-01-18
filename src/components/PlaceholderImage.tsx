@@ -218,7 +218,7 @@ export function ThumbnailWithFallback({
   uri: string | null | undefined;
   size: number;
   borderRadius?: number;
-  style?: ViewStyle;
+  style?: ImageStyle;
 }) {
   const [hasError, setHasError] = useState(false);
   const prevUriRef = useRef(uri);
