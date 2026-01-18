@@ -2,7 +2,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useFonts } from "expo-font";
 import {
   Inter_400Regular,
@@ -22,7 +22,6 @@ import { AuthGuard } from "@/components/AuthGuard";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { colors } from "@/lib/design-tokens";
 import { initializeBackgroundUploads } from "@/lib/storage";
-import { useRef } from "react";
 
 export const unstable_settings = {
   initialRouteName: "login",
@@ -188,6 +187,31 @@ function RootLayoutNav({
   );
 }
 
+/**
+ * Hides the splash screen only after auth is ready.
+ * This prevents the home screen from flashing before redirect to login.
+ */
+function SplashHider({ fontsLoaded, fontError }: { fontsLoaded: boolean; fontError: Error | null }) {
+  const { isLoading: isAuthLoading } = useAuth();
+  const hasHiddenSplash = useRef(false);
+
+  useEffect(() => {
+    // Only hide splash once, when both fonts and auth are ready
+    if (hasHiddenSplash.current) return;
+
+    const fontsReady = fontsLoaded || fontError;
+    const authReady = !isAuthLoading;
+
+    if (fontsReady && authReady) {
+      hasHiddenSplash.current = true;
+      console.log("✅ Hiding splash - fonts and auth ready");
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError, isAuthLoading]);
+
+  return null;
+}
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
@@ -200,7 +224,7 @@ export default function RootLayout() {
     BodoniModa_700Bold,
   });
 
-  // Hide splash screen when fonts are loaded
+  // Log font loading status
   useEffect(() => {
     if (fontsLoaded) {
       console.log("✅ FONTS LOADED:", {
@@ -210,11 +234,9 @@ export default function RootLayout() {
         BodoniModa_600SemiBold: !!BodoniModa_600SemiBold,
         BodoniModa_700Bold: !!BodoniModa_700Bold,
       });
-      SplashScreen.hideAsync();
     }
     if (fontError) {
       console.error("❌ FONT ERROR:", fontError);
-      SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
 
@@ -226,6 +248,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <SplashHider fontsLoaded={fontsLoaded} fontError={fontError} />
         <BackgroundUploadInitializer />
         <GestureHandlerRootView style={{ flex: 1 }}>
           <KeyboardProvider>
