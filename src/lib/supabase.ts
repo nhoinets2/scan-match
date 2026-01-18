@@ -5,6 +5,23 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
+// Helper to clear invalid auth tokens from storage
+const clearInvalidTokens = async () => {
+  try {
+    // Clear Supabase auth tokens from AsyncStorage
+    const keys = await AsyncStorage.getAllKeys();
+    const supabaseKeys = keys.filter(
+      (key) => key.includes("supabase") || key.includes("sb-")
+    );
+    if (supabaseKeys.length > 0) {
+      await AsyncStorage.multiRemove(supabaseKeys);
+      console.log("[Supabase] Cleared invalid auth tokens from storage");
+    }
+  } catch (e) {
+    console.log("[Supabase] Error clearing tokens:", e);
+  }
+};
+
 // Create a placeholder client if credentials are missing
 // This prevents the app from crashing during development
 let supabase: SupabaseClient;
@@ -17,6 +34,15 @@ if (supabaseUrl && supabaseAnonKey) {
       persistSession: true,
       detectSessionInUrl: true, // Enable URL detection for password reset links
     },
+  });
+
+  // Set up a listener to handle token refresh errors globally
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    if (event === "TOKEN_REFRESHED" && !session) {
+      // Token refresh failed, clear invalid tokens
+      console.log("[Supabase] Token refresh failed, clearing storage...");
+      await clearInvalidTokens();
+    }
   });
 } else {
   console.warn(
@@ -34,4 +60,4 @@ if (supabaseUrl && supabaseAnonKey) {
   } as unknown as SupabaseClient;
 }
 
-export { supabase };
+export { supabase, clearInvalidTokens };

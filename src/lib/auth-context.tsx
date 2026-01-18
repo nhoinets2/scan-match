@@ -4,7 +4,7 @@ import { Session, User } from "@supabase/supabase-js";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
-import { supabase } from "./supabase";
+import { supabase, clearInvalidTokens } from "./supabase";
 import { useSnapToMatchStore } from "./store";
 import { useQuotaStore } from "./quota-store";
 import { initializeRevenueCat, logoutUser } from "./revenuecatClient";
@@ -62,41 +62,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Get initial session and initialize RevenueCat
-    supabase.auth.getSession().then(async ({ data: { session: initialSession }, error }) => {
-      if (error) {
-        console.error("[Auth] Error getting session:", error);
-        // Handle invalid refresh token - sign out the user gracefully
-        if (error.message?.includes("Refresh Token") || error.message?.includes("refresh_token")) {
-          console.log("[Auth] Invalid refresh token detected, signing out...");
-          await supabase.auth.signOut();
-          setSession(null);
-          setUser(null);
-          setIsLoading(false);
-          return;
+    const initializeSession = async () => {
+      try {
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error("[Auth] Error getting session:", error);
+          // Handle invalid refresh token - sign out the user gracefully
+          if (
+            error.message?.includes("Refresh Token") ||
+            error.message?.includes("refresh_token") ||
+            error.message?.includes("Invalid") ||
+            (error as any)?.code === "invalid_refresh_token"
+          ) {
+            console.log("[Auth] Invalid refresh token detected, clearing session...");
+            try {
+              await supabase.auth.signOut();
+            } catch (signOutError) {
+              console.log("[Auth] Sign out failed (expected if token is invalid):", signOutError);
+            }
+            setSession(null);
+            setUser(null);
+            setIsLoading(false);
+            return;
+          }
         }
-      }
-      setSession(initialSession);
-      setUser(initialSession?.user ?? null);
 
-      // Only initialize RevenueCat if user is signed in
-      if (initialSession?.user?.id) {
-        console.log("[Auth] Session restored for user:", initialSession.user.email);
-        console.log("[Auth] Initializing RevenueCat with user ID:", initialSession.user.id);
-        await initializeRevenueCat(initialSession.user.id);
-      } else {
-        console.log("[Auth] No session - RevenueCat will initialize on sign-in");
-      }
+        setSession(initialSession);
+        setUser(initialSession?.user ?? null);
 
-      setIsLoading(false);
-    }).catch(async (error) => {
-      // Catch any unhandled errors during session retrieval
-      console.error("[Auth] Failed to get session:", error);
-      // Sign out to clear invalid session data
-      await supabase.auth.signOut().catch(() => {});
-      setSession(null);
-      setUser(null);
-      setIsLoading(false);
-    });
+        // Only initialize RevenueCat if user is signed in
+        if (initialSession?.user?.id) {
+          console.log("[Auth] Session restored for user:", initialSession.user.email);
+          console.log("[Auth] Initializing RevenueCat with user ID:", initialSession.user.id);
+          await initializeRevenueCat(initialSession.user.id);
+        } else {
+          console.log("[Auth] No session - RevenueCat will initialize on sign-in");
+        }
+
+        setIsLoading(false);
+      } catch (error: any) {
+        // Catch any unhandled errors during session retrieval
+        console.error("[Auth] Failed to get session:", error);
+
+        // Check if this is a refresh token error
+        const errorMessage = error?.message || String(error);
+        if (
+          errorMessage.includes("Refresh Token") ||
+          errorMessage.includes("refresh_token") ||
+          errorMessage.includes("Invalid")
+        ) {
+          console.log("[Auth] Refresh token error caught, clearing session...");
+          await clearInvalidTokens();
+        }
+
+        // Sign out to clear invalid session data
+        try {
+          await supabase.auth.signOut();
+        } catch (signOutError) {
+          console.log("[Auth] Sign out during error recovery failed:", signOutError);
+        }
+        setSession(null);
+        setUser(null);
+        setIsLoading(false);
+      }
+    };
+
+    initializeSession();
 
     // Listen for auth changes
     const {
