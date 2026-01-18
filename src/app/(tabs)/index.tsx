@@ -637,12 +637,14 @@ function StatusPill({ label, color }: { label: string; color: string }) {
 function RecentCheckListItem({
   check,
   index,
+  wardrobe,
   onPress,
   onLongPressDelete,
   onShowDebugSnapshot,
 }: {
   check: RecentCheck;
   index: number;
+  wardrobe: WardrobeItem[];
   onPress: (check: RecentCheck) => void;
   onLongPressDelete?: (check: RecentCheck) => void;
   onShowDebugSnapshot?: (snapshot: any) => void;
@@ -650,9 +652,8 @@ function RecentCheckListItem({
   // Calculate tile size for horizontal carousel (slightly larger than 2-column grid)
   const screenWidth = Dimensions.get("window").width;
   const tileSize = screenWidth * 0.42; // ~42% of screen width
-  
-  // Get current wardrobe and calculate match count
-  const { data: wardrobe = [] } = useWardrobe();
+
+  // Calculate match count using passed wardrobe (avoids N+1 query problem)
   const matchCount = useMatchCount(check, wardrobe);
   
   return (
@@ -1194,6 +1195,7 @@ export default function HomeScreen() {
                   key={check.id}
                   check={check}
                   index={index}
+                  wardrobe={wardrobe}
                   onPress={(c) => {
                     // Navigate to saved result screen
                     router.push({

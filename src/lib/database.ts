@@ -234,10 +234,16 @@ export const useRemoveWardrobeItem = () => {
       // Return the deleted item ID so caller can use it
       return { deletedId: id };
     },
-    // NOTE: We intentionally do NOT invalidate queries here.
-    // The caller should invalidate AFTER navigation to prevent UI freezes
-    // when multiple components are subscribed to the wardrobe query.
-    // Use queryClient.invalidateQueries({ queryKey: ["wardrobe"] }) after navigation.
+    // NOTE: We intentionally do NOT invalidate or optimistically update queries here.
+    // The caller handles cache updates AFTER navigation to prevent UI freezes.
+    //
+    // Flow:
+    // 1. Mutation completes (storage cleanup + DB delete)
+    // 2. Caller navigates away
+    // 3. Caller updates cache after navigation animation completes
+    //
+    // This prevents expensive re-renders on screens that are still mounted
+    // during the navigation animation.
   });
 };
 

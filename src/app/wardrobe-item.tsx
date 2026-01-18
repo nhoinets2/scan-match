@@ -10,6 +10,7 @@ import {
   Modal,
   Alert,
   ActivityIndicator,
+  InteractionManager,
 } from "react-native";
 import { Image } from "expo-image";
 import { BlurView } from "expo-blur";
@@ -380,17 +381,19 @@ export default function WardrobeItemScreen() {
 
       // Navigate FIRST, before invalidating queries
       // This prevents the results screen and home page from re-rendering with stale data
+      console.log('[Delete] Navigation starting...');
       navigateBack();
 
-      // Invalidate wardrobe query AFTER navigation with a delay
-      // This ensures the screen transition completes before triggering re-renders
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["wardrobe"] });
-        // Also reset local state
-        setShowDeleteConfirmation(false);
-        setIsDeleting(false);
-        setDeletingItem(null);
-      }, 300);
+      // Invalidate wardrobe query AFTER navigation animation fully completes
+      // Use InteractionManager + significant delay to ensure all screens unmount
+      // Modal animations can take 300-500ms each, and we're dismissing 2 screens
+      InteractionManager.runAfterInteractions(() => {
+        // Extra delay to ensure screens are fully unmounted (not just hidden)
+        setTimeout(() => {
+          console.log('[Delete] Invalidating wardrobe cache...');
+          queryClient.invalidateQueries({ queryKey: ["wardrobe"] });
+        }, 500);
+      });
     } catch (error) {
       console.error('[Delete] Failed to delete wardrobe item:', error);
       setIsDeleting(false);
