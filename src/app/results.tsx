@@ -2074,8 +2074,8 @@ function ResultsSuccess({
           showSubtitleTooltip: !!subtitle,
           trailingType: "chevron",
           trailingChevronColor: colors.text.primary,
-          // href for navigation to wardrobe item screen
-          href: `/wardrobe-item?itemId=${encodeURIComponent(String(item.id))}`,
+          // href for navigation to wardrobe item screen (view-only mode)
+          href: `/wardrobe-item?itemId=${encodeURIComponent(String(item.id))}&viewOnly=true`,
           onPressAnalytics: () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             trackWardrobeMatchItemTapped({
@@ -2380,8 +2380,8 @@ function ResultsSuccess({
         showSubtitleTooltip: false,
         trailingType: "chevron",
         trailingChevronColor: colors.text.primary,
-        // href for navigation to wardrobe item screen
-        href: `/wardrobe-item?itemId=${encodeURIComponent(String(item.id))}`,
+        // href for navigation to wardrobe item screen (view-only mode)
+        href: `/wardrobe-item?itemId=${encodeURIComponent(String(item.id))}&viewOnly=true`,
         onPressAnalytics: () => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         },
@@ -4768,9 +4768,9 @@ width: spacing.xs / 2,
               totalMatches: confidenceResult.matches.length,
             });
           }
-          // Navigate to wardrobe item
+          // Navigate to wardrobe item (view-only mode)
           const itemId = item.id;
-          router.push(`/wardrobe-item?itemId=${encodeURIComponent(String(itemId))}`);
+          router.push(`/wardrobe-item?itemId=${encodeURIComponent(String(itemId))}&viewOnly=true`);
         }}
       />
       )}

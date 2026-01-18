@@ -202,12 +202,15 @@ function CategoryPicker({
 
 export default function WardrobeItemScreen() {
   const insets = useSafeAreaInsets();
-  const { itemId } = useLocalSearchParams<{ itemId: string }>();
+  const { itemId, viewOnly } = useLocalSearchParams<{ itemId: string; viewOnly?: string }>();
   const { data: wardrobe = [] } = useWardrobe();
   const updateWardrobeItemMutation = useUpdateWardrobeItem();
   const removeWardrobeItemMutation = useRemoveWardrobeItem();
   const scrollViewRef = useRef<ScrollView>(null);
   const detailsY = useRef<number>(0); // scroll target for optional details
+
+  // View-only mode (e.g., when opened from results screen)
+  const isViewOnly = viewOnly === "true";
 
   const item = useMemo(() => {
     return wardrobe.find((w: WardrobeItem) => w.id === itemId) ?? null;
@@ -616,29 +619,35 @@ export default function WardrobeItemScreen() {
                   }}
                   numberOfLines={1}
                 >
-                  {isEditMode 
-                    ? "Edit details" 
-                    : displayItem 
+                  {isEditMode
+                    ? "Edit details"
+                    : displayItem
                       ? getCategorySingular(displayItem.category)
                       : "Wardrobe item"}
                 </Text>
               </View>
-              <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  handleDeleteRequest();
-                }}
-                style={{
-                  width: spacing.xxl,
-                  height: spacing.xxl,
-                  borderRadius: borderRadius.pill,
-                  backgroundColor: "rgba(255,255,255,0.1)",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Trash2 size={20} color={colors.text.primary} strokeWidth={1.5} />
-              </Pressable>
+              {/* Delete button - hidden in view-only mode */}
+              {!isViewOnly ? (
+                <Pressable
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    handleDeleteRequest();
+                  }}
+                  style={{
+                    width: spacing.xxl,
+                    height: spacing.xxl,
+                    borderRadius: borderRadius.pill,
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Trash2 size={20} color={colors.text.primary} strokeWidth={1.5} />
+                </Pressable>
+              ) : (
+                // Empty spacer to keep header balanced
+                <View style={{ width: spacing.xxl, height: spacing.xxl }} />
+              )}
             </View>
           </Animated.View>
           {/* Separator line */}
@@ -1186,7 +1195,8 @@ export default function WardrobeItemScreen() {
             )}
             </ScrollView>
 
-            {/* Bottom action */}
+            {/* Bottom action - hidden in view-only mode */}
+            {!isViewOnly && (
             <View
               style={{
                 position: "absolute",
@@ -1226,6 +1236,7 @@ export default function WardrobeItemScreen() {
           />
         )}
             </View>
+            )}
           </KeyboardAvoidingView>
 
       {/* Photo viewer modal */}
