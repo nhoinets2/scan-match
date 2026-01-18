@@ -202,12 +202,25 @@ function CategoryPicker({
 
 export default function WardrobeItemScreen() {
   const insets = useSafeAreaInsets();
-  const { itemId } = useLocalSearchParams<{ itemId: string }>();
+  const { itemId, fromResults } = useLocalSearchParams<{ itemId: string; fromResults?: string }>();
   const { data: wardrobe = [] } = useWardrobe();
   const updateWardrobeItemMutation = useUpdateWardrobeItem();
   const removeWardrobeItemMutation = useRemoveWardrobeItem();
   const scrollViewRef = useRef<ScrollView>(null);
   const detailsY = useRef<number>(0); // scroll target for optional details
+
+  // Track if we came from results screen (need to dismiss 2 modals)
+  const cameFromResults = fromResults === "true";
+
+  // Helper to navigate back properly based on where we came from
+  // If from results, dismiss both modals to avoid results screen re-rendering with stale data
+  const navigateBack = () => {
+    if (cameFromResults) {
+      router.dismiss(2);
+    } else {
+      router.back();
+    }
+  };
 
   const item = useMemo(() => {
     return wardrobe.find((w: WardrobeItem) => w.id === itemId) ?? null;
@@ -363,10 +376,10 @@ export default function WardrobeItemScreen() {
       // Set global flag for wardrobe page to show toast
       (globalThis as typeof globalThis & { __wardrobeItemDeleted?: boolean }).__wardrobeItemDeleted = true;
 
-      // Navigate FIRST before resetting state to avoid UI freeze
-      // Use replace to go directly to wardrobe tab instead of router.back()
-      // This prevents issues when navigating back to a screen that references the deleted item
-      router.replace("/(tabs)/wardrobe");
+      // Navigate based on where we came from
+      // If from results screen, dismiss both modals (wardrobe-item + results) to go back to tabs
+      // This prevents the results screen from re-rendering with stale data and causing a freeze
+      navigateBack();
 
       // Reset state after navigation is initiated (use setTimeout to ensure navigation starts first)
       setTimeout(() => {
@@ -491,14 +504,14 @@ export default function WardrobeItemScreen() {
           animationType="fade"
           onRequestClose={() => {
             setDeleteError(null);
-            router.replace("/(tabs)/wardrobe");
+            navigateBack();
           }}
         >
           <Pressable
             style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
             onPress={() => {
               setDeleteError(null);
-              router.replace("/(tabs)/wardrobe");
+              navigateBack();
             }}
           >
             <Pressable
@@ -562,7 +575,7 @@ export default function WardrobeItemScreen() {
                 label="Close"
                 onPress={() => {
                   setDeleteError(null);
-                  router.replace("/(tabs)/wardrobe");
+                  navigateBack();
                 }}
                 style={{ width: "100%" }}
               />
@@ -1424,8 +1437,7 @@ export default function WardrobeItemScreen() {
               onPress={() => {
                 setDeleteError(null);
                 setDeletingItem(null);
-                // Use replace instead of back to avoid navigating to a screen that references the deleted item
-                router.replace("/(tabs)/wardrobe");
+                navigateBack();
               }}
               style={{ marginTop: spacing.sm }}
             />

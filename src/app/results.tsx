@@ -2075,7 +2075,7 @@ function ResultsSuccess({
           trailingType: "chevron",
           trailingChevronColor: colors.text.primary,
           // href for navigation to wardrobe item screen
-          href: `/wardrobe-item?itemId=${encodeURIComponent(String(item.id))}`,
+          href: `/wardrobe-item?itemId=${encodeURIComponent(String(item.id))}&fromResults=true`,
           onPressAnalytics: () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             trackWardrobeMatchItemTapped({
@@ -2381,7 +2381,7 @@ function ResultsSuccess({
         trailingType: "chevron",
         trailingChevronColor: colors.text.primary,
         // href for navigation to wardrobe item screen
-        href: `/wardrobe-item?itemId=${encodeURIComponent(String(item.id))}`,
+        href: `/wardrobe-item?itemId=${encodeURIComponent(String(item.id))}&fromResults=true`,
         onPressAnalytics: () => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         },
@@ -4770,7 +4770,7 @@ width: spacing.xs / 2,
           }
           // Navigate to wardrobe item
           const itemId = item.id;
-          router.push(`/wardrobe-item?itemId=${encodeURIComponent(String(itemId))}`);
+          router.push(`/wardrobe-item?itemId=${encodeURIComponent(String(itemId))}&fromResults=true`);
         }}
       />
       )}
