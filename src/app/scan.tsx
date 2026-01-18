@@ -470,8 +470,11 @@ export default function ScanScreen() {
           fromScan: "true", // Flag to indicate this came from scan (for proper back navigation)
         },
       });
-      
-      setIsProcessing(false);
+
+      // Don't reset isProcessing here - keep the processing overlay visible
+      // The scan screen stays in the stack underneath results, so we want to keep
+      // showing "Checking how this might work for you..." until results fully covers it
+      // This prevents a flash of the camera view during the transition
     } catch (error) {
       // Check if it's a network error
       const errMessage = error instanceof Error ? error.message : String(error || "");
