@@ -64,11 +64,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial session and initialize RevenueCat
     supabase.auth.getSession().then(async ({ data: { session: initialSession }, error }) => {
       if (error) {
-        console.error("Error getting session:", error);
+        console.error("[Auth] Error getting session:", error);
+        // Handle invalid refresh token - sign out the user gracefully
+        if (error.message?.includes("Refresh Token") || error.message?.includes("refresh_token")) {
+          console.log("[Auth] Invalid refresh token detected, signing out...");
+          await supabase.auth.signOut();
+          setSession(null);
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
       }
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
-      
+
       // Only initialize RevenueCat if user is signed in
       if (initialSession?.user?.id) {
         console.log("[Auth] Session restored for user:", initialSession.user.email);
@@ -77,7 +86,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         console.log("[Auth] No session - RevenueCat will initialize on sign-in");
       }
-      
+
+      setIsLoading(false);
+    }).catch(async (error) => {
+      // Catch any unhandled errors during session retrieval
+      console.error("[Auth] Failed to get session:", error);
+      // Sign out to clear invalid session data
+      await supabase.auth.signOut().catch(() => {});
+      setSession(null);
+      setUser(null);
       setIsLoading(false);
     });
 
