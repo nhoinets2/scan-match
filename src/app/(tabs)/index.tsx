@@ -38,7 +38,6 @@ import {
 } from "lucide-react-native";
 import { ImageWithFallback } from "@/components/PlaceholderImage";
 import Clipboard from "@react-native-clipboard/clipboard";
-import { useQueryClient } from "@tanstack/react-query";
 
 import {
   useWardrobe,
@@ -637,14 +636,12 @@ function StatusPill({ label, color }: { label: string; color: string }) {
 function RecentCheckListItem({
   check,
   index,
-  wardrobe,
   onPress,
   onLongPressDelete,
   onShowDebugSnapshot,
 }: {
   check: RecentCheck;
   index: number;
-  wardrobe: WardrobeItem[];
   onPress: (check: RecentCheck) => void;
   onLongPressDelete?: (check: RecentCheck) => void;
   onShowDebugSnapshot?: (snapshot: any) => void;
@@ -652,8 +649,9 @@ function RecentCheckListItem({
   // Calculate tile size for horizontal carousel (slightly larger than 2-column grid)
   const screenWidth = Dimensions.get("window").width;
   const tileSize = screenWidth * 0.42; // ~42% of screen width
-
-  // Calculate match count using passed wardrobe (avoids N+1 query problem)
+  
+  // Get current wardrobe and calculate match count
+  const { data: wardrobe = [] } = useWardrobe();
   const matchCount = useMatchCount(check, wardrobe);
   
   return (
@@ -861,7 +859,6 @@ function getCategoryLabel(categoryId: string): string {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const wardrobeCount = useWardrobeCount();
   const { data: wardrobe = [], refetch: refetchWardrobe, isFetching: isFetchingWardrobe } = useWardrobe();
   const { data: recentChecks = [], refetch: refetchRecentChecks, isFetching: isFetchingRecentChecks } = useRecentChecks();
@@ -924,15 +921,12 @@ export default function HomeScreen() {
 
   const handleWardrobeConfirmDelete = async () => {
     if (!wardrobeItemToDelete || isWardrobeDeleting) return;
-
+    
     setIsWardrobeDeleting(true);
-
+    
     try {
       await removeWardrobeItemMutation.mutateAsync({ id: wardrobeItemToDelete.id, imageUri: wardrobeItemToDelete.imageUri });
-
-      // Invalidate wardrobe query to refresh data
-      queryClient.invalidateQueries({ queryKey: ["wardrobe"] });
-
+      
       // Success
       setWardrobeItemToDelete(null);
       setIsWardrobeDeleting(false);
@@ -1195,7 +1189,6 @@ export default function HomeScreen() {
                   key={check.id}
                   check={check}
                   index={index}
-                  wardrobe={wardrobe}
                   onPress={(c) => {
                     // Navigate to saved result screen
                     router.push({

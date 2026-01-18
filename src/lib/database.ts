@@ -230,20 +230,13 @@ export const useRemoveWardrobeItem = () => {
         .eq("user_id", user.id);
 
       if (error) throw error;
-
-      // Return the deleted item ID so caller can use it
-      return { deletedId: id };
     },
-    // NOTE: We intentionally do NOT invalidate or optimistically update queries here.
-    // The caller handles cache updates AFTER navigation to prevent UI freezes.
-    //
-    // Flow:
-    // 1. Mutation completes (storage cleanup + DB delete)
-    // 2. Caller navigates away
-    // 3. Caller updates cache after navigation animation completes
-    //
-    // This prevents expensive re-renders on screens that are still mounted
-    // during the navigation animation.
+    // No optimistic update - item stays visible until delete succeeds
+    // This prevents jarring disappear/reappear on error
+    onSuccess: () => {
+      // Only update cache after successful deletion
+      queryClient.invalidateQueries({ queryKey: ["wardrobe", user?.id] });
+    },
   });
 };
 

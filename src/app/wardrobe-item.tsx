@@ -10,7 +10,6 @@ import {
   Modal,
   Alert,
   ActivityIndicator,
-  InteractionManager,
 } from "react-native";
 import { Image } from "expo-image";
 import { BlurView } from "expo-blur";
@@ -28,7 +27,6 @@ import {
   AlertCircle,
 } from "lucide-react-native";
 import { ThumbnailPlaceholderImage } from "@/components/PlaceholderImage";
-import { useQueryClient } from "@tanstack/react-query";
 
 import { useWardrobe, useRemoveWardrobeItem, useUpdateWardrobeItem } from "@/lib/database";
 import { colors, typography, spacing, components, borderRadius, cards, shadows, button } from "@/lib/design-tokens";
@@ -204,26 +202,12 @@ function CategoryPicker({
 
 export default function WardrobeItemScreen() {
   const insets = useSafeAreaInsets();
-  const { itemId, fromResults } = useLocalSearchParams<{ itemId: string; fromResults?: string }>();
+  const { itemId } = useLocalSearchParams<{ itemId: string }>();
   const { data: wardrobe = [] } = useWardrobe();
   const updateWardrobeItemMutation = useUpdateWardrobeItem();
   const removeWardrobeItemMutation = useRemoveWardrobeItem();
-  const queryClient = useQueryClient();
   const scrollViewRef = useRef<ScrollView>(null);
   const detailsY = useRef<number>(0); // scroll target for optional details
-
-  // Track if we came from results screen (need to dismiss 2 modals)
-  const cameFromResults = fromResults === "true";
-
-  // Helper to navigate back properly based on where we came from
-  // If from results, dismiss both modals to avoid results screen re-rendering with stale data
-  const navigateBack = () => {
-    if (cameFromResults) {
-      router.dismiss(2);
-    } else {
-      router.back();
-    }
-  };
 
   const item = useMemo(() => {
     return wardrobe.find((w: WardrobeItem) => w.id === itemId) ?? null;
@@ -363,43 +347,28 @@ export default function WardrobeItemScreen() {
     // Use displayItem to support retry after error (when item might still be null from optimistic update)
     const itemToDelete = item ?? deletingItem;
     if (!itemToDelete || isDeleting) return;
-
+    
     // Store item data before delete so we can keep showing content
     if (!deletingItem) {
       setDeletingItem(itemToDelete);
     }
     setIsDeleting(true);
-
+    
     try {
       await removeWardrobeItemMutation.mutateAsync({ id: itemToDelete.id, imageUri: itemToDelete.imageUri });
-
-      // Success - haptic feedback
+      
+      // Success - haptic and navigate
+      setShowDeleteConfirmation(false);
+      setIsDeleting(false);
+      setDeletingItem(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-      // Set global flag for wardrobe page to show toast
+      // Set global flag for wardrobe page to show toast, then go back
       (globalThis as typeof globalThis & { __wardrobeItemDeleted?: boolean }).__wardrobeItemDeleted = true;
-
-      // Navigate FIRST, before any cache updates
-      console.log('[Delete] Navigation starting...');
-      navigateBack();
-
-      // Update cache AFTER navigation using setQueryData instead of invalidate
-      // setQueryData directly modifies the cache without triggering a refetch,
-      // which prevents the expensive recalculations that cause the freeze
-      InteractionManager.runAfterInteractions(() => {
-        setTimeout(() => {
-          console.log('[Delete] Updating wardrobe cache directly...');
-          // Use setQueryData with a filter function to update all wardrobe queries
-          // This is more efficient than invalidate because it doesn't trigger a refetch
-          queryClient.setQueriesData<WardrobeItem[]>(
-            { queryKey: ["wardrobe"] },
-            (oldData) => {
-              if (!oldData) return oldData;
-              return oldData.filter(item => item.id !== itemToDelete.id);
-            }
-          );
-        }, 300);
-      });
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.push("/(tabs)/wardrobe");
+      }
     } catch (error) {
       console.error('[Delete] Failed to delete wardrobe item:', error);
       setIsDeleting(false);
@@ -517,17 +486,17 @@ export default function WardrobeItemScreen() {
           animationType="fade"
           onRequestClose={() => {
             setDeleteError(null);
-            navigateBack();
+            handleClose();
           }}
         >
-          <Pressable
+          <Pressable 
             style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
             onPress={() => {
               setDeleteError(null);
-              navigateBack();
+              handleClose();
             }}
           >
-            <Pressable
+            <Pressable 
               onPress={(e) => e.stopPropagation()}
               style={{
                 backgroundColor: colors.bg.primary,
@@ -588,7 +557,7 @@ export default function WardrobeItemScreen() {
                 label="Close"
                 onPress={() => {
                   setDeleteError(null);
-                  navigateBack();
+                  handleClose();
                 }}
                 style={{ width: "100%" }}
               />
@@ -1450,7 +1419,7 @@ export default function WardrobeItemScreen() {
               onPress={() => {
                 setDeleteError(null);
                 setDeletingItem(null);
-                navigateBack();
+                handleClose();
               }}
               style={{ marginTop: spacing.sm }}
             />
