@@ -1168,7 +1168,10 @@ export default function HomeScreen() {
                     if (isNavigatingToAllChecks) return; // Prevent double-tap
                     setIsNavigatingToAllChecks(true);
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    router.push("/all-checks");
+                    // Use setTimeout to ensure state update renders before navigation
+                    setTimeout(() => {
+                      router.push("/all-checks");
+                    }, 0);
                   }}
                   disabled={isNavigatingToAllChecks}
                   hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -1245,7 +1248,10 @@ export default function HomeScreen() {
                     if (isNavigatingToWardrobe) return; // Prevent double-tap
                     setIsNavigatingToWardrobe(true);
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    router.push("/wardrobe");
+                    // Use setTimeout to ensure state update renders before navigation
+                    setTimeout(() => {
+                      router.push("/wardrobe");
+                    }, 0);
                   }}
                   disabled={isNavigatingToWardrobe}
                   style={{ flexDirection: "row", alignItems: "center", opacity: isNavigatingToWardrobe ? 0.6 : 1 }}
