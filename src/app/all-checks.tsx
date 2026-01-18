@@ -20,8 +20,7 @@ import Animated, {
   FadeOut,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import Clipboard from "@react-native-clipboard/clipboard";
-import { ArrowLeft, Clock, Copy, X, CloudUpload, RefreshCw, WifiOff, AlertCircle } from "lucide-react-native";
+import { ArrowLeft, Clock, CloudUpload, RefreshCw, WifiOff, AlertCircle } from "lucide-react-native";
 import { ImageWithFallback } from "@/components/PlaceholderImage";
 
 import { useRecentChecks, useRemoveRecentCheck, useWardrobe, SCAN_RETENTION } from "@/lib/database";
@@ -394,361 +393,6 @@ function EmptyState() {
     </Animated.View>
   );
 }
-
-// TEMPORARY: Debug snapshot modal component
-function DebugSnapshotModal({
-  visible,
-  snapshot,
-  onClose,
-}: {
-  visible: boolean;
-  snapshot: any;
-  onClose: () => void;
-}) {
-  const insets = useSafeAreaInsets();
-  const [copied, setCopied] = useState(false);
-
-  // Early return BEFORE expensive JSON.stringify
-  if (!visible || !snapshot) return null;
-
-  const snapshotJson = JSON.stringify(snapshot, null, 2);
-
-  const handleCopy = () => {
-    Clipboard.setString(snapshotJson);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  // Extract key info for formatted summary
-  const engines = snapshot.engines || {};
-  const confidence = engines.confidence || {};
-  const legacy = engines.legacy || {};
-  const topMatches = snapshot.topMatches || [];
-  const nearMatches = snapshot.nearMatches || [];
-  const suggestions = snapshot.suggestions || {};
-
-  return (
-    <Modal
-      visible={visible}
-      transparent={false}
-      animationType="slide"
-      onRequestClose={onClose}
-      presentationStyle="fullScreen"
-    >
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: colors.bg.primary,
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
-        }}
-      >
-        {/* Header */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: spacing.md,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border.subtle,
-          }}
-        >
-          <View>
-            <Text
-              style={{
-                ...typography.ui.sectionTitle,
-                color: colors.text.primary,
-              }}
-            >
-              Debug Snapshot
-            </Text>
-            <Text
-              style={{
-                ...typography.ui.caption,
-                color: colors.text.tertiary,
-                marginTop: spacing.xs / 2,
-              }}
-            >
-              {snapshot.version} • {snapshot.scannedCategory}
-            </Text>
-          </View>
-          <Pressable
-            onPress={onClose}
-            style={{
-              width: spacing.xl,
-              height: spacing.xl,
-              borderRadius: borderRadius.card,
-              backgroundColor: colors.bg.secondary,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <X size={18} color={colors.text.primary} />
-          </Pressable>
-        </View>
-
-        {/* Content */}
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xl }}
-          showsVerticalScrollIndicator={true}
-        >
-          {/* Engine Status */}
-          <View style={{
-            backgroundColor: colors.bg.secondary,
-            borderRadius: borderRadius.image,
-            padding: spacing.md,
-            marginBottom: spacing.md,
-          }}>
-            <Text style={{
-              ...typography.ui.cardTitle,
-              color: colors.text.primary,
-              marginBottom: spacing.sm,
-            }}>
-              Engine Status
-            </Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
-              <StatusPill
-                label={`Tier: ${confidence.debugTier || 'N/A'}`}
-                color={confidence.debugTier === 'HIGH' ? colors.status.success : confidence.debugTier === 'MEDIUM' ? colors.status.warning : colors.status.error}
-              />
-              <StatusPill
-                label={confidence.evaluated ? 'Evaluated' : 'Not Evaluated'}
-                color={confidence.evaluated ? colors.status.success : colors.status.error}
-              />
-              <StatusPill
-                label={`Mode ${confidence.suggestionsMode || '?'}`}
-                color={colors.status.info}
-              />
-              {legacy.usedForMatches && (
-                <StatusPill label="Legacy Used" color={colors.status.warning} />
-              )}
-            </View>
-          </View>
-
-          {/* Match Counts */}
-          <View style={{
-            backgroundColor: colors.bg.secondary,
-            borderRadius: borderRadius.image,
-            padding: spacing.md,
-            marginBottom: spacing.md,
-          }}>
-            <Text style={{
-              ...typography.ui.cardTitle,
-              color: colors.text.primary,
-              marginBottom: spacing.sm,
-            }}>
-              Matches
-            </Text>
-            <View style={{ flexDirection: "row", gap: spacing.lg }}>
-              <View style={{ alignItems: 'center' }}>
-                <Text style={{ ...typography._internal.displayMd, fontSize: 32, color: colors.status.success }}>
-                  {confidence.matchesHighCount ?? 0}
-                </Text>
-                <Text style={{ ...typography.ui.caption, color: colors.text.tertiary }}>
-                  HIGH
-                </Text>
-              </View>
-              <View style={{ alignItems: 'center' }}>
-                <Text style={{ ...typography._internal.displayMd, fontSize: 32, color: colors.status.warning }}>
-                  {confidence.nearMatchesCount ?? 0}
-                </Text>
-                <Text style={{ ...typography.ui.caption, color: colors.text.tertiary }}>
-                  NEAR
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Top Matches Detail */}
-          {topMatches.length > 0 && (
-            <View style={{
-              backgroundColor: colors.bg.secondary,
-              borderRadius: borderRadius.image,
-              padding: 12,
-              marginBottom: 12,
-            }}>
-              <Text style={{
-                fontFamily: "Inter_600SemiBold",
-                fontSize: 14,
-                color: colors.text.primary,
-                marginBottom: 8,
-              }}>
-                Top Matches ({topMatches.length})
-              </Text>
-              {topMatches.map((match: any, i: number) => (
-                <View key={i} style={{
-                  paddingVertical: 8,
-                  borderTopWidth: i > 0 ? 1 : 0,
-                  borderTopColor: colors.border.subtle,
-                }}>
-                  <Text style={{ fontFamily: "Inter_500Medium", fontSize: 13, color: colors.text.primary }}>
-                    {match.pairType} • Score: {(match.rawScore * 100).toFixed(0)}%
-                  </Text>
-                  {match.caps?.length > 0 && (
-                    <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: colors.text.tertiary, marginTop: 2 }}>
-                      Caps: {match.caps.join(', ')}
-                    </Text>
-                  )}
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Near Matches Detail */}
-          {nearMatches.length > 0 && (
-            <View style={{
-              backgroundColor: colors.bg.secondary,
-              borderRadius: borderRadius.image,
-              padding: 12,
-              marginBottom: 12,
-            }}>
-              <Text style={{
-                fontFamily: "Inter_600SemiBold",
-                fontSize: 14,
-                color: colors.text.primary,
-                marginBottom: 8,
-              }}>
-                Near Matches ({nearMatches.length})
-              </Text>
-              {nearMatches.map((match: any, i: number) => (
-                <View key={i} style={{
-                  paddingVertical: 8,
-                  borderTopWidth: i > 0 ? 1 : 0,
-                  borderTopColor: colors.border.subtle,
-                }}>
-                  <Text style={{ fontFamily: "Inter_500Medium", fontSize: 13, color: colors.text.primary }}>
-                    {match.pairType} • Score: {(match.rawScore * 100).toFixed(0)}%
-                    {match.isType2a && ' (2a)'}
-                    {match.isType2b && ' (2b)'}
-                  </Text>
-                  {match.caps?.length > 0 && (
-                    <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: colors.text.tertiary, marginTop: 2 }}>
-                      Caps: {match.caps.join(', ')}
-                    </Text>
-                  )}
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Suggestions */}
-          {(suggestions.modeABullets?.length > 0 || suggestions.modeBBullets?.length > 0) && (
-            <View style={{
-              backgroundColor: colors.bg.secondary,
-              borderRadius: borderRadius.image,
-              padding: 12,
-              marginBottom: 12,
-            }}>
-              <Text style={{
-                fontFamily: "Inter_600SemiBold",
-                fontSize: 14,
-                color: colors.text.primary,
-                marginBottom: 8,
-              }}>
-                Suggestions
-              </Text>
-              {suggestions.modeABullets?.map((bullet: string, i: number) => (
-                <Text key={`a-${i}`} style={{ fontFamily: "Inter_400Regular", fontSize: 13, color: colors.text.secondary, marginBottom: 6 }}>
-                  • {bullet}
-                </Text>
-              ))}
-              {suggestions.modeBBullets?.map((bullet: string, i: number) => (
-                <Text key={`b-${i}`} style={{ fontFamily: "Inter_400Regular", fontSize: 13, color: colors.text.secondary, marginBottom: 6 }}>
-                  • {bullet}
-                </Text>
-              ))}
-            </View>
-          )}
-
-          {/* Raw JSON */}
-          <View style={{
-            backgroundColor: button.primary.backgroundColor,
-            borderRadius: borderRadius.image,
-            padding: 12,
-          }}>
-            <Text style={{
-              fontFamily: "Inter_600SemiBold",
-              fontSize: 12,
-              color: '#888',
-              marginBottom: 8,
-            }}>
-              Raw JSON
-            </Text>
-            <Text
-              style={{
-                fontFamily: "Courier",
-                fontSize: 11,
-                color: colors.text.tertiary,
-                lineHeight: 16,
-              }}
-              selectable
-            >
-              {snapshotJson}
-            </Text>
-          </View>
-        </ScrollView>
-
-        {/* Footer with copy button */}
-        <View
-          style={{
-            padding: spacing.md,
-            borderTopWidth: 1,
-            borderTopColor: colors.border.subtle,
-          }}
-        >
-          <Pressable
-            onPress={handleCopy}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: copied ? colors.status.success : colors.accent.terracotta,
-              paddingVertical: spacing.md + spacing.xs / 2,
-              paddingHorizontal: spacing.lg,
-              borderRadius: borderRadius.image,
-              gap: spacing.sm,
-            }}
-          >
-            <Copy size={18} color={colors.text.inverse} />
-            <Text
-              style={{
-                ...typography.button.primary,
-                color: colors.text.inverse,
-              }}
-            >
-              {copied ? 'Copied!' : 'Copy JSON to Clipboard'}
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-// Helper component for status pills
-function StatusPill({ label, color }: { label: string; color: string }) {
-  return (
-    <View style={{
-      backgroundColor: `${color}20`,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.xs,
-      borderRadius: borderRadius.pill,
-      borderWidth: 1,
-      borderColor: `${color}40`,
-    }}>
-      <Text style={{
-        ...typography.ui.micro,
-        color: color,
-      }}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
 export default function AllChecksScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -775,10 +419,7 @@ export default function AllChecksScreen() {
   const [showToast, setShowToast] = useState(false);
   const [deleteError, setDeleteError] = useState<'network' | 'other' | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  // TEMPORARY: Debug snapshot modal state
-  const [showDebugSnapshot, setShowDebugSnapshot] = useState(false);
-  const [debugSnapshot, setDebugSnapshot] = useState<any>(null);
-  
+
   // Debug: Log image URIs when checks change (helps diagnose cross-device sync issues)
   useEffect(() => {
     if (__DEV__ && recentChecks.length > 0) {
@@ -899,6 +540,21 @@ export default function AllChecksScreen() {
     [tileSize, handleCheckPress, handleDeleteRequest, matchCountMap]
   );
 
+  // getItemLayout for FlatList scroll performance optimization
+  // Each row contains 2 items, row height = tileSize + marginBottom (spacing.md)
+  const getItemLayout = useCallback(
+    (_data: ArrayLike<RecentCheck> | null | undefined, index: number) => {
+      const rowHeight = tileSize + spacing.md;
+      const rowIndex = Math.floor(index / 2); // 2 columns
+      return {
+        length: tileSize,
+        offset: rowIndex * rowHeight,
+        index,
+      };
+    },
+    [tileSize]
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
       {/* Header */}
@@ -943,6 +599,7 @@ export default function AllChecksScreen() {
           numColumns={2}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
+          getItemLayout={getItemLayout}
           showsVerticalScrollIndicator
           indicatorStyle="black"
           contentContainerStyle={{
@@ -1000,16 +657,6 @@ export default function AllChecksScreen() {
       <SuccessToast
         visible={showToast}
         message="Removed from All scans"
-      />
-
-      {/* TEMPORARY: Debug Snapshot Modal */}
-      <DebugSnapshotModal
-        visible={showDebugSnapshot}
-        snapshot={debugSnapshot}
-        onClose={() => {
-          setShowDebugSnapshot(false);
-          setDebugSnapshot(null);
-        }}
       />
 
       {/* Delete error modal */}
