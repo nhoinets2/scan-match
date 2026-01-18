@@ -38,6 +38,7 @@ import {
 } from "lucide-react-native";
 import { ImageWithFallback } from "@/components/PlaceholderImage";
 import Clipboard from "@react-native-clipboard/clipboard";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
   useWardrobe,
@@ -859,6 +860,7 @@ function getCategoryLabel(categoryId: string): string {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const wardrobeCount = useWardrobeCount();
   const { data: wardrobe = [], refetch: refetchWardrobe, isFetching: isFetchingWardrobe } = useWardrobe();
   const { data: recentChecks = [], refetch: refetchRecentChecks, isFetching: isFetchingRecentChecks } = useRecentChecks();
@@ -921,12 +923,15 @@ export default function HomeScreen() {
 
   const handleWardrobeConfirmDelete = async () => {
     if (!wardrobeItemToDelete || isWardrobeDeleting) return;
-    
+
     setIsWardrobeDeleting(true);
-    
+
     try {
       await removeWardrobeItemMutation.mutateAsync({ id: wardrobeItemToDelete.id, imageUri: wardrobeItemToDelete.imageUri });
-      
+
+      // Invalidate wardrobe query to refresh data
+      queryClient.invalidateQueries({ queryKey: ["wardrobe"] });
+
       // Success
       setWardrobeItemToDelete(null);
       setIsWardrobeDeleting(false);

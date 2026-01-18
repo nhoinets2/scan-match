@@ -735,12 +735,15 @@ export default function WardrobeScreen() {
   // Confirm delete action
   const handleConfirmDelete = async () => {
     if (!itemToDelete || isDeleting) return;
-    
+
     setIsDeleting(true);
-    
+
     try {
       await removeWardrobeItemMutation.mutateAsync({ id: itemToDelete.id, imageUri: itemToDelete.imageUri });
-      
+
+      // Invalidate wardrobe query to refresh data
+      queryClient.invalidateQueries({ queryKey: ["wardrobe"] });
+
       // Success - close modal, show toast
       setItemToDelete(null);
       setIsDeleting(false);

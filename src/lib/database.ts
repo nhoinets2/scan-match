@@ -230,13 +230,14 @@ export const useRemoveWardrobeItem = () => {
         .eq("user_id", user.id);
 
       if (error) throw error;
+
+      // Return the deleted item ID so caller can use it
+      return { deletedId: id };
     },
-    // No optimistic update - item stays visible until delete succeeds
-    // This prevents jarring disappear/reappear on error
-    onSuccess: () => {
-      // Only update cache after successful deletion
-      queryClient.invalidateQueries({ queryKey: ["wardrobe", user?.id] });
-    },
+    // NOTE: We intentionally do NOT invalidate queries here.
+    // The caller should invalidate AFTER navigation to prevent UI freezes
+    // when multiple components are subscribed to the wardrobe query.
+    // Use queryClient.invalidateQueries({ queryKey: ["wardrobe"] }) after navigation.
   });
 };
 

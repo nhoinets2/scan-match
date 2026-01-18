@@ -27,6 +27,7 @@ import {
   AlertCircle,
 } from "lucide-react-native";
 import { ThumbnailPlaceholderImage } from "@/components/PlaceholderImage";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { useWardrobe, useRemoveWardrobeItem, useUpdateWardrobeItem } from "@/lib/database";
 import { colors, typography, spacing, components, borderRadius, cards, shadows, button } from "@/lib/design-tokens";
@@ -206,6 +207,7 @@ export default function WardrobeItemScreen() {
   const { data: wardrobe = [] } = useWardrobe();
   const updateWardrobeItemMutation = useUpdateWardrobeItem();
   const removeWardrobeItemMutation = useRemoveWardrobeItem();
+  const queryClient = useQueryClient();
   const scrollViewRef = useRef<ScrollView>(null);
   const detailsY = useRef<number>(0); // scroll target for optional details
 
@@ -376,17 +378,19 @@ export default function WardrobeItemScreen() {
       // Set global flag for wardrobe page to show toast
       (globalThis as typeof globalThis & { __wardrobeItemDeleted?: boolean }).__wardrobeItemDeleted = true;
 
-      // Navigate based on where we came from
-      // If from results screen, dismiss both modals (wardrobe-item + results) to go back to tabs
-      // This prevents the results screen from re-rendering with stale data and causing a freeze
+      // Navigate FIRST, before invalidating queries
+      // This prevents the results screen and home page from re-rendering with stale data
       navigateBack();
 
-      // Reset state after navigation is initiated (use setTimeout to ensure navigation starts first)
+      // Invalidate wardrobe query AFTER navigation with a delay
+      // This ensures the screen transition completes before triggering re-renders
       setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["wardrobe"] });
+        // Also reset local state
         setShowDeleteConfirmation(false);
         setIsDeleting(false);
         setDeletingItem(null);
-      }, 100);
+      }, 300);
     } catch (error) {
       console.error('[Delete] Failed to delete wardrobe item:', error);
       setIsDeleting(false);
