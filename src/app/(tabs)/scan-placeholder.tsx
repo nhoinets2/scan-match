@@ -1,11 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { View, Text, Pressable, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  FadeInUp,
+  FadeOut,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import {
@@ -15,11 +18,11 @@ import {
   Sparkles,
 } from "lucide-react-native";
 
-import { 
-  colors, 
-  typography, 
-  spacing, 
-  borderRadius, 
+import {
+  colors,
+  typography,
+  spacing,
+  borderRadius,
   shadows,
   segmentedControl,
   button,
@@ -301,6 +304,29 @@ export default function ScanScreen() {
   const insets = useSafeAreaInsets();
   const [scanMode, setScanMode] = useState<ScanMode>("try");
 
+  // Toast state for "Added to Wardrobe" feedback
+  const [showWardrobeAddedToast, setShowWardrobeAddedToast] = useState(false);
+
+  // Auto-hide toast after 2 seconds
+  useEffect(() => {
+    if (showWardrobeAddedToast) {
+      const timeout = setTimeout(() => {
+        setShowWardrobeAddedToast(false);
+      }, 2000);
+      return () => clearTimeout(timeout);
+    }
+  }, [showWardrobeAddedToast]);
+
+  // Check for wardrobe item added flag when screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      if ((globalThis as any).__wardrobeItemAdded) {
+        setShowWardrobeAddedToast(true);
+        (globalThis as any).__wardrobeItemAdded = false;
+      }
+    }, [])
+  );
+
   const handleScanPress = () => {
     // Navigate to appropriate camera screen based on selected mode
     if (scanMode === "wardrobe") {
@@ -342,7 +368,7 @@ export default function ScanScreen() {
               color: colors.text.secondary,
             }}
           >
-            {scanMode === "try" 
+            {scanMode === "try"
               ? "Scan an item to see how it fits your style."
               : "Add items you own to get better recommendations."}
           </Text>
@@ -361,6 +387,42 @@ export default function ScanScreen() {
         {/* Guidance Tip */}
         <GuidanceTip />
       </ScrollView>
+
+      {/* Wardrobe Added Toast */}
+      {showWardrobeAddedToast && (
+        <Animated.View
+          entering={FadeInUp.duration(300).springify().damping(20)}
+          exiting={FadeOut.duration(200)}
+          style={{
+            position: "absolute",
+            bottom: 140,
+            left: 24,
+            right: 24,
+            zIndex: 1000,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: button.primary.backgroundColor,
+              borderRadius: borderRadius.card,
+              paddingHorizontal: 20,
+              paddingVertical: 16,
+              alignItems: "center",
+              ...shadows.lg,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Inter_500Medium",
+                fontSize: 15,
+                color: colors.text.inverse,
+              }}
+            >
+              Added to Wardrobe
+            </Text>
+          </View>
+        </Animated.View>
+      )}
     </View>
   );
 }

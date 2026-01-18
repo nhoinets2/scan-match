@@ -884,6 +884,19 @@ export default function HomeScreen() {
   const [showDebugSnapshot, setShowDebugSnapshot] = useState(false);
   const [debugSnapshot, setDebugSnapshot] = useState<any>(null);
 
+  // Wardrobe item add toast state (shown when returning from add-item flow)
+  const [showWardrobeAddedToast, setShowWardrobeAddedToast] = useState(false);
+
+  // Auto-hide wardrobe added toast after 2 seconds
+  useEffect(() => {
+    if (showWardrobeAddedToast) {
+      const timeout = setTimeout(() => {
+        setShowWardrobeAddedToast(false);
+      }, 2000);
+      return () => clearTimeout(timeout);
+    }
+  }, [showWardrobeAddedToast]);
+
   // Wardrobe item delete state
   const removeWardrobeItemMutation = useRemoveWardrobeItem();
   const [wardrobeItemToDelete, setWardrobeItemToDelete] = useState<WardrobeItem | null>(null);
@@ -1011,6 +1024,7 @@ export default function HomeScreen() {
   
   // Force re-render when screen gains focus to update relative timestamps
   // Also reset scroll position to prevent content offset bugs
+  // Also check for wardrobe item added flag to show toast
   const [, setTimestampTick] = useState(0);
   useFocusEffect(
     useCallback(() => {
@@ -1018,6 +1032,11 @@ export default function HomeScreen() {
       setTimestampTick(tick => tick + 1);
       // Reset scroll to top to prevent content offset bugs from RefreshControl
       scrollRef.current?.scrollTo({ y: 0, animated: false });
+      // Check if an item was just added to wardrobe (from add-item flow)
+      if ((globalThis as any).__wardrobeItemAdded) {
+        setShowWardrobeAddedToast(true);
+        (globalThis as any).__wardrobeItemAdded = false;
+      }
     }, [])
   );
 
@@ -1538,6 +1557,42 @@ export default function HomeScreen() {
               }}
             >
               Removed from Wardrobe
+            </Text>
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Wardrobe Added Toast - shown when returning from add-item flow */}
+      {showWardrobeAddedToast && (
+        <Animated.View
+          entering={FadeInUp.duration(300).springify().damping(20)}
+          exiting={FadeOut.duration(200)}
+          style={{
+            position: "absolute",
+            bottom: 140,
+            left: 24,
+            right: 24,
+            zIndex: 1000,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: button.primary.backgroundColor,
+              borderRadius: borderRadius.card,
+              paddingHorizontal: 20,
+              paddingVertical: 16,
+              alignItems: "center",
+              ...shadows.lg,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Inter_500Medium",
+                fontSize: 15,
+                color: colors.text.inverse,
+              }}
+            >
+              Added to Wardrobe
             </Text>
           </View>
         </Animated.View>
