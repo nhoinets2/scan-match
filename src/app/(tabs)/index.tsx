@@ -976,6 +976,10 @@ export default function HomeScreen() {
   const [scanDeleteError, setScanDeleteError] = useState<'network' | 'other' | null>(null);
   const [isScanDeleting, setIsScanDeleting] = useState(false);
 
+  // Navigation loading states to prevent double-tap
+  const [isNavigatingToAllChecks, setIsNavigatingToAllChecks] = useState(false);
+  const [isNavigatingToWardrobe, setIsNavigatingToWardrobe] = useState(false);
+
   // Auto-hide scan toast after 2 seconds
   useEffect(() => {
     if (showScanToast) {
@@ -1054,6 +1058,9 @@ export default function HomeScreen() {
       setTimestampTick(tick => tick + 1);
       // Reset scroll to top to prevent content offset bugs from RefreshControl
       scrollRef.current?.scrollTo({ y: 0, animated: false });
+      // Reset navigation loading states when returning to this screen
+      setIsNavigatingToAllChecks(false);
+      setIsNavigatingToWardrobe(false);
       // Check if an item was just added to wardrobe (from add-item flow)
       if ((globalThis as any).__wardrobeItemAdded) {
         setShowWardrobeAddedToast(true);
@@ -1158,11 +1165,14 @@ export default function HomeScreen() {
               {effectiveRecentChecks.length > 5 && (
                 <Pressable
                   onPress={() => {
+                    if (isNavigatingToAllChecks) return; // Prevent double-tap
+                    setIsNavigatingToAllChecks(true);
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     router.push("/all-checks");
                   }}
+                  disabled={isNavigatingToAllChecks}
                   hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                  style={{ flexDirection: "row", alignItems: "center" }}
+                  style={{ flexDirection: "row", alignItems: "center", opacity: isNavigatingToAllChecks ? 0.6 : 1 }}
                 >
                 <Text
                   style={{
@@ -1173,7 +1183,11 @@ export default function HomeScreen() {
                 >
                   View all ({effectiveRecentChecks.length})
                 </Text>
-                  <ChevronRight size={16} color={colors.text.secondary} />
+                  {isNavigatingToAllChecks ? (
+                    <ActivityIndicator size={14} color={colors.text.secondary} />
+                  ) : (
+                    <ChevronRight size={16} color={colors.text.secondary} />
+                  )}
                 </Pressable>
               )}
             </View>
@@ -1228,10 +1242,13 @@ export default function HomeScreen() {
               {wardrobeCount > 5 && (
                 <Pressable
                   onPress={() => {
+                    if (isNavigatingToWardrobe) return; // Prevent double-tap
+                    setIsNavigatingToWardrobe(true);
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     router.push("/wardrobe");
                   }}
-                  style={{ flexDirection: "row", alignItems: "center" }}
+                  disabled={isNavigatingToWardrobe}
+                  style={{ flexDirection: "row", alignItems: "center", opacity: isNavigatingToWardrobe ? 0.6 : 1 }}
                 >
                   <Text
                     style={{
@@ -1242,7 +1259,11 @@ export default function HomeScreen() {
                   >
                     View all ({wardrobeCount})
                   </Text>
-                  <ChevronRight size={16} color={colors.text.secondary} />
+                  {isNavigatingToWardrobe ? (
+                    <ActivityIndicator size={14} color={colors.text.secondary} />
+                  ) : (
+                    <ChevronRight size={16} color={colors.text.secondary} />
+                  )}
                 </Pressable>
               )}
             </View>
