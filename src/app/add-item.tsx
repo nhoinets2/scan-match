@@ -2150,10 +2150,10 @@ export default function AddItemScreen() {
             {/* Title */}
             <Text
               style={{
-                ...typography.display.screenTitle,
+                ...typography.ui.cardTitle,
                 color: colors.text.primary,
                 textAlign: "center",
-                marginBottom: spacing.xs,
+                marginBottom: spacing.sm,
               }}
             >
               {saveError === 'network' ? 'Connection unavailable' : "Couldn't save item"}
