@@ -1242,9 +1242,10 @@ export default function AddItemScreen() {
       console.error("[Storage] Failed to add item:", error);
       setIsSaving(false); // Reset loading state
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      
+
       // Check if it's a network error
       const errMessage = error instanceof Error ? error.message : String(error || "");
+      const errLower = errMessage.toLowerCase();
       const isNetworkErr =
         errMessage.includes("Network request failed") ||
         errMessage.includes("The Internet connection appears to be offline") ||
@@ -1253,8 +1254,18 @@ export default function AddItemScreen() {
         errMessage.includes("Failed to fetch") ||
         errMessage.includes("fetch failed") ||
         errMessage.includes("ENOTFOUND") ||
-        errMessage.includes("ECONNREFUSED");
-      
+        errMessage.includes("ECONNREFUSED") ||
+        errMessage.includes("Could not connect to the server") ||
+        errMessage.includes("A server with the specified hostname could not be found") ||
+        errMessage.includes("A data connection is not currently allowed") ||
+        errMessage.includes("not connected to the internet") ||
+        errLower.includes("offline") ||
+        errLower.includes("no internet") ||
+        errLower.includes("network error") ||
+        errLower.includes("network is unreachable") ||
+        errLower.includes("socket is not connected") ||
+        errLower.includes("timed out");
+
       console.log("[AddItem] Save error:", errMessage, "isNetwork:", isNetworkErr);
       setSaveError(isNetworkErr ? 'network' : 'other');
     }
