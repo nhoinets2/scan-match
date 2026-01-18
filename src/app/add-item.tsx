@@ -1556,7 +1556,7 @@ export default function AddItemScreen() {
               {/* Title */}
               <Text
                 style={{
-                  ...typography.display.screenTitle,
+                  ...typography.ui.sectionTitle,
                   color: colors.text.primary,
                   textAlign: "center",
                   marginBottom: spacing.xs,
