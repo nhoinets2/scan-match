@@ -73,19 +73,19 @@ const HELP_SECTIONS: HelpSection[] = [
         id: "how-to-scan",
         question: "How do I scan an item?",
         answer:
-          "Tap 'Scan item' on the home screen, then point your camera at the clothing item. Make sure the item is well-lit and fully visible. You can also upload a photo from your gallery by tapping the photo icon.",
+          "Tap 'Scan & Match' on the home screen to open the camera. Point your camera at the clothing item and tap the capture button. You can also upload a photo from your gallery by tapping the image icon in the bottom left. The app will guide you with helpful tips while scanning.",
       },
       {
         id: "scan-tips",
         question: "Tips for better scan results",
         answer:
-          "For best results: 1) Use good lighting - natural light works best. 2) Capture the full item in frame. 3) Avoid busy backgrounds. 4) Hold the camera steady. 5) If scanning a patterned item, make sure the pattern is clearly visible.",
+          "For best results:\n\n• Lay flat or hang up the item for best visibility\n• Use good lighting - natural light works best to see colors accurately\n• Include the full item in frame - make sure nothing is cut off\n• Use plain backgrounds - avoid busy patterns or cluttered surfaces\n• Hold the camera steady when capturing\n\nThe camera screen shows rotating tips to help guide you through each scan.",
       },
       {
         id: "scan-issues",
         question: "Why isn't my scan working?",
         answer:
-          "If scanning isn't working, try: 1) Ensuring camera permissions are enabled. 2) Moving to better lighting. 3) Holding the item against a plain background. 4) Cleaning your camera lens. If problems persist, try uploading a photo instead.",
+          "If scanning isn't working:\n\n• Check camera permissions - Go to Settings and ensure Scan & Match has camera access\n• Improve lighting - Move to a brighter area or use natural light\n• Try a plain background - Hang the item or lay it on a solid-colored surface\n• Clean your camera lens\n• Use the gallery option - Tap the image icon to upload a photo instead of using live camera",
       },
     ],
   },
@@ -98,25 +98,19 @@ const HELP_SECTIONS: HelpSection[] = [
         id: "add-items",
         question: "How do I add items to my wardrobe?",
         answer:
-          "Tap 'Add to wardrobe' on the home screen or the '+' button on the Wardrobe tab. Take a photo or choose from your gallery. The app will automatically detect the category and colors, but you can adjust these manually.",
+          "Tap 'Build Wardrobe' on the home screen to scan and add items. Take a photo or choose from your gallery. The app will automatically detect the category and colors, but you can adjust these manually before saving.",
       },
       {
         id: "edit-items",
         question: "How do I edit or remove wardrobe items?",
         answer:
-          "Go to the Wardrobe tab and tap on any item to view its details. From there, you can edit the category, colors, style tags, and brand. To remove an item, swipe left on it in the list or tap 'Remove item' in the item detail view.",
+          "Go to the Wardrobe tab and tap on any item to view its details. From there, you can edit the category, colors, style tags, and brand. To remove an item, long-press on it in the grid to show the delete confirmation, then tap 'Remove'.",
       },
       {
         id: "categories",
         question: "What categories are available?",
         answer:
           "Scan & Match supports 8 categories: Tops, Bottoms, Skirts, Dresses, Outerwear, Shoes, Bags, and Accessories. Categorizing your items correctly helps improve match accuracy.",
-      },
-      {
-        id: "goes-with-everything",
-        question: "What does 'goes with everything' mean?",
-        answer:
-          "Items marked as 'goes with everything' are versatile basics that work with most outfits - like a white t-shirt or classic jeans. These items will appear more frequently in match suggestions.",
       },
       {
         id: "cloud-sync",
@@ -188,21 +182,21 @@ const HELP_SECTIONS: HelpSection[] = [
     topics: [
       {
         id: "save-item",
-        question: "How do I save an item for later?",
+        question: "How do I save a scan for later?",
         answer:
-          "After scanning an item, tap 'Save for later' at the bottom of the results screen. This saves the item to your Saved tab so you can revisit it when making a purchase decision.",
+          "After scanning an item, tap the bookmark icon at the top right of the results screen. When saved, the bookmark will fill in with a checkmark. This saves the scan to your Saved tab so you can revisit it when making a purchase decision.",
       },
       {
         id: "view-saved",
-        question: "Where can I find my saved items?",
+        question: "Where can I find my saved scans?",
         answer:
-          "Go to the Saved tab (heart icon) in the bottom navigation. Here you'll see all items you've saved, organized by when you scanned them. Tap any item to see its full match results again.",
+          "Go to the Saved tab (bookmark icon) in the bottom navigation. Here you'll see all scans you've saved, organized by when you scanned them. Tap any scan to see its full match results again.",
       },
       {
         id: "remove-saved",
-        question: "How do I remove a saved item?",
+        question: "How do I remove a saved scan?",
         answer:
-          "Swipe left on any item in the Saved tab to reveal the delete button, or tap on the item and select 'Remove' from the detail view.",
+          "Long-press on any scan in the Saved tab to show the delete confirmation. Tap 'Remove' to delete it. You can also unsave a scan by tapping the filled bookmark icon at the top of the results screen.",
       },
       {
         id: "auto-cleanup",
@@ -214,7 +208,7 @@ const HELP_SECTIONS: HelpSection[] = [
         id: "all-scans-limits",
         question: "What are the limits on the All scans page?",
         answer:
-          "The All scans page shows both your saved scans (unlimited, never auto-deleted) and up to 20 unsaved scans. Once you have 20 unsaved scans, adding a new scan will automatically remove your oldest unsaved scan. To keep a scan permanently, tap 'Save for later' on the results screen.",
+          "The All scans page shows both your saved scans (unlimited, never auto-deleted) and up to 20 unsaved scans. Once you have 20 unsaved scans, adding a new scan will automatically remove your oldest unsaved scan. To keep a scan permanently, tap the bookmark icon on the results screen.",
       },
       {
         id: "saved-scan-sync",

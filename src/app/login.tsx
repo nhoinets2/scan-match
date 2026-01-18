@@ -39,6 +39,7 @@ export default function LoginScreen() {
   };
 
   const handleGoogleSignIn = () => {
+    console.log("[Login] handleGoogleSignIn triggered");
     signInWithGoogle();
     // Navigation is handled by AuthGuard after successful sign in
   };

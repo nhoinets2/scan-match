@@ -15,7 +15,7 @@ if (supabaseUrl && supabaseAnonKey) {
       storage: AsyncStorage,
       autoRefreshToken: true,
       persistSession: true,
-      detectSessionInUrl: false,
+      detectSessionInUrl: true, // Enable URL detection for password reset links
     },
   });
 } else {

@@ -580,10 +580,10 @@ export function TipSheetModal({
                 }}
                 accessibilityLabel="Add items to wardrobe"
                 style={{
-                  backgroundColor: colors.accent.terracotta,
-                borderRadius: borderRadius.pill,
-                height: button.height.primary,
-                alignItems: "center",
+                  backgroundColor: button.primary.backgroundColor,
+                  borderRadius: borderRadius.pill,
+                  height: button.height.primary,
+                  alignItems: "center",
                   justifyContent: "center",
                   ...shadows.sm,
                 }}
@@ -1044,15 +1044,15 @@ function SuggestionsSection({
   if (isLoading) {
     return (
       <View>
-        <View
-          style={{
-            width: 120,
-            height: 14,
-            backgroundColor: colors.bg.tertiary,
-            borderRadius: borderRadius.pill,
-            marginBottom: 12,
-          }}
-        />
+          <View
+            style={{
+              width: 120,
+              height: 14,
+              backgroundColor: colors.bg.tertiary,
+              borderRadius: borderRadius.pill,
+              marginBottom: spacing.sm,
+            }}
+          />
         <View
           style={{
             flexDirection: "row",
@@ -1115,7 +1115,7 @@ function SuggestionsSection({
   // Fetch failed state
   if (errorType === "fetch_failed") {
     return (
-      <View style={{ padding: 32, alignItems: "center" }}>
+      <View style={{ paddingVertical: spacing.xl * 2, paddingHorizontal: spacing.lg, alignItems: "center" }}>
         <Text
           style={{
             ...typography.ui.bodyMedium,
@@ -1131,7 +1131,7 @@ function SuggestionsSection({
             ...typography.ui.label,
             color: colors.text.tertiary,
             textAlign: "center",
-            marginBottom: 16,
+            marginBottom: spacing.md,
           }}
         >
           Check your connection and try again.
@@ -1139,8 +1139,8 @@ function SuggestionsSection({
         <Pressable
           onPress={onRetry}
           style={{
-            paddingHorizontal: 20,
-            paddingVertical: 10,
+            paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.sm,
             backgroundColor: colors.state.pressed,
             borderRadius: borderRadius.image,
           }}
@@ -1161,7 +1161,7 @@ function SuggestionsSection({
   // Library is empty (no items in Supabase)
   if (libraryIsEmpty || errorType === "empty") {
     return (
-      <View style={{ padding: 32, alignItems: "center" }}>
+      <View style={{ paddingVertical: spacing.xl * 2, paddingHorizontal: spacing.lg, alignItems: "center" }}>
         <Text
           style={{
             ...typography.ui.bodyMedium,
@@ -1192,7 +1192,7 @@ function SuggestionsSection({
   // ─────────────────────────────────────────────
   if (content.items.length === 0 && !showMore) {
     return (
-      <View style={{ padding: 32, alignItems: "center" }}>
+      <View style={{ paddingVertical: spacing.xl * 2, paddingHorizontal: spacing.lg, alignItems: "center" }}>
         <Text
           style={{
             ...typography.ui.sectionTitle,
@@ -1208,7 +1208,7 @@ function SuggestionsSection({
             ...typography.ui.body,
             color: colors.text.secondary,
             textAlign: "center",
-            marginBottom: 20,
+            marginBottom: spacing.lg,
           }}
         >
           Want to see more items from this category?
@@ -1222,16 +1222,20 @@ function SuggestionsSection({
               setShowMore(true);
             }}
             style={{
-              backgroundColor: colors.accent.terracotta,
+              backgroundColor: button.secondary.backgroundColor,
               borderRadius: borderRadius.pill,
-              paddingHorizontal: 24,
-              paddingVertical: 12,
+              borderWidth: button.secondary.borderWidth,
+              borderColor: button.secondary.borderColor,
+              height: button.height.secondary,
+              paddingHorizontal: button.paddingX.secondary,
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
             <Text
               style={{
-                ...typography.ui.bodyMedium,
-                color: colors.text.inverse,
+                ...typography.button.secondary,
+                color: button.secondary.textColor,
               }}
             >
               Show more items
@@ -1287,7 +1291,7 @@ function SuggestionsSection({
           style={{
             ...typography.ui.caption,
             color: colors.text.tertiary,
-            marginBottom: 12,
+            marginBottom: spacing.sm,
             fontStyle: "italic",
           }}
         >
@@ -1299,7 +1303,7 @@ function SuggestionsSection({
           style={{
             ...typography.ui.caption,
             color: colors.text.tertiary,
-            marginBottom: 12,
+            marginBottom: spacing.sm,
             fontStyle: "italic",
           }}
         >
@@ -1357,10 +1361,10 @@ function SuggestionsSection({
                 style={{
                   position: "absolute",
                   top: 60,
-                  right: 20,
+                  right: spacing.lg,
                   backgroundColor: "rgba(255,255,255,0.15)" /* On dark BG */,
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
+                  paddingHorizontal: spacing.sm,
+                  paddingVertical: spacing.xs,
                   borderRadius: borderRadius.image,
                 }}
               >
@@ -1393,9 +1397,9 @@ function SuggestionsSection({
                   style={{
                     ...typography.ui.body,
                     color: colors.text.inverse,
-                    marginTop: 16,
+                    marginTop: spacing.md,
                     textAlign: "center",
-                    paddingHorizontal: 20,
+                    paddingHorizontal: spacing.lg,
                   }}
                   numberOfLines={2}
                 >
@@ -1515,14 +1519,14 @@ function BoardCard({ board, onPress, isLead }: BoardCardProps) {
                 flex: 1,
                 alignItems: "center",
                 justifyContent: "center",
-                padding: 16,
+                padding: spacing.md,
               }}
             >
               <Text
                 style={{
                   ...typography.ui.label,
                   color: colors.accent.terracotta,
-                  marginBottom: 6,
+                  marginBottom: spacing.xs,
                 }}
               >
                 ⚠️ Board image missing
@@ -1543,7 +1547,7 @@ function BoardCard({ board, onPress, isLead }: BoardCardProps) {
                     fontFamily: "monospace",
                     fontSize: 9,
                     color: colors.text.tertiary,
-                    marginTop: 8,
+                    marginTop: spacing.xs,
                   }}
                 >
                   {board._debug.packId}/{board._debug.variant}/{board._debug.kind}
@@ -1592,16 +1596,16 @@ function BoardCard({ board, onPress, isLead }: BoardCardProps) {
       </View>
 
       {/* Caption with kind pill */}
-      <View style={{ paddingHorizontal: 14, paddingVertical: 12 }}>
+      <View style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
         {/* Kind pill */}
         <View
           style={{
             alignSelf: "flex-start",
             backgroundColor: colors.state.pressed,
-            paddingHorizontal: 8,
-            paddingVertical: 3,
+            paddingHorizontal: spacing.xs,
+            paddingVertical: spacing.xs / 2,
             borderRadius: borderRadius.pill,
-            marginBottom: 6,
+            marginBottom: spacing.xs,
           }}
         >
           <Text
@@ -1658,7 +1662,7 @@ function EducationalSection({
             <View
               key={`board-${index}`}
               style={{
-                marginTop: isLead ? 0 : 16,
+                marginTop: isLead ? 0 : spacing.md,
                 width: "75%", // Preview size - tap to see full
               }}
             >
@@ -1702,10 +1706,10 @@ function EducationalSection({
                 style={{
                   position: "absolute",
                   top: 60,
-                  right: 20,
+                  right: spacing.lg,
                   backgroundColor: "rgba(255,255,255,0.15)" /* On dark BG */,
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
+                  paddingHorizontal: spacing.sm,
+                  paddingVertical: spacing.xs,
                   borderRadius: borderRadius.image,
                 }}
               >
@@ -1738,9 +1742,9 @@ function EducationalSection({
                   style={{
                     ...typography.ui.body,
                     color: colors.text.inverse,
-                    marginTop: 16,
+                    marginTop: spacing.md,
                     textAlign: "center",
-                    paddingHorizontal: 20,
+                    paddingHorizontal: spacing.lg,
                   }}
                   numberOfLines={2}
                 >

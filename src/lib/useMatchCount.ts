@@ -99,7 +99,7 @@ export function calculateMatchCountsForChecks(
         const totalMatches = highCount + nearCount;
         
         if (totalMatches === 0) {
-          map[check.id] = null;
+          map[check.id] = "0 matches";
         } else if (totalMatches === 1) {
           map[check.id] = "1 match";
         } else {

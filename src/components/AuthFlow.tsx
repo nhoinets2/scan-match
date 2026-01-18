@@ -292,6 +292,7 @@ function AuthContent({
         <View style={{ flex: 1 }}>
           <Pressable
             onPress={() => {
+              console.log("[AuthFlow] Google button pressed on landing screen");
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               props.onGoogleSignIn();
             }}
@@ -1419,6 +1420,7 @@ export default function AuthFlow(props: AuthFlowProps) {
                     <View style={{ flex: 1 }}>
                       <Pressable
                         onPress={() => {
+                          console.log("[AuthFlow] Google button pressed on login screen");
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                           props.onGoogleSignIn();
                         }}
@@ -1843,6 +1845,7 @@ export default function AuthFlow(props: AuthFlowProps) {
                     <View style={{ flex: 1 }}>
                       <Pressable
                         onPress={() => {
+                          console.log("[AuthFlow] Google button pressed on signup screen");
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                           props.onGoogleSignIn();
                         }}
@@ -2093,7 +2096,7 @@ export default function AuthFlow(props: AuthFlowProps) {
                             backgroundColor: colors.state.destructiveBg,
                             borderRadius: borderRadius.image,
                             padding: spacing.md,
-                            marginBottom: spacing.md,
+                            marginTop: spacing.md,
                           }}
                         >
                           <Text style={{ ...typography.ui.body, color: colors.state.destructive }}>
@@ -2101,8 +2104,13 @@ export default function AuthFlow(props: AuthFlowProps) {
                           </Text>
                         </Animated.View>
                       )}
+                    </Animated.View>
 
-                      {/* Submit Button */}
+                    {/* Submit Button - Outside the card */}
+                    <Animated.View
+                      entering={FadeInDown.delay(180).duration(500)}
+                      style={{ marginTop: spacing.md }}
+                    >
                       <AnimatedButton
                         variant="primary"
                         onPress={() =>
@@ -2186,9 +2194,9 @@ export default function AuthFlow(props: AuthFlowProps) {
                 <Animated.View entering={FadeIn.duration(500)} style={{ alignItems: "center" }}>
                   <View
                     style={{
-                      width: 80,
-                      height: 80,
-                      borderRadius: borderRadius.card,
+                      width: spacing.xxl * 2,
+                      height: spacing.xxl * 2,
+                      borderRadius: borderRadius.pill,
                       backgroundColor: colors.surface.icon,
                       alignItems: "center",
                       justifyContent: "center",
@@ -2200,9 +2208,7 @@ export default function AuthFlow(props: AuthFlowProps) {
 
                   <Text
                     style={{
-                      fontFamily: "Inter_600SemiBold",
-                      fontSize: typography.sizes.h1,
-                      color: colors.text.primary,
+                      ...typography.display.screenTitle,
                       textAlign: "center",
                       marginBottom: spacing.sm,
                     }}
@@ -2212,17 +2218,15 @@ export default function AuthFlow(props: AuthFlowProps) {
 
                   <Text
                     style={{
-                      fontFamily: "Inter_400Regular",
-                      fontSize: typography.sizes.body,
+                      ...typography.ui.body,
                       color: colors.text.secondary,
                       textAlign: "center",
-                      lineHeight: 22,
                       paddingHorizontal: spacing.lg,
                       marginBottom: spacing.xl,
                     }}
                   >
                     We sent a link to{"\n"}
-                    <Text style={{ fontFamily: "Inter_500Medium", color: colors.text.primary }}>
+                    <Text style={{ ...typography.ui.bodyMedium, color: colors.text.primary }}>
                       {email.trim()}
                     </Text>
                   </Text>
@@ -2237,8 +2241,7 @@ export default function AuthFlow(props: AuthFlowProps) {
                   >
                     <Text
                       style={{
-                        fontFamily: "Inter_600SemiBold",
-                        fontSize: typography.sizes.body,
+                        ...typography.button.secondary,
                         color: colors.text.primary,
                       }}
                     >

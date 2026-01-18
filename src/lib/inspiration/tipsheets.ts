@@ -1082,12 +1082,6 @@ export const TIP_SHEETS: Record<string, TipSheetEntry> = {
     packId: "A_accessories_minimal",
   },
 
-  ACCESSORIES__OUTFIT_SIMPLE: {
-    mode: "A",
-    subtitle: "Simple pieces let accessories feel intentional.",
-    targetCategory: null,
-    packId: "A_outfit_clean_simple",
-  },
   ACCESSORIES__SHOES_NEUTRAL: {
     mode: "A",
     subtitle: "Neutral shoes keep the overall look cohesive.",
@@ -1928,9 +1922,7 @@ export const BUNDLE_RECIPES: Record<string, BundleRecipe> = {
   },
 
   // ─────────────────────────────────────────────
-  // ACCESSORIES scanned → suggest outfit/shoes/outerwear
-  // NOTE: ACCESSORIES__OUTFIT_SIMPLE has targetCategory: null (concept advice)
-  // so it doesn't have a recipe - user sees educational boards instead
+  // ACCESSORIES scanned → suggest shoes/outerwear
   // ─────────────────────────────────────────────
   ACCESSORIES__SHOES_NEUTRAL: {
     targetCategory: "shoes",

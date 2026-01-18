@@ -488,7 +488,6 @@ export type ModeABulletKey =
   | 'BAGS__SHOES_NEUTRAL'
   | 'BAGS__ACCESSORIES_MINIMAL'
   // ACCESSORIES scanned
-  | 'ACCESSORIES__OUTFIT_SIMPLE'
   | 'ACCESSORIES__SHOES_NEUTRAL'
   | 'ACCESSORIES__OUTERWEAR_CLEAN'
   // DEFAULT (fallback)
@@ -807,11 +806,6 @@ export const MODE_A_TEMPLATES_V2: Record<Category | 'default', ModeATemplateV2> 
   accessories: {
     intro: 'This complements:',
     bullets: [
-      {
-        key: 'ACCESSORIES__OUTFIT_SIMPLE',
-        text: 'Simple outfit pieces',
-        target: null,
-      },
       {
         key: 'ACCESSORIES__SHOES_NEUTRAL',
         text: 'Neutral everyday shoes',

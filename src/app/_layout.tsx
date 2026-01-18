@@ -1,9 +1,10 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef } from "react";
 import { useFonts } from "expo-font";
+import * as Linking from "expo-linking";
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -52,6 +53,59 @@ function BackgroundUploadInitializer() {
       void initializeBackgroundUploads();
     }
   }, [isLoading, user]);
+
+  return null; // This component renders nothing
+}
+
+/**
+ * Handles deep links for password reset.
+ * When user clicks the reset link in email, this navigates them to the password reset screen.
+ */
+function DeepLinkHandler() {
+  const router = useRouter();
+  const handledUrl = useRef<string | null>(null);
+
+  useEffect(() => {
+    // Handle initial URL if app was opened from a link
+    const handleInitialUrl = async () => {
+      const initialUrl = await Linking.getInitialURL();
+      if (initialUrl && initialUrl !== handledUrl.current) {
+        handledUrl.current = initialUrl;
+        handleDeepLink(initialUrl);
+      }
+    };
+
+    // Listen for URL changes while app is running
+    const subscription = Linking.addEventListener("url", (event) => {
+      if (event.url && event.url !== handledUrl.current) {
+        handledUrl.current = event.url;
+        handleDeepLink(event.url);
+      }
+    });
+
+    handleInitialUrl();
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  const handleDeepLink = (url: string) => {
+    console.log("[DeepLink] Received URL:", url);
+    
+    // Check if this is an OAuth callback (access_token or code in URL)
+    if (url.includes("access_token") || url.includes("code=")) {
+      console.log("[DeepLink] OAuth callback detected - Supabase will handle session automatically");
+      // Supabase's detectSessionInUrl: true will automatically handle this
+      return;
+    }
+    
+    // Check if this is a password reset link
+    if (url.includes("reset-password") || url.includes("type=recovery")) {
+      console.log("[DeepLink] Navigating to reset password confirmation screen");
+      router.push("/reset-password-confirm");
+    }
+  };
 
   return null; // This component renders nothing
 }
@@ -168,6 +222,13 @@ function RootLayoutNav({
             }}
           />
           <Stack.Screen
+            name="reset-password-confirm"
+            options={{
+              headerShown: false,
+              presentation: "modal",
+            }}
+          />
+          <Stack.Screen
             name="help-center"
             options={{
               headerShown: false,
@@ -250,6 +311,7 @@ export default function RootLayout() {
       <AuthProvider>
         <SplashHider fontsLoaded={fontsLoaded} fontError={fontError} />
         <BackgroundUploadInitializer />
+        <DeepLinkHandler />
         <GestureHandlerRootView style={{ flex: 1 }}>
           <KeyboardProvider>
             <StatusBar style="dark" />

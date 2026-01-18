@@ -1448,7 +1448,7 @@ export default function AddItemScreen() {
                     textAlign: "center",
                   }}
                 >
-                  Snap an item you already own.
+                  Scan an item you already own.
                 </Text>
               </View>
             </Animated.View>

@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      console.log("[Auth] Auth state changed:", event);
+      console.log("[Auth] Auth state changed:", event, "User:", newSession?.user?.email);
       setSession(newSession);
       setUser(newSession?.user ?? null);
 
@@ -112,6 +112,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("[Auth] User signed in, initializing RevenueCat with ID:", newSession.user.id);
         await initializeRevenueCat(newSession.user.id);
         console.log("[Auth] ✅ RevenueCat initialized with user ID from the start");
+      }
+      
+      // Clear Google loading state on auth change
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+        setIsGoogleLoading(false);
+        setIsAppleLoading(false);
       }
     });
 
@@ -187,29 +193,100 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
+    console.log("[Auth] signInWithGoogle called");
     try {
       setIsGoogleLoading(true);
       setGoogleError(null);
       
       // Get the redirect URL for the current platform
       const redirectUrl = Linking.createURL("/");
+      console.log("[Auth] Google OAuth redirect URL:", redirectUrl);
       
       // Use Supabase OAuth - credentials are configured in Supabase Dashboard
-      const { error } = await supabase.auth.signInWithOAuth({
+      console.log("[Auth] Initiating Google OAuth...");
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: redirectUrl,
-          skipBrowserRedirect: false,
+          skipBrowserRedirect: true, // We'll handle the browser ourselves
         },
       });
       
+      console.log("[Auth] Google OAuth response:", { data, error });
+      
       if (error) {
-        console.error("Google sign-in error:", error);
+        console.error("[Auth] Google sign-in error:", error);
         setGoogleError(error);
+        setIsGoogleLoading(false);
+        return;
       }
+      
+      if (data?.url) {
+        console.log("[Auth] Opening Google OAuth URL:", data.url);
+        
+        // Open the OAuth URL in browser
+        const result = await WebBrowser.openAuthSessionAsync(
+          data.url,
+          redirectUrl,
+          {
+            showInRecents: true,
+          }
+        );
+        
+        console.log("[Auth] Browser result:", result);
+        
+        if (result.type === "success" && result.url) {
+          console.log("[Auth] OAuth callback received, URL:", result.url);
+          
+          // Check for errors in the callback URL
+          if (result.url.includes("error=")) {
+            const urlParams = new URLSearchParams(result.url.split("?")[1]);
+            const errorCode = urlParams.get("error_code");
+            const errorDescription = urlParams.get("error_description");
+            console.error("[Auth] OAuth error:", errorCode, errorDescription);
+            
+            const authError = new Error(
+              errorDescription 
+                ? decodeURIComponent(errorDescription).replace(/\+/g, " ")
+                : "Google sign-in failed"
+            );
+            setGoogleError(authError);
+            setIsGoogleLoading(false);
+            return;
+          }
+          
+          // Extract the URL params and manually set the session
+          const url = new URL(result.url);
+          const params = new URLSearchParams(url.search + url.hash.replace("#", "&"));
+          const accessToken = params.get("access_token");
+          const refreshToken = params.get("refresh_token");
+          
+          if (accessToken && refreshToken) {
+            console.log("[Auth] Setting session from OAuth tokens");
+            const { error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            
+            if (sessionError) {
+              console.error("[Auth] Failed to set session:", sessionError);
+              setGoogleError(sessionError);
+            } else {
+              console.log("[Auth] ✅ Google OAuth session established");
+            }
+          } else {
+            console.log("[Auth] No tokens found in callback URL, waiting for auth state change");
+          }
+        } else if (result.type === "cancel") {
+          console.log("[Auth] User canceled OAuth");
+        } else {
+          console.log("[Auth] OAuth dismissed");
+        }
+      }
+      
       setIsGoogleLoading(false);
     } catch (error) {
-      console.error("Google sign-in error:", error);
+      console.error("[Auth] Google sign-in exception:", error);
       setGoogleError(error as Error);
       setIsGoogleLoading(false);
     }
@@ -229,7 +306,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'snaptomatch://reset-password',
+    });
     return { error: error as Error | null };
   };
 

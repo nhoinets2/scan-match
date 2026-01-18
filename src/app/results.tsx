@@ -3228,14 +3228,14 @@ function ResultsSuccess({
         {wardrobeCount === 0 ? (
           <>
             {/* Step Timeline Card */}
-            <Animated.View entering={FadeInDown.delay(300)} style={{ marginBottom: spacing.sm }}>
+            <Animated.View entering={FadeInDown.delay(300)} style={{ marginBottom: spacing.lg }}>
             <View
               style={{
                 // V3: cards.standard = border-first, no shadow
                 backgroundColor: cards.standard.backgroundColor,
                 borderWidth: cards.standard.borderWidth,
                 borderColor: cards.standard.borderColor,
-                borderRadius: borderRadius.pill,
+                borderRadius: cards.standard.borderRadius,
                 padding: spacing.lg,
               }}
             >
@@ -3246,11 +3246,11 @@ function ResultsSuccess({
                   style={{
                     width: spacing.xl,
                     height: spacing.xl,
-                    borderRadius: borderRadius.card,
+                    borderRadius: borderRadius.pill,
                     backgroundColor: colors.accent.terracottaLight,
                     alignItems: "center",
                     justifyContent: "center",
-                    marginRight: 12,
+                    marginRight: spacing.sm,
                   }}
                 >
                   <Check size={18} color={colors.accent.terracotta} strokeWidth={2.5} />
@@ -3271,8 +3271,8 @@ function ResultsSuccess({
               {/* Connector line */}
               <View
                 style={{
-width: spacing.xs / 2,
-                height: spacing.md - spacing.xs,
+                  width: spacing.xs / 2,
+                  height: spacing.md - spacing.xs,
                   backgroundColor: colors.bg.tertiary,
                   marginLeft: spacing.md,
                   marginBottom: spacing.xs / 2,
@@ -3286,12 +3286,12 @@ width: spacing.xs / 2,
                   style={{
                     width: spacing.xl,
                     height: spacing.xl,
-                    borderRadius: borderRadius.card,
+                    borderRadius: borderRadius.pill,
                     borderWidth: 2,
                     borderColor: colors.accent.terracotta,
                     alignItems: "center",
                     justifyContent: "center",
-                    marginRight: 12,
+                    marginRight: spacing.sm,
                     backgroundColor: colors.bg.elevated,
                   }}
                 >
@@ -3329,8 +3329,8 @@ width: spacing.xs / 2,
               {/* Connector line */}
               <View
                 style={{
-width: spacing.xs / 2,
-                height: spacing.md - spacing.xs,
+                  width: spacing.xs / 2,
+                  height: spacing.md - spacing.xs,
                   backgroundColor: colors.bg.tertiary,
                   marginLeft: spacing.md,
                   marginBottom: spacing.xs / 2,
@@ -3344,12 +3344,12 @@ width: spacing.xs / 2,
                   style={{
                     width: spacing.xl,
                     height: spacing.xl,
-                    borderRadius: borderRadius.card,
+                    borderRadius: borderRadius.pill,
                     borderWidth: 2,
                     borderColor: colors.border.hairline,
                     alignItems: "center",
                     justifyContent: "center",
-                    marginRight: 12,
+                    marginRight: spacing.sm,
                     backgroundColor: colors.bg.elevated,
                   }}
                 >
@@ -3366,7 +3366,7 @@ width: spacing.xs / 2,
                 <View style={{ flex: 1, paddingTop: spacing.xs }}>
                   <Text
                     style={{
-                      ...typography.ui.sectionTitle,
+                      ...typography.ui.cardTitle,
                       color: colors.text.secondary,
                       marginBottom: spacing.xs / 2,
                     }}
@@ -3375,7 +3375,7 @@ width: spacing.xs / 2,
                   </Text>
                   <Text
                     style={{
-                      ...typography.ui.caption,
+                      ...typography.ui.micro,
                       color: colors.text.tertiary,
                     }}
                   >
@@ -3388,12 +3388,12 @@ width: spacing.xs / 2,
 
             {/* What to add first - tappable tips that open bottom sheet */}
             {helpfulAdditionRows.length > 0 && (
-              <Animated.View entering={FadeInDown.delay(400)} style={{ marginBottom: spacing.md, marginTop: spacing.xs / 2 }}>
+              <Animated.View entering={FadeInDown.delay(400)} style={{ marginBottom: spacing.md }}>
                 <Text
                   style={{
                     ...typography.ui.sectionTitle,
                     color: colors.text.primary,
-                    marginBottom: spacing.sm,
+                    marginBottom: spacing.lg,
                     paddingHorizontal: spacing.xs,
                   }}
                 >
@@ -3455,7 +3455,7 @@ width: spacing.xs / 2,
                             backgroundColor: colors.accent.terracottaLight,
                             alignItems: "center",
                             justifyContent: "center",
-                            marginRight: 12,
+                            marginRight: spacing.sm,
                           }}
                         >
                           {row.leadingIcon}
@@ -3720,7 +3720,7 @@ width: spacing.xs / 2,
                                 backgroundColor: colors.accent.terracottaLight,
                                 alignItems: "center",
                                 justifyContent: "center",
-                                marginRight: 12,
+                                marginRight: spacing.sm,
                                 overflow: "hidden",
                               }}
                             >
@@ -3739,7 +3739,7 @@ width: spacing.xs / 2,
                                 backgroundColor: colors.accent.terracottaLight,
                                 alignItems: "center",
                                 justifyContent: "center",
-                                marginRight: 12,
+                                marginRight: spacing.sm,
                                 overflow: "hidden",
                               }}
                             >
@@ -4324,7 +4324,7 @@ width: spacing.xs / 2,
             onPress={handleAddWardrobe}
             accessibilityLabel="Add items to wardrobe"
             style={{
-              backgroundColor: colors.accent.terracotta,
+              backgroundColor: button.primary.backgroundColor,
               borderRadius: borderRadius.pill,
               height: button.height.primary,
               alignItems: "center",
