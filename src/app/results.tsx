@@ -179,12 +179,15 @@ interface ResultsSuccessProps {
   
   // Actions
   clearScan: () => void;
-  
+
   // Layout
   insets: { top: number; bottom: number; left: number; right: number };
-  
+
   // Auth
   user: { id: string } | null;
+
+  // Navigation context
+  fromScan?: boolean;
 }
 
 // ============================================
@@ -202,6 +205,8 @@ type ResultsRouteParams = {
   // For viewing saved/recent checks
   checkId?: string;
   from?: string;
+  // Flag indicating navigation came from scan screen (for proper back navigation)
+  fromScan?: string;
 };
 
 /**
@@ -231,12 +236,14 @@ const ANALYSIS_STEPS = [
   "Final touches",
 ];
 
-function ResultsLoading({ 
-  imageUri, 
-  insets 
-}: { 
-  imageUri: string; 
-  insets: { top: number; bottom: number } 
+function ResultsLoading({
+  imageUri,
+  insets,
+  fromScan,
+}: {
+  imageUri: string;
+  insets: { top: number; bottom: number };
+  fromScan?: boolean;
 }) {
   // Screen dimensions for responsive sizing
   const { width: screenWidth } = useWindowDimensions();
@@ -296,7 +303,11 @@ function ResultsLoading({
   // Close handler with haptic feedback
   const handleClose = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.back();
+    if (fromScan) {
+      router.dismiss(2);
+    } else {
+      router.back();
+    }
   };
 
   return (
@@ -531,12 +542,14 @@ function ResultsFailed({
   attempt,
   onRetry,
   insets,
+  fromScan,
 }: {
   imageUri: string;
   error: AnalyzeError;
   attempt: number;
   onRetry: () => void;
   insets: { top: number; bottom: number };
+  fromScan?: boolean;
 }) {
   const isMaxRetries = attempt >= MAX_RETRIES;
 
@@ -577,7 +590,14 @@ function ResultsFailed({
         }}
       >
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            if (fromScan) {
+              router.dismiss(2);
+            } else {
+              router.back();
+            }
+          }}
           style={({ pressed }) => ({
             width: spacing.xxl,
             height: spacing.xxl,
@@ -1490,7 +1510,7 @@ export default function ResultsScreen() {
   // All hooks after this point will be in ResultsSuccess.
   if (shouldUseImageUriFlow && analysisState) {
     if (analysisState.status === "loading") {
-      return <ResultsLoading imageUri={analysisState.imageUri} insets={insets} />;
+      return <ResultsLoading imageUri={analysisState.imageUri} insets={insets} fromScan={params.fromScan === "true"} />;
     }
     if (analysisState.status === "failed") {
       return (
@@ -1500,6 +1520,7 @@ export default function ResultsScreen() {
           attempt={analysisState.attempt}
           onRetry={handleRetry}
           insets={insets}
+          fromScan={params.fromScan === "true"}
         />
       );
     }
@@ -1547,6 +1568,7 @@ export default function ResultsScreen() {
       updateRecentCheckOutcomeMutation={updateRecentCheckOutcomeMutation}
       insets={insets}
       user={user}
+      fromScan={params.fromScan === "true"}
     />
   );
 }
@@ -1578,6 +1600,7 @@ function ResultsSuccess({
   updateRecentCheckOutcomeMutation,
   insets,
   user,
+  fromScan,
 }: ResultsSuccessProps) {
   const hasAddedCheck = useRef(false);
   
@@ -2480,7 +2503,13 @@ function ResultsSuccess({
     if (!isViewingSavedCheck) {
       clearScan();
     }
-    router.back();
+    // If we came from scan, go back twice to skip the scan screen
+    // This prevents showing the scan camera briefly when closing results
+    if (fromScan) {
+      router.dismiss(2);
+    } else {
+      router.back();
+    }
   };
 
   // Get original outcome based on verdict state (for unsaving)

@@ -458,14 +458,16 @@ export default function ScanScreen() {
       
       // Credit consumed - navigate to results (analysis will happen there)
       console.log("[Quota] Credit allowed, navigating to results with imageUri");
-      
+
       // Navigate to results - results.tsx will handle analysis via state machine
-      router.replace({
+      // Using push instead of replace to avoid flash of previous screen during transition
+      router.push({
         pathname: "/results",
         params: {
           imageUri,
           analysisKey,
           source,
+          fromScan: "true", // Flag to indicate this came from scan (for proper back navigation)
         },
       });
       
