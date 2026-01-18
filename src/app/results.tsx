@@ -2607,9 +2607,10 @@ function ResultsSuccess({
           console.error('[Save] Failed to save scan:', error);
           // Revert visual state
           setIsSaved(false);
-          
+
           // Check if it's a network error
           const errMessage = error instanceof Error ? error.message : String(error || "");
+          const errLower = errMessage.toLowerCase();
           const isNetworkErr =
             errMessage.includes("Network request failed") ||
             errMessage.includes("The Internet connection appears to be offline") ||
@@ -2618,8 +2619,18 @@ function ResultsSuccess({
             errMessage.includes("Failed to fetch") ||
             errMessage.includes("fetch failed") ||
             errMessage.includes("ENOTFOUND") ||
-            errMessage.includes("ECONNREFUSED");
-          
+            errMessage.includes("ECONNREFUSED") ||
+            errMessage.includes("Could not connect to the server") ||
+            errMessage.includes("A server with the specified hostname could not be found") ||
+            errMessage.includes("A data connection is not currently allowed") ||
+            errMessage.includes("not connected to the internet") ||
+            errLower.includes("offline") ||
+            errLower.includes("no internet") ||
+            errLower.includes("network error") ||
+            errLower.includes("network is unreachable") ||
+            errLower.includes("socket is not connected") ||
+            errLower.includes("timed out");
+
           console.log("[Save] Error:", errMessage, "isNetwork:", isNetworkErr);
           setSaveError(isNetworkErr ? 'network' : 'other');
         }
@@ -4693,11 +4704,10 @@ width: spacing.xs / 2,
             {/* Title */}
             <Text
               style={{
-                fontFamily: "PlayfairDisplay_600SemiBold",
-                fontSize: typography.sizes.h3,
+                ...typography.ui.cardTitle,
                 color: colors.text.primary,
                 textAlign: "center",
-                marginBottom: spacing.xs,
+                marginBottom: spacing.sm,
               }}
             >
               {saveError === 'network' ? 'Connection unavailable' : "Couldn't save scan"}
@@ -4706,16 +4716,14 @@ width: spacing.xs / 2,
             {/* Subtitle */}
             <Text
               style={{
-                fontFamily: "Inter_400Regular",
-                fontSize: typography.sizes.body,
+                ...typography.ui.body,
                 color: colors.text.secondary,
                 textAlign: "center",
                 marginBottom: spacing.lg,
-                lineHeight: 22,
               }}
             >
-              {saveError === 'network' 
-                ? 'Please check your internet and try again.' 
+              {saveError === 'network'
+                ? 'Please check your internet and try again.'
                 : 'Please try again in a moment.'}
             </Text>
 
