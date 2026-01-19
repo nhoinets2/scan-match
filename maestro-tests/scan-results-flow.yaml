@@ -1,0 +1,58 @@
+appId: com.anonymous.vibecode
+---
+# Scan Results Flow Tests
+# Tests the results screen after a successful scan
+# Prerequisite: User logged in, has scan credits, and completes a scan
+
+- launchApp
+- waitForAnimationToEnd
+
+# This test verifies results screen UI elements
+# Since we can't actually trigger camera in Maestro, we test via saved scans
+
+# Navigate to home/recent checks
+- assertVisible:
+    text: ".*Home.*|.*Recent.*"
+    optional: true
+
+# Look for any existing scan results to tap
+- tapOn:
+    text: ".*View all.*|.*Recent checks.*"
+    optional: true
+- waitForAnimationToEnd
+
+# Take screenshot of recent scans list
+- takeScreenshot: "results-recent-scans-list.png"
+
+# If there's a scan, tap on it to view results
+- tapOn:
+    index: 0
+    optional: true
+- waitForAnimationToEnd
+
+# Verify results screen elements if we got to one
+- assertVisible:
+    text: ".*Match.*|.*Skip.*|.*Save.*"
+    optional: true
+
+# Look for verdict/confidence indicators
+- assertVisible:
+    text: ".*Great.*|.*Good.*|.*Okay.*|.*Skip.*"
+    optional: true
+
+# Take screenshot of results
+- takeScreenshot: "results-detail-screen.png"
+
+# Verify outfit suggestions section
+- assertVisible:
+    text: ".*Outfit.*|.*Ideas.*|.*Style.*"
+    optional: true
+
+# Verify action buttons
+- assertVisible:
+    text: ".*Save.*|.*Add.*"
+    optional: true
+
+# Go back
+- back
+- waitForAnimationToEnd

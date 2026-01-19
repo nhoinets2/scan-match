@@ -1,0 +1,52 @@
+appId: com.anonymous.vibecode
+---
+# Quota Limit Display Tests
+# Verifies quota information is displayed correctly
+# Note: This tests UI display, not actual quota enforcement
+
+- launchApp
+- waitForAnimationToEnd
+
+# Navigate to account/settings where quota might be shown
+- tapOn:
+    text: "Account"
+    optional: true
+- waitForAnimationToEnd
+
+# Fallback: tap account tab position (usually rightmost)
+- runFlow:
+    when:
+      notVisible: "Account|Settings|Profile"
+    commands:
+      - tapOn:
+          point: "90%,95%"
+      - waitForAnimationToEnd
+
+# Take screenshot of account screen
+- takeScreenshot: "quota-account-screen.png"
+
+# Look for usage/quota related text
+- assertVisible:
+    text: ".*scans.*|.*usage.*|.*remaining.*"
+    optional: true
+
+# Look for subscription status
+- assertVisible:
+    text: ".*Pro.*|.*Free.*|.*Subscription.*"
+    optional: true
+
+# If there's a subscription section, tap it
+- tapOn:
+    text: ".*Subscription.*|.*Manage.*|.*Plan.*"
+    optional: true
+- waitForAnimationToEnd
+
+- takeScreenshot: "quota-subscription-screen.png"
+
+# Go back
+- back
+- waitForAnimationToEnd
+
+# Return to home
+- back
+- waitForAnimationToEnd

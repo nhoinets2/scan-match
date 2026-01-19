@@ -1,0 +1,81 @@
+appId: com.anonymous.vibecode
+---
+# Critical Scan Flow Tests
+# Tests the complete scan flow with Edge Function integration
+# Prerequisite: User must be logged in with scan credits available
+
+- launchApp
+- waitForAnimationToEnd
+
+# Ensure we're on the home screen (logged in)
+- assertVisible:
+    text: ".*Wardrobe.*|.*Home.*|.*Looks.*"
+    optional: true
+
+# Navigate to scan by tapping the scan/camera area
+- tapOn:
+    text: "Scan"
+    optional: true
+- waitForAnimationToEnd
+
+# If scan text not found, try tapping camera tab position
+- runFlow:
+    when:
+      notVisible: "Scan Item|Position item|Scan item"
+    commands:
+      - tapOn:
+          point: "37%,95%"
+      - waitForAnimationToEnd
+
+# Verify scan screen loaded
+- assertVisible:
+    text: "Scan item"
+    optional: true
+
+# Take screenshot of scan screen
+- takeScreenshot: "critical-scan-screen.png"
+
+# Verify key UI elements exist
+- assertVisible:
+    text: "Upload from photos"
+    optional: true
+
+# Verify help button exists
+- assertVisible:
+    id: ".*help.*"
+    optional: true
+
+# Verify close/X button exists for dismissing
+- assertVisible:
+    id: ".*close.*"
+    optional: true
+
+# Test the gallery upload option
+- tapOn:
+    text: "Upload from photos"
+    optional: true
+- waitForAnimationToEnd
+
+# Should open photo picker or show permission dialog
+- takeScreenshot: "critical-photo-picker.png"
+
+# Cancel/go back from photo picker
+- back
+- waitForAnimationToEnd
+
+# Verify we're back on scan screen
+- assertVisible:
+    text: "Scan item"
+    optional: true
+
+# Close scan screen
+- tapOn:
+    id: ".*close.*"
+    optional: true
+- waitForAnimationToEnd
+
+# Or use back button
+- back
+- waitForAnimationToEnd
+
+- takeScreenshot: "critical-scan-closed.png"

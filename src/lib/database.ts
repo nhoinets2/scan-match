@@ -437,9 +437,9 @@ export const useRecentChecks = () => {
       return (data as DbRecentCheck[]).map(mapDbToRecentCheck);
     },
     enabled: !!user?.id,
-    // Keep data fresh for 2 seconds - prevents flash during navigation back
-    // after save/unsave (optimistic update already has correct data)
-    staleTime: 2000,
+    // Keep data fresh for 30 seconds - prevents refetch and re-render when navigating back
+    // from results screen. Mutations still invalidate cache when changes are made.
+    staleTime: 30000,
   });
 };
 
@@ -647,6 +647,11 @@ interface UsageCounts {
   scansUsed: number;
   wardrobeAddsUsed: number;
   isPro: boolean;
+  // Monthly quota tracking
+  scansThisMonth: number;
+  wardrobeAddsThisMonth: number;
+  scanMonthlyLimit: number;
+  wardrobeAddMonthlyLimit: number;
 }
 
 /**
@@ -654,10 +659,11 @@ interface UsageCounts {
  * Useful for analytics and debugging conversion triggers.
  */
 export type ConsumeReason = 
-  | 'consumed'          // Credit was successfully consumed
-  | 'idempotent_replay' // Same idempotency key - no new charge
-  | 'pro_unlimited'     // Pro user - unlimited access
-  | 'quota_exceeded';   // At/over limit - blocked
+  | 'consumed'              // Credit was successfully consumed
+  | 'idempotent_replay'     // Same idempotency key - no new charge
+  | 'pro_unlimited'         // Pro user - unlimited access
+  | 'quota_exceeded'        // At/over lifetime limit (free users)
+  | 'monthly_quota_exceeded'; // At/over monthly limit (all users)
 
 interface ConsumeResult {
   allowed: boolean;
@@ -666,6 +672,10 @@ interface ConsumeResult {
   remaining: number;
   alreadyConsumed: boolean;
   reason: ConsumeReason;
+  // Monthly quota info
+  monthlyUsed: number;
+  monthlyLimit: number;
+  monthlyRemaining: number;
 }
 
 /**
@@ -694,7 +704,15 @@ export const useUsageCounts = () => {
   return useQuery({
     queryKey: ["usageCounts", user?.id],
     queryFn: async (): Promise<UsageCounts> => {
-      if (!user?.id) return { scansUsed: 0, wardrobeAddsUsed: 0, isPro: false };
+      if (!user?.id) return { 
+        scansUsed: 0, 
+        wardrobeAddsUsed: 0, 
+        isPro: false,
+        scansThisMonth: 0,
+        wardrobeAddsThisMonth: 0,
+        scanMonthlyLimit: USAGE_LIMITS.FREE_SCANS,
+        wardrobeAddMonthlyLimit: USAGE_LIMITS.FREE_WARDROBE_ADDS,
+      };
 
       // No user_id parameter - function uses auth.uid() internally for security
       const { data, error } = await supabase.rpc('get_usage_counts');
@@ -702,7 +720,15 @@ export const useUsageCounts = () => {
       if (error) {
         console.error('[Usage] Failed to get usage counts:', error);
         // Return zeros on error - fail open for UX, but log for monitoring
-        return { scansUsed: 0, wardrobeAddsUsed: 0, isPro: false };
+        return { 
+          scansUsed: 0, 
+          wardrobeAddsUsed: 0, 
+          isPro: false,
+          scansThisMonth: 0,
+          wardrobeAddsThisMonth: 0,
+          scanMonthlyLimit: USAGE_LIMITS.FREE_SCANS,
+          wardrobeAddMonthlyLimit: USAGE_LIMITS.FREE_WARDROBE_ADDS,
+        };
       }
 
       // RPC returns array with single row
@@ -711,6 +737,10 @@ export const useUsageCounts = () => {
         scansUsed: row?.scans_used ?? 0,
         wardrobeAddsUsed: row?.wardrobe_adds_used ?? 0,
         isPro: row?.is_pro ?? false,
+        scansThisMonth: row?.scans_this_month ?? 0,
+        wardrobeAddsThisMonth: row?.wardrobe_adds_this_month ?? 0,
+        scanMonthlyLimit: row?.scan_monthly_limit ?? USAGE_LIMITS.FREE_SCANS,
+        wardrobeAddMonthlyLimit: row?.wardrobe_add_monthly_limit ?? USAGE_LIMITS.FREE_WARDROBE_ADDS,
       };
     },
     enabled: !!user?.id,
@@ -767,6 +797,9 @@ export const useConsumeScanCredit = () => {
         remaining: row?.remaining ?? 0,
         alreadyConsumed: row?.already_consumed ?? false,
         reason: (row?.reason as ConsumeReason) ?? 'quota_exceeded',
+        monthlyUsed: row?.monthly_used ?? 0,
+        monthlyLimit: row?.monthly_limit ?? USAGE_LIMITS.FREE_SCANS,
+        monthlyRemaining: row?.monthly_remaining ?? 0,
       };
       
       // Log reason for analytics/debugging
@@ -779,8 +812,16 @@ export const useConsumeScanCredit = () => {
       queryClient.setQueryData<UsageCounts>(
         ["usageCounts", user?.id],
         (old) => old 
-          ? { ...old, scansUsed: result.used } 
-          : { scansUsed: result.used, wardrobeAddsUsed: 0, isPro: false }
+          ? { ...old, scansUsed: result.used, scansThisMonth: result.monthlyUsed } 
+          : { 
+              scansUsed: result.used, 
+              wardrobeAddsUsed: 0, 
+              isPro: false,
+              scansThisMonth: result.monthlyUsed,
+              wardrobeAddsThisMonth: 0,
+              scanMonthlyLimit: result.monthlyLimit,
+              wardrobeAddMonthlyLimit: USAGE_LIMITS.FREE_WARDROBE_ADDS,
+            }
       );
     },
   });
@@ -834,6 +875,9 @@ export const useConsumeWardrobeAddCredit = () => {
         remaining: row?.remaining ?? 0,
         alreadyConsumed: row?.already_consumed ?? false,
         reason: (row?.reason as ConsumeReason) ?? 'quota_exceeded',
+        monthlyUsed: row?.monthly_used ?? 0,
+        monthlyLimit: row?.monthly_limit ?? USAGE_LIMITS.FREE_WARDROBE_ADDS,
+        monthlyRemaining: row?.monthly_remaining ?? 0,
       };
       
       // Log reason for analytics/debugging
@@ -846,8 +890,16 @@ export const useConsumeWardrobeAddCredit = () => {
       queryClient.setQueryData<UsageCounts>(
         ["usageCounts", user?.id],
         (old) => old 
-          ? { ...old, wardrobeAddsUsed: result.used } 
-          : { scansUsed: 0, wardrobeAddsUsed: result.used, isPro: false }
+          ? { ...old, wardrobeAddsUsed: result.used, wardrobeAddsThisMonth: result.monthlyUsed } 
+          : { 
+              scansUsed: 0, 
+              wardrobeAddsUsed: result.used, 
+              isPro: false,
+              scansThisMonth: 0,
+              wardrobeAddsThisMonth: result.monthlyUsed,
+              scanMonthlyLimit: USAGE_LIMITS.FREE_SCANS,
+              wardrobeAddMonthlyLimit: result.monthlyLimit,
+            }
       );
     },
   });
@@ -861,14 +913,37 @@ export const useConsumeWardrobeAddCredit = () => {
 export const useUsageQuota = () => {
   const { data: counts, isLoading } = useUsageCounts();
   
+  const scanMonthlyLimit = counts?.scanMonthlyLimit ?? USAGE_LIMITS.FREE_SCANS;
+  const wardrobeAddMonthlyLimit = counts?.wardrobeAddMonthlyLimit ?? USAGE_LIMITS.FREE_WARDROBE_ADDS;
+  
   return {
+    // Lifetime usage
     scansUsed: counts?.scansUsed ?? 0,
     wardrobeAddsUsed: counts?.wardrobeAddsUsed ?? 0,
     isPro: counts?.isPro ?? false,
-    hasScansRemaining: (counts?.isPro) || (counts?.scansUsed ?? 0) < USAGE_LIMITS.FREE_SCANS,
-    hasWardrobeAddsRemaining: (counts?.isPro) || (counts?.wardrobeAddsUsed ?? 0) < USAGE_LIMITS.FREE_WARDROBE_ADDS,
-    remainingScans: Math.max(0, USAGE_LIMITS.FREE_SCANS - (counts?.scansUsed ?? 0)),
-    remainingWardrobeAdds: Math.max(0, USAGE_LIMITS.FREE_WARDROBE_ADDS - (counts?.wardrobeAddsUsed ?? 0)),
+    
+    // Monthly usage
+    scansThisMonth: counts?.scansThisMonth ?? 0,
+    wardrobeAddsThisMonth: counts?.wardrobeAddsThisMonth ?? 0,
+    scanMonthlyLimit,
+    wardrobeAddMonthlyLimit,
+    
+    // Remaining checks (considers both lifetime and monthly limits)
+    hasScansRemaining: counts?.isPro 
+      ? (counts?.scansThisMonth ?? 0) < scanMonthlyLimit
+      : (counts?.scansUsed ?? 0) < USAGE_LIMITS.FREE_SCANS && (counts?.scansThisMonth ?? 0) < scanMonthlyLimit,
+    hasWardrobeAddsRemaining: counts?.isPro 
+      ? (counts?.wardrobeAddsThisMonth ?? 0) < wardrobeAddMonthlyLimit
+      : (counts?.wardrobeAddsUsed ?? 0) < USAGE_LIMITS.FREE_WARDROBE_ADDS && (counts?.wardrobeAddsThisMonth ?? 0) < wardrobeAddMonthlyLimit,
+    
+    // Remaining counts (for UI display - shows monthly remaining for Pro, lifetime for free)
+    remainingScans: counts?.isPro
+      ? Math.max(0, scanMonthlyLimit - (counts?.scansThisMonth ?? 0))
+      : Math.max(0, USAGE_LIMITS.FREE_SCANS - (counts?.scansUsed ?? 0)),
+    remainingWardrobeAdds: counts?.isPro
+      ? Math.max(0, wardrobeAddMonthlyLimit - (counts?.wardrobeAddsThisMonth ?? 0))
+      : Math.max(0, USAGE_LIMITS.FREE_WARDROBE_ADDS - (counts?.wardrobeAddsUsed ?? 0)),
+    
     isLoading,
   };
 };

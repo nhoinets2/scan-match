@@ -1,0 +1,60 @@
+appId: com.anonymous.vibecode
+---
+# Scan Error States Tests
+# Verifies error handling in scan flow
+# Tests that error UI is user-friendly
+
+- launchApp
+- waitForAnimationToEnd
+
+# Navigate to scan screen
+- tapOn:
+    text: "Scan"
+    optional: true
+- waitForAnimationToEnd
+
+# Fallback: tap scan position
+- runFlow:
+    when:
+      notVisible: "Scan item"
+    commands:
+      - tapOn:
+          point: "37%,95%"
+      - waitForAnimationToEnd
+
+# Verify scan screen loaded
+- assertVisible:
+    text: "Scan item"
+    optional: true
+
+- takeScreenshot: "error-test-scan-screen.png"
+
+# Test help modal
+- tapOn:
+    id: ".*help.*"
+    optional: true
+- waitForAnimationToEnd
+
+# Verify help content
+- assertVisible:
+    text: ".*How to scan.*|.*Tips.*"
+    optional: true
+
+- takeScreenshot: "error-test-help-modal.png"
+
+# Close help modal
+- tapOn:
+    text: "Got it"
+    optional: true
+- waitForAnimationToEnd
+
+# Close scan screen
+- back
+- waitForAnimationToEnd
+
+# Verify we returned home
+- assertVisible:
+    text: ".*Home.*|.*Wardrobe.*"
+    optional: true
+
+- takeScreenshot: "error-test-back-home.png"

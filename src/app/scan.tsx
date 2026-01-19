@@ -26,19 +26,15 @@ import {
   ImageIcon,
   HelpCircle,
   ChevronDown,
-  WifiOff,
-  AlertCircle,
 } from "lucide-react-native";
 
 import { useSnapToMatchStore } from "@/lib/store";
 import { prewarmCacheConnection } from "@/lib/analysis-cache";
-import { colors, typography, spacing, components, borderRadius } from "@/lib/design-tokens";
+import { colors, typography, spacing, components, borderRadius, cards, shadows } from "@/lib/design-tokens";
 import { ButtonTertiary } from "@/components/ButtonTertiary";
 import { IconButton } from "@/components/IconButton";
 import { ButtonPrimary } from "@/components/ButtonPrimary";
-import { useUsageQuota, useConsumeScanCredit, generateIdempotencyKey } from "@/lib/database";
-import { useProStatus } from "@/lib/useProStatus";
-import { Paywall } from "@/components/Paywall";
+import { generateIdempotencyKey } from "@/lib/database";
 
 const TIPS = [
   "Lay flat or hang up for best results",
@@ -312,26 +308,10 @@ export default function ScanScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
-  const [showPaywall, setShowPaywall] = useState(false);
-  const [creditCheckError, setCreditCheckError] = useState<'network' | 'other' | null>(null);
 
   const clearScan = useSnapToMatchStore((s) => s.clearScan);
 
-  // Quota and Pro status (usage-based, synced across devices)
-  const { isPro, refetch: refetchProStatus } = useProStatus();
-  const { scansUsed, hasScansRemaining, isLoading: isLoadingQuota } = useUsageQuota();
-  const consumeScanCredit = useConsumeScanCredit();
-
   const captureScale = useSharedValue(1);
-
-  // Check quota on mount and when usage changes - show paywall if exceeded and not Pro
-  useEffect(() => {
-    // Wait for quota to load before checking
-    if (isLoadingQuota) return;
-    if (!isPro && !hasScansRemaining) {
-      setShowPaywall(true);
-    }
-  }, [isPro, hasScansRemaining, isLoadingQuota]);
 
   // Clear any previous scan when entering this screen
   useEffect(() => {
@@ -355,23 +335,8 @@ export default function ScanScreen() {
     transform: [{ scale: captureScale.value }],
   }));
 
-  // Check quota before allowing capture
-  const checkQuotaAndProceed = (): boolean => {
-    if (isPro) return true; // Pro users have unlimited scans
-    if (hasScansRemaining) return true; // Free user with scans remaining
-
-    // Show paywall
-    setShowPaywall(true);
-    return false;
-  };
-
   const handleCapture = async () => {
     if (!cameraRef.current || isCapturing || isProcessing) return;
-
-    // Check quota first
-    if (!checkQuotaAndProceed()) {
-      return;
-    }
 
     setIsCapturing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -397,11 +362,6 @@ export default function ScanScreen() {
 
   const handlePickImage = async () => {
     if (isProcessing) return;
-
-    // Check quota first
-    if (!checkQuotaAndProceed()) {
-      return;
-    }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -429,78 +389,34 @@ export default function ScanScreen() {
   };
 
   // ============================================
-  // PR3: SIMPLIFIED processImage
+  // SIMPLIFIED processImage
   // ============================================
-  // Now just checks quota and navigates to results with imageUri.
-  // The actual analysis happens in results.tsx (state machine).
+  // Navigates directly to results with imageUri.
+  // Quota is now handled atomically by the Edge Function in results.tsx.
   const processImage = async (imageUri: string, source: 'camera' | 'gallery' = 'camera') => {
     setIsProcessing(true);
     setIsCapturing(false);
     console.log("processImage called with imageUri:", imageUri?.slice(0, 50));
 
-    // Generate analysisKey for telemetry correlation
+    // Generate analysisKey for idempotency (quota + analysis atomically handled by Edge Function)
     const analysisKey = generateIdempotencyKey();
 
-    try {
-      // CRITICAL: Consume credit BEFORE navigating to prevent over-quota usage
-      // This is atomic and server-side enforced
-      console.log("[Quota] Attempting to consume scan credit with key:", analysisKey);
-      const consumeResult = await consumeScanCredit.mutateAsync(analysisKey);
-      console.log("[Quota] Consume result:", consumeResult.reason, consumeResult);
-      
-      if (!consumeResult.allowed) {
-        // Credit denied - show paywall, DO NOT navigate
-        console.log("[Quota] Credit denied (reason:", consumeResult.reason, "), showing paywall");
-        setIsProcessing(false);
-        setShowPaywall(true);
-        return;
-      }
-      
-      // Credit consumed - navigate to results (analysis will happen there)
-      console.log("[Quota] Credit allowed, navigating to results with imageUri");
+    // Navigate to results - results.tsx will handle quota + analysis via Edge Function
+    // Using push instead of replace to avoid flash of previous screen during transition
+    router.push({
+      pathname: "/results",
+      params: {
+        imageUri,
+        analysisKey,
+        source,
+        fromScan: "true", // Flag to indicate this came from scan (for proper back navigation)
+      },
+    });
 
-      // Navigate to results - results.tsx will handle analysis via state machine
-      // Using push instead of replace to avoid flash of previous screen during transition
-      router.push({
-        pathname: "/results",
-        params: {
-          imageUri,
-          analysisKey,
-          source,
-          fromScan: "true", // Flag to indicate this came from scan (for proper back navigation)
-        },
-      });
-
-      // Don't reset isProcessing here - keep the processing overlay visible
-      // The scan screen stays in the stack underneath results, so we want to keep
-      // showing "Checking how this might work for you..." until results fully covers it
-      // This prevents a flash of the camera view during the transition
-    } catch (error) {
-      // Check if it's a network error
-      const errMessage = error instanceof Error ? error.message : String(error || "");
-      const isNetworkError =
-        errMessage.includes("Network request failed") ||
-        errMessage.includes("The Internet connection appears to be offline") ||
-        errMessage.includes("The network connection was lost") ||
-        errMessage.includes("Unable to resolve host") ||
-        errMessage.includes("Failed to fetch") ||
-        errMessage.includes("fetch failed") ||
-        errMessage.includes("ENOTFOUND") ||
-        errMessage.includes("ECONNREFUSED");
-      
-      // Don't show modal for user-initiated cancellation (abort on unmount)
-      const isCancelled = errMessage.includes("cancelled") || errMessage.includes("aborted");
-      if (isCancelled) {
-        console.log("[Scan] Credit check cancelled, ignoring");
-        setIsProcessing(false);
-        return;
-      }
-      
-      console.log("[Scan] Error during credit check:", errMessage, "isNetwork:", isNetworkError);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setIsProcessing(false);
-      setCreditCheckError(isNetworkError ? 'network' : 'other');
-    }
+    // Don't reset isProcessing here - keep the processing overlay visible
+    // The scan screen stays in the stack underneath results, so we want to keep
+    // showing the overlay until results fully covers it
+    // This prevents a flash of the camera view during the transition
   };
 
   const handleClose = () => {
@@ -511,19 +427,6 @@ export default function ScanScreen() {
   const handleSkip = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.back();
-  };
-
-  const handlePaywallClose = () => {
-    setShowPaywall(false);
-    // Go back since user declined to upgrade
-    router.back();
-  };
-
-  const handlePaywallSuccess = () => {
-    setShowPaywall(false);
-    // Refetch pro status to update state
-    refetchProStatus();
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   // Permission handling
@@ -714,98 +617,6 @@ export default function ScanScreen() {
 
       {/* Help bottom sheet */}
       <HelpBottomSheet visible={showHelp} onClose={() => setShowHelp(false)} />
-
-      {/* Paywall modal */}
-      <Paywall
-        visible={showPaywall}
-        onClose={handlePaywallClose}
-        onPurchaseComplete={handlePaywallSuccess}
-        reason="in_store_limit"
-      />
-
-      {/* Credit check error modal */}
-      <Modal
-        visible={creditCheckError !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setCreditCheckError(null)}
-      >
-        <Pressable 
-          style={{ flex: 1, backgroundColor: colors.overlay.dark, justifyContent: "center", alignItems: "center" }}
-          onPress={() => setCreditCheckError(null)}
-        >
-          <Pressable 
-            onPress={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: colors.bg.primary,
-              borderRadius: borderRadius.card,
-              padding: spacing.xl,
-              marginHorizontal: spacing.lg,
-              alignItems: "center",
-              maxWidth: 320,
-            }}
-          >
-            {/* Icon */}
-            <View
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 28,
-                backgroundColor: colors.verdict.okay.bg,
-                alignItems: "center",
-                justifyContent: "center",
-                marginBottom: spacing.md,
-              }}
-            >
-              {creditCheckError === 'network' ? (
-                <WifiOff size={28} color={colors.verdict.okay.text} strokeWidth={2} />
-              ) : (
-                <AlertCircle size={28} color={colors.verdict.okay.text} strokeWidth={2} />
-              )}
-            </View>
-
-            {/* Title */}
-            <Text
-              style={{
-                ...typography.ui.cardTitle,
-                color: colors.text.primary,
-                textAlign: "center",
-                marginBottom: spacing.sm,
-              }}
-            >
-              {creditCheckError === 'network' ? 'Connection unavailable' : "Couldn't check credits"}
-            </Text>
-
-            {/* Subtitle */}
-            <Text
-              style={{
-                ...typography.ui.body,
-                color: colors.text.secondary,
-                textAlign: "center",
-                marginBottom: spacing.lg,
-              }}
-            >
-              {creditCheckError === 'network' 
-                ? 'Please check your internet and try again.' 
-                : 'Please try again in a moment.'}
-            </Text>
-
-            {/* Primary Button */}
-            <ButtonPrimary
-              label="Try again"
-              onPress={() => setCreditCheckError(null)}
-              style={{ width: "100%" }}
-            />
-
-            {/* Secondary Button */}
-            <ButtonTertiary
-              label="Close"
-              onPress={() => setCreditCheckError(null)}
-              style={{ marginTop: spacing.sm }}
-            />
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
 }

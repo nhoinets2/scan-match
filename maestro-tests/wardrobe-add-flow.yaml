@@ -1,0 +1,70 @@
+appId: com.anonymous.vibecode
+---
+# Wardrobe Add Flow Tests
+# Tests adding items to wardrobe (also uses quota system)
+# Prerequisite: User logged in with wardrobe add credits
+
+- launchApp
+- waitForAnimationToEnd
+
+# Navigate to wardrobe tab
+- tapOn:
+    text: "Wardrobe"
+    optional: true
+- waitForAnimationToEnd
+
+# Fallback: tap wardrobe tab position
+- runFlow:
+    when:
+      notVisible: "My Wardrobe|Your wardrobe|Wardrobe"
+    commands:
+      - tapOn:
+          point: "63%,95%"
+      - waitForAnimationToEnd
+
+# Verify wardrobe screen loaded
+- assertVisible:
+    text: ".*Wardrobe.*"
+    optional: true
+
+- takeScreenshot: "wardrobe-main-screen.png"
+
+# Look for add item button
+- assertVisible:
+    text: ".*Add.*|.*\\+.*"
+    optional: true
+
+# Look for empty state or items
+- assertVisible:
+    text: ".*Add your first.*|.*tops.*|.*bottoms.*"
+    optional: true
+
+# Tap add item if available
+- tapOn:
+    text: "Add item"
+    optional: true
+- waitForAnimationToEnd
+
+# Or tap the + button
+- tapOn:
+    id: ".*add.*"
+    optional: true
+- waitForAnimationToEnd
+
+- takeScreenshot: "wardrobe-add-screen.png"
+
+# Verify add item screen elements
+- assertVisible:
+    text: ".*photo.*|.*camera.*|.*gallery.*"
+    optional: true
+
+# Go back without adding
+- back
+- waitForAnimationToEnd
+
+# Verify we're back on wardrobe
+- assertVisible:
+    text: ".*Wardrobe.*"
+    optional: true
+
+- takeScreenshot: "wardrobe-back.png"

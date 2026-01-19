@@ -124,6 +124,7 @@ import { OutfitIdeasSection } from "@/components/OutfitIdeasSection";
 import { TipSheetModal } from "@/components/TipSheetModal";
 import { TailorSuggestionsCard } from "@/components/TailorSuggestionsCard";
 import { FavoriteStoresModal } from "@/components/FavoriteStoresModal";
+import { Paywall } from "@/components/Paywall";
 import type { TipSheetMode } from "@/lib/inspiration/tipsheets";
 import {
   useStorePreference,
@@ -552,9 +553,19 @@ function ResultsFailed({
   fromScan?: boolean;
 }) {
   const isMaxRetries = attempt >= MAX_RETRIES;
+  const isQuotaExceeded = error.kind === "quota_exceeded";
+  const [showPaywall, setShowPaywall] = useState(false);
 
   // Get error-specific hint
   const getErrorHint = () => {
+    if (isQuotaExceeded) {
+      // Check if it's a monthly limit vs lifetime limit
+      const isMonthly = error.message?.includes("monthly");
+      return isMonthly 
+        ? "You've reached your monthly scan limit. It will reset at the start of next month."
+        : "You've used all your free scans. Upgrade to Pro for more scans.";
+    }
+
     if (isMaxRetries) {
       if (error.kind === "no_network") {
         return "Check your connection and try again later.";
@@ -574,9 +585,19 @@ function ResultsFailed({
     }
   };
 
+  // Get error title
+  const getErrorTitle = () => {
+    if (isQuotaExceeded) {
+      const isMonthly = error.message?.includes("monthly");
+      return isMonthly ? "Monthly limit reached" : "Scan limit reached";
+    }
+    return "We couldn't analyze this item";
+  };
+
   // Get error icon
   const ErrorIcon = error.kind === "no_network" ? WifiOff : 
-                    error.kind === "timeout" ? Clock : 
+                    error.kind === "timeout" ? Clock :
+                    error.kind === "quota_exceeded" ? Lock :
                     AlertOctagon;
 
   return (
@@ -655,7 +676,7 @@ function ResultsFailed({
             marginBottom: spacing.sm,
           }}
         >
-          We couldn't analyze this item
+          {getErrorTitle()}
         </Text>
         <Text
           style={{
@@ -670,7 +691,27 @@ function ResultsFailed({
 
         {/* Buttons */}
         <View style={{ width: "100%", gap: spacing.md }}>
-          {isMaxRetries ? (
+          {isQuotaExceeded ? (
+            // Quota exceeded: show upgrade option (for free users) or just close (for Pro at monthly limit)
+            <>
+              {!error.message?.includes("monthly") && (
+                <ButtonPrimary
+                  label="Upgrade to Pro"
+                  onPress={() => setShowPaywall(true)}
+                />
+              )}
+              <ButtonTertiary
+                label="Go back"
+                onPress={() => {
+                  if (fromScan) {
+                    router.dismiss(2);
+                  } else {
+                    router.back();
+                  }
+                }}
+              />
+            </>
+          ) : isMaxRetries ? (
             // Max retries exceeded: "Scan another item" goes explicitly to scan screen
             // Use replace to avoid stacking failed results in history
             <ButtonPrimary
@@ -692,6 +733,19 @@ function ResultsFailed({
           )}
         </View>
       </View>
+
+      {/* Paywall modal */}
+      <Paywall
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        onPurchaseComplete={() => {
+          setShowPaywall(false);
+          // After upgrade, user can retry
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          onRetry();
+        }}
+        reason="in_store_limit"
+      />
     </View>
   );
 }
@@ -1389,6 +1443,7 @@ export default function ResultsScreen() {
     (async () => {
       const result = await analyzeClothingImage({
         imageUri,
+        idempotencyKey: analysisKey, // Required for server-side quota enforcement
         signal: ac.signal,
       });
       
@@ -2607,7 +2662,8 @@ function ResultsSuccess({
           setIsSaved(false);
 
           // Check if it's a network error
-          const errMessage = error instanceof Error ? error.message : String(error || "");
+          // Note: Supabase errors have .message but aren't Error instances
+          const errMessage = (error as any)?.message || (error instanceof Error ? error.message : String(error || ""));
           const errLower = errMessage.toLowerCase();
           const isNetworkErr =
             errMessage.includes("Network request failed") ||
@@ -3972,17 +4028,14 @@ function ResultsSuccess({
                             }}
                           >
                             {item.imageUri ? (
-                              <View style={{ width: '92%', height: '92%', alignItems: 'center', justifyContent: 'center' }}>
-                                <Image
-                                  source={{ uri: item.imageUri }}
-                                  style={{ 
-                                    width: '100%', 
-                                    height: '100%',
-                                    transform: [{ scale: 1.08 }],
-                                  }}
-                                  contentFit="contain"
-                                />
-                              </View>
+                              <Image
+                                source={{ uri: item.imageUri }}
+                                style={{ 
+                                  width: '100%', 
+                                  height: '100%',
+                                }}
+                                contentFit="cover"
+                              />
                             ) : (
                               <Package size={24} color={colors.text.tertiary} />
                             )}
@@ -4666,18 +4719,25 @@ function ResultsSuccess({
         onRequestClose={() => setSaveError(null)}
       >
         <Pressable 
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+          style={{ 
+            flex: 1, 
+            backgroundColor: colors.overlay.dark, 
+            justifyContent: "center", 
+            alignItems: "center",
+            padding: spacing.lg,
+          }}
           onPress={() => setSaveError(null)}
         >
           <Pressable 
             onPress={(e) => e.stopPropagation()}
             style={{
-              backgroundColor: colors.bg.primary,
-              borderRadius: 24,
-              padding: spacing.xl,
-              marginHorizontal: spacing.lg,
+              backgroundColor: cards.elevated.backgroundColor,
+              borderRadius: cards.elevated.borderRadius,
+              padding: spacing.lg,
+              width: "100%",
+              maxWidth: 340,
               alignItems: "center",
-              maxWidth: 320,
+              ...shadows.lg,
             }}
           >
             {/* Icon */}
@@ -4703,7 +4763,6 @@ function ResultsSuccess({
             <Text
               style={{
                 ...typography.ui.cardTitle,
-                color: colors.text.primary,
                 textAlign: "center",
                 marginBottom: spacing.sm,
               }}
@@ -4717,7 +4776,7 @@ function ResultsSuccess({
                 ...typography.ui.body,
                 color: colors.text.secondary,
                 textAlign: "center",
-                marginBottom: spacing.lg,
+                marginBottom: spacing.xl,
               }}
             >
               {saveError === 'network'
@@ -4725,19 +4784,17 @@ function ResultsSuccess({
                 : 'Please try again in a moment.'}
             </Text>
 
-            {/* Primary Button */}
-            <ButtonPrimary
-              label="Try again"
-              onPress={() => setSaveError(null)}
-              style={{ width: "100%" }}
-            />
-
-            {/* Secondary Button */}
-            <ButtonTertiary
-              label="Close"
-              onPress={() => setSaveError(null)}
-              style={{ marginTop: spacing.sm }}
-            />
+            {/* Buttons */}
+            <View style={{ gap: spacing.sm, width: "100%" }}>
+              <ButtonPrimary
+                label="Try again"
+                onPress={() => setSaveError(null)}
+              />
+              <ButtonTertiary
+                label="Close"
+                onPress={() => setSaveError(null)}
+              />
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
