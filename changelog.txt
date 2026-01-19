@@ -19,11 +19,12 @@
 - Wardrobe adds now consume from correct quota pool (was incorrectly using scan credits)
 - Dark overlay on logout/transition screens now covers full screen edge-to-edge
 - Analysis failures when app goes to background now auto-retry on return
+- Paywall no longer interrupts users who used their last credit successfully (was showing paywall after analysis completed)
 
 ### Improved
 - **Add wardrobe item performance**: Removed redundant client-side quota check (~100-200ms faster)
 - Skip cache lookup for wardrobe adds (user photos are unlikely to be cached, saves ~189ms on misses)
-- Image picker cropping is now flexible (previously locked to 3:4 aspect ratio)
+- Image picker no longer forces cropping (iOS limitation prevented free-form crop, now uses full image)
 - AI now generates richer style notes (2 descriptive sentences instead of short phrases)
 
 ### Technical
