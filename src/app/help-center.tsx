@@ -73,7 +73,7 @@ const HELP_SECTIONS: HelpSection[] = [
         id: "how-to-scan",
         question: "How do I scan an item?",
         answer:
-          "Tap 'Scan & Match' on the home screen to open the camera. Point your camera at the clothing item and tap the capture button. You can also upload a photo from your gallery by tapping the image icon in the bottom left. The app will guide you with helpful tips while scanning.",
+          "Tap 'Scan & Match' on the home screen to open the camera. Point your camera at the clothing item and tap the capture button. You can also upload a photo from your gallery by tapping the image icon in the bottom left. The app will guide you with helpful tips while scanning.\n\nNote: A scan credit is used when you capture or select a photo and the AI analysis begins. Once analysis starts, the credit is consumed even if you navigate away before seeing results.",
       },
       {
         id: "scan-tips",
@@ -98,7 +98,7 @@ const HELP_SECTIONS: HelpSection[] = [
         id: "add-items",
         question: "How do I add items to my wardrobe?",
         answer:
-          "Tap 'Build Wardrobe' on the home screen to scan and add items. Take a photo or choose from your gallery. The app will automatically detect the category and colors, but you can adjust these manually before saving.",
+          "Tap 'Build Wardrobe' on the home screen to scan and add items. Take a photo or choose from your gallery. The app will automatically detect the category and colors, but you can adjust these manually before saving.\n\nNote: A wardrobe add credit is used when you capture or select a photo and the AI analysis begins – not when you save the item. Once analysis starts, the credit is consumed even if you navigate away or the app closes.",
       },
       {
         id: "edit-items",
@@ -239,7 +239,7 @@ const HELP_SECTIONS: HelpSection[] = [
         id: "how-credits-work",
         question: "How do scan and wardrobe add credits work?",
         answer:
-          "On the free plan, you have 5 scan credits and 15 wardrobe add credits. A credit is used when you start a scan or wardrobe add – specifically when the AI analysis begins, not when you save the result. This means if your scan doesn't complete (due to network issues or app closing), the credit is still used. Pro members have unlimited scans and adds with no credit limits.",
+          "On the free plan, you have 5 scan credits and 15 wardrobe add credits. Credits are consumed the moment you capture or select a photo – when our AI starts analyzing the image.\n\nImportant: Once analysis begins, the credit is used regardless of what happens next. This includes:\n• Navigating away or closing the app mid-analysis\n• Network issues interrupting the process\n• Choosing not to save the result\n\nThis is because the AI analysis runs immediately when you take the photo, and that's what costs us to provide. Think of it like taking a professional photo – even if you don't keep the photo, the photographer still took the shot.\n\nPro members have unlimited scans and adds with no credit limits.",
       },
       {
         id: "see-remaining-credits",
@@ -255,9 +255,9 @@ const HELP_SECTIONS: HelpSection[] = [
       },
       {
         id: "credit-not-restored",
-        question: "Why wasn't my credit restored when I deleted an item?",
+        question: "Why wasn't my credit restored when I deleted an item or cancelled?",
         answer:
-          "Credits are used when you start a scan or wardrobe add, not when you save the item. Since the AI analysis has already run (which is what costs us), deleting the item afterwards doesn't restore the credit. Think of it like taking a photo – even if you delete the photo, the camera still took the shot.",
+          "Credits are consumed the moment the AI analysis begins – when you capture or select a photo. Since the analysis runs immediately (which is what costs us to provide), credits can't be restored if you:\n\n• Delete the item later\n• Navigate away during analysis\n• Close the app mid-scan\n• Choose not to save the result\n\nTo avoid accidentally using credits, make sure you're ready to complete the scan before capturing your photo.",
       },
       {
         id: "get-more-credits",
