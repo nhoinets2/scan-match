@@ -828,9 +828,10 @@ export default function AuthFlow(props: AuthFlowProps) {
 
   // If user is logged in, AuthGuard will handle redirect
   // Show landing page image with dimmed overlay and spinner
+  // Dark background ensures no light edges show through if image doesn't fully cover
   if (props.isAuthed) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg.primary, overflow: "hidden" }}>
+      <View style={{ flex: 1, backgroundColor: "#000", overflow: "hidden" }}>
         <Image
           source={HERO_LANDING_IMAGE}
           style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }}

@@ -117,9 +117,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }, [isRedirecting, inMainApp, inOnboarding, inAuthGroup, user]);
 
   // Show landing page image while auth is loading to prevent white flash
+  // Dark background ensures no light edges show through if image doesn't fully cover
   if (isAuthLoading) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg.primary, overflow: "hidden" }}>
+      <View style={{ flex: 1, backgroundColor: "#000", overflow: "hidden" }}>
         <Image
           source={HERO_LANDING_IMAGE}
           style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }}
@@ -133,9 +134,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   // User not logged in but not on auth screens yet - show landing image while redirecting to login
   // Uses same dark overlay + spinner as sign-out for seamless transition
+  // Dark background ensures no light edges show through if image doesn't fully cover
   if (!user && !inAuthGroup) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg.primary, overflow: "hidden" }}>
+      <View style={{ flex: 1, backgroundColor: "#000", overflow: "hidden" }}>
         <Image
           source={HERO_LANDING_IMAGE}
           style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }}
@@ -173,9 +175,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   // User logged in and on auth screens - show landing image while redirecting
   // This covers the case when user just signed in and we're checking onboarding status
+  // Dark background ensures no light edges show through if image doesn't fully cover
   if (user && inAuthGroup) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg.primary, overflow: "hidden" }}>
+      <View style={{ flex: 1, backgroundColor: "#000", overflow: "hidden" }}>
         <Image
           source={HERO_LANDING_IMAGE}
           style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }}
@@ -213,9 +216,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   // Show landing image during redirect transition to prevent white flash
   // Only show during active redirects, not on other screens like account, etc.
+  // Dark background ensures no light edges show through if image doesn't fully cover
   if (isRedirecting) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg.primary, overflow: "hidden" }}>
+      <View style={{ flex: 1, backgroundColor: "#000", overflow: "hidden" }}>
         <Image
           source={HERO_LANDING_IMAGE}
           style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }}

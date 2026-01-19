@@ -181,9 +181,10 @@ export default function TabLayout() {
 
   // Don't render tabs until we know onboarding status to prevent flash
   // Show landing image with dim overlay during loading to match auth flow
+  // Dark background ensures no light edges show through if image doesn't fully cover
   if (!fontsLoaded || isAuthLoading || isOnboardingLoading) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg.primary, overflow: "hidden" }}>
+      <View style={{ flex: 1, backgroundColor: "#000", overflow: "hidden" }}>
         <Image
           source={HERO_LANDING_IMAGE}
           style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }}
@@ -220,9 +221,10 @@ export default function TabLayout() {
   }
 
   // If user needs onboarding, show landing image while redirect happens
+  // Dark background ensures no light edges show through if image doesn't fully cover
   if (user && !onboardingComplete) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg.primary, overflow: "hidden" }}>
+      <View style={{ flex: 1, backgroundColor: "#000", overflow: "hidden" }}>
         <Image
           source={HERO_LANDING_IMAGE}
           style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }}

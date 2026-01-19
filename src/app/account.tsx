@@ -453,6 +453,7 @@ export default function AccountScreen() {
       />
 
       {/* Sign Out Loading Overlay - Landing image with dim overlay */}
+      {/* Dark background ensures no light edges show through if image doesn't fully cover */}
       {loading && (
         <View
           style={{
@@ -461,7 +462,7 @@ export default function AccountScreen() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: colors.bg.primary,
+            backgroundColor: "#000",
             overflow: "hidden",
           }}
         >
