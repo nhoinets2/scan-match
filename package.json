@@ -14,7 +14,8 @@
     "test:coverage": "jest --coverage",
     "prebuild:ios": "EXPO_USE_NPM=1 npx expo prebuild --platform ios",
     "build:ios": "bash scripts/run-ios-maestro.sh",
-    "ios:maestro": "bash scripts/run-ios-simple.sh"
+    "ios:maestro": "bash scripts/run-ios-simple.sh",
+    "compare-models": "npx tsx scripts/compare-models.ts"
   },
   "dependencies": {
     "@babel/plugin-proposal-export-namespace-from": "^7.18.9",
