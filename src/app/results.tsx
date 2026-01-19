@@ -2705,7 +2705,10 @@ function ResultsSuccess({
           // Check if it's a network error
           // Note: Supabase errors have .message but aren't Error instances
           const errMessage = (error as any)?.message || (error instanceof Error ? error.message : String(error || ""));
+          const errCode = (error as any)?.code || "";
           const errLower = errMessage.toLowerCase();
+          
+          // Comprehensive network error detection (covers all network/offline scenarios)
           const isNetworkErr =
             errMessage.includes("Network request failed") ||
             errMessage.includes("The Internet connection appears to be offline") ||
@@ -2715,18 +2718,32 @@ function ResultsSuccess({
             errMessage.includes("fetch failed") ||
             errMessage.includes("ENOTFOUND") ||
             errMessage.includes("ECONNREFUSED") ||
+            errMessage.includes("ECONNRESET") ||
+            errMessage.includes("ETIMEDOUT") ||
+            errMessage.includes("EHOSTUNREACH") ||
+            errMessage.includes("ENETUNREACH") ||
             errMessage.includes("Could not connect to the server") ||
             errMessage.includes("A server with the specified hostname could not be found") ||
             errMessage.includes("A data connection is not currently allowed") ||
             errMessage.includes("not connected to the internet") ||
+            errMessage.includes("request timeout") ||
+            errMessage.includes("connection timeout") ||
+            errCode.includes("ENOTFOUND") ||
+            errCode.includes("ECONNREFUSED") ||
+            errCode.includes("ECONNRESET") ||
+            errCode.includes("ETIMEDOUT") ||
+            errCode.includes("EHOSTUNREACH") ||
+            errCode.includes("ENETUNREACH") ||
             errLower.includes("offline") ||
             errLower.includes("no internet") ||
             errLower.includes("network error") ||
             errLower.includes("network is unreachable") ||
             errLower.includes("socket is not connected") ||
-            errLower.includes("timed out");
+            errLower.includes("timed out") ||
+            errLower.includes("no connection") ||
+            errLower.includes("connection refused") ||
+            errLower.includes("connection reset");
 
-          console.log("[Save] Error:", errMessage, "isNetwork:", isNetworkErr);
           setSaveError(isNetworkErr ? 'network' : 'other');
         }
       };
