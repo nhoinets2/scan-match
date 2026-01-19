@@ -3,6 +3,7 @@
 ## January 19, 2026
 
 ### Fixed
+- **Misleading quota message for free users**: Fixed bug where free users hitting their quota saw "Monthly limit reached - resets next month" instead of "Scan limit reached - Upgrade to Pro". The monthly reset message was misleading because free users have a lifetime limit that never resets. Now checks lifetime limit first before monthly limit.
 - **CRITICAL: Quota not consumed on cache hits**: Fixed bug where cached scan results bypassed quota consumption entirely, allowing unlimited free scans. Now properly consumes quota via RPC even when returning cached analysis results.
 - **Scan flow instability**: Analysis state now properly resets when scanning a new item (was showing stale results from previous scans when screen was reused)
 - **Wardrobe updates not reflected**: Results screen now refreshes wardrobe data when returning from add-item (matches now update immediately after adding wardrobe items)

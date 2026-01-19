@@ -163,24 +163,10 @@ BEGIN
   END IF;
   
   -- Free user: check both lifetime AND monthly limits
-  -- Monthly limit takes precedence (lower of the two effective limits)
-  IF COALESCE(v_monthly_used, 0) >= v_monthly_limit THEN
-    -- At monthly limit
-    IF p_idempotency_key IS NOT NULL THEN
-      DELETE FROM quota_consumptions 
-      WHERE user_id = v_user_id AND idempotency_key = p_idempotency_key AND consumption_type = 'scan';
-    END IF;
-    
-    RETURN QUERY SELECT 
-      FALSE, COALESCE(v_current_used, 0), v_lifetime_limit,
-      GREATEST(0, v_lifetime_limit - COALESCE(v_current_used, 0)),
-      FALSE, 'monthly_quota_exceeded'::TEXT,
-      COALESCE(v_monthly_used, 0), v_monthly_limit, 0;
-    RETURN;
-  END IF;
-  
+  -- IMPORTANT: Check lifetime FIRST since it never resets!
+  -- This prevents showing "resets next month" when lifetime is also exhausted.
   IF COALESCE(v_current_used, 0) >= v_lifetime_limit THEN
-    -- At lifetime limit (free users)
+    -- At lifetime limit (free users) - this is the permanent limit
     IF p_idempotency_key IS NOT NULL THEN
       DELETE FROM quota_consumptions 
       WHERE user_id = v_user_id AND idempotency_key = p_idempotency_key AND consumption_type = 'scan';
@@ -191,6 +177,21 @@ BEGIN
       FALSE, 'quota_exceeded'::TEXT,
       COALESCE(v_monthly_used, 0), v_monthly_limit, 
       GREATEST(0, v_monthly_limit - COALESCE(v_monthly_used, 0));
+    RETURN;
+  END IF;
+  
+  IF COALESCE(v_monthly_used, 0) >= v_monthly_limit THEN
+    -- At monthly limit only (lifetime still has room - edge case)
+    IF p_idempotency_key IS NOT NULL THEN
+      DELETE FROM quota_consumptions 
+      WHERE user_id = v_user_id AND idempotency_key = p_idempotency_key AND consumption_type = 'scan';
+    END IF;
+    
+    RETURN QUERY SELECT 
+      FALSE, COALESCE(v_current_used, 0), v_lifetime_limit,
+      GREATEST(0, v_lifetime_limit - COALESCE(v_current_used, 0)),
+      FALSE, 'monthly_quota_exceeded'::TEXT,
+      COALESCE(v_monthly_used, 0), v_monthly_limit, 0;
     RETURN;
   END IF;
   
@@ -309,21 +310,10 @@ BEGIN
   END IF;
   
   -- Free user: check both limits
-  IF COALESCE(v_monthly_used, 0) >= v_monthly_limit THEN
-    IF p_idempotency_key IS NOT NULL THEN
-      DELETE FROM quota_consumptions 
-      WHERE user_id = v_user_id AND idempotency_key = p_idempotency_key AND consumption_type = 'wardrobe_add';
-    END IF;
-    
-    RETURN QUERY SELECT 
-      FALSE, COALESCE(v_current_used, 0), v_lifetime_limit,
-      GREATEST(0, v_lifetime_limit - COALESCE(v_current_used, 0)),
-      FALSE, 'monthly_quota_exceeded'::TEXT,
-      COALESCE(v_monthly_used, 0), v_monthly_limit, 0;
-    RETURN;
-  END IF;
-  
+  -- IMPORTANT: Check lifetime FIRST since it never resets!
+  -- This prevents showing "resets next month" when lifetime is also exhausted.
   IF COALESCE(v_current_used, 0) >= v_lifetime_limit THEN
+    -- At lifetime limit (free users) - this is the permanent limit
     IF p_idempotency_key IS NOT NULL THEN
       DELETE FROM quota_consumptions 
       WHERE user_id = v_user_id AND idempotency_key = p_idempotency_key AND consumption_type = 'wardrobe_add';
@@ -334,6 +324,21 @@ BEGIN
       FALSE, 'quota_exceeded'::TEXT,
       COALESCE(v_monthly_used, 0), v_monthly_limit, 
       GREATEST(0, v_monthly_limit - COALESCE(v_monthly_used, 0));
+    RETURN;
+  END IF;
+  
+  IF COALESCE(v_monthly_used, 0) >= v_monthly_limit THEN
+    -- At monthly limit only (lifetime still has room - edge case)
+    IF p_idempotency_key IS NOT NULL THEN
+      DELETE FROM quota_consumptions 
+      WHERE user_id = v_user_id AND idempotency_key = p_idempotency_key AND consumption_type = 'wardrobe_add';
+    END IF;
+    
+    RETURN QUERY SELECT 
+      FALSE, COALESCE(v_current_used, 0), v_lifetime_limit,
+      GREATEST(0, v_lifetime_limit - COALESCE(v_current_used, 0)),
+      FALSE, 'monthly_quota_exceeded'::TEXT,
+      COALESCE(v_monthly_used, 0), v_monthly_limit, 0;
     RETURN;
   END IF;
   
@@ -418,7 +423,13 @@ GRANT EXECUTE ON FUNCTION maybe_reset_monthly_counters(UUID) TO authenticated;
 -- Notes
 -- ─────────────────────────────────────────────
 -- - Monthly counters reset automatically when consume functions detect new month
--- - Pro users now have monthly caps (200 scans, 500 wardrobe adds)
+-- - Pro users now have monthly caps (500 scans, 500 wardrobe adds)
 -- - Free users have both lifetime (5/15) AND monthly (5/15) limits
 -- - New reason code: 'monthly_quota_exceeded' for hitting monthly cap
 -- - get_usage_counts() now returns monthly data for UI display
+--
+-- IMPORTANT: For free users, we check LIFETIME limit before MONTHLY limit.
+-- This ensures users see "Upgrade to Pro" (honest message) instead of 
+-- "Resets next month" when their lifetime quota is exhausted.
+-- The monthly limit only matters for free users if they somehow have
+-- lifetime credits remaining but hit the monthly cap (edge case).
