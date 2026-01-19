@@ -1445,6 +1445,10 @@ export default function ResultsScreen() {
     });
     
     // Reset to loading state for the new image
+    // Also reset background retry state for fresh scan
+    wasBackgroundedDuringLoading.current = false;
+    backgroundRetryAttempt.current = 0;
+    
     setAnalysisState({
       status: "loading",
       imageUri,
@@ -1454,6 +1458,7 @@ export default function ResultsScreen() {
   
   // Background state tracking for auto-retry
   const wasBackgroundedDuringLoading = useRef(false);
+  const backgroundRetryAttempt = useRef(0);
   
   // AppState listener for auto-retry when returning from background
   useEffect(() => {
@@ -1466,11 +1471,26 @@ export default function ResultsScreen() {
         wasBackgroundedDuringLoading.current = true;
       } else if (nextState === 'active' && wasBackgroundedDuringLoading.current) {
         // Returned to foreground after backgrounding during loading
-        wasBackgroundedDuringLoading.current = false;
         
-        // Auto-retry if analysis failed while backgrounded
-        if (analysisState?.status === 'failed' && analysisState.attempt < MAX_RETRIES) {
-          console.log('[Results] Returning from background, auto-retrying analysis');
+        // Auto-retry if still in loading state (error handler kept us in loading)
+        if (analysisState?.status === 'loading' && backgroundRetryAttempt.current > 0 && analysisState.attempt < MAX_RETRIES) {
+          console.log('[Results] Returning from background, auto-retrying analysis (attempt', backgroundRetryAttempt.current + 1, '/', MAX_RETRIES, ')');
+          logAnalysisLifecycleEvent({
+            name: "analysis_retry_background",
+            props: { attempt: backgroundRetryAttempt.current + 1, analysisKey, source },
+          });
+          // Increment attempt to trigger the analysis effect to re-run
+          setAnalysisState({
+            status: "loading",
+            imageUri: analysisState.imageUri,
+            attempt: backgroundRetryAttempt.current + 1,
+          });
+          backgroundRetryAttempt.current = 0;
+          wasBackgroundedDuringLoading.current = false;
+        } 
+        // Legacy path: Auto-retry if analysis failed while backgrounded (shouldn't happen with new logic)
+        else if (analysisState?.status === 'failed' && analysisState.attempt < MAX_RETRIES) {
+          console.log('[Results] Returning from background, auto-retrying analysis (legacy path)');
           logAnalysisLifecycleEvent({
             name: "analysis_retry_background",
             props: { attempt: analysisState.attempt + 1, analysisKey, source },
@@ -1480,8 +1500,11 @@ export default function ResultsScreen() {
             imageUri: analysisState.imageUri,
             attempt: analysisState.attempt + 1,
           });
+          wasBackgroundedDuringLoading.current = false;
         } else if (analysisState?.status === 'success') {
           console.log('[Results] Returning from background, analysis already succeeded');
+          wasBackgroundedDuringLoading.current = false;
+          backgroundRetryAttempt.current = 0;
         }
       }
     };
@@ -1555,6 +1578,14 @@ export default function ResultsScreen() {
           });
         }
         
+        // If error happened while backgrounded and we haven't exceeded max retries,
+        // stay in 'loading' state - the AppState handler will trigger auto-retry
+        if (wasBackgroundedDuringLoading.current && analysisState.attempt < MAX_RETRIES) {
+          console.log('[Results] Error during background (attempt', analysisState.attempt, '/', MAX_RETRIES, '), staying in loading for auto-retry');
+          backgroundRetryAttempt.current = analysisState.attempt;
+          return; // Stay in 'loading' state, don't show error screen
+        }
+        
         setAnalysisState({
           status: "failed",
           imageUri,
@@ -1565,6 +1596,10 @@ export default function ResultsScreen() {
       }
       
       // Success!
+      // Reset background retry state since we succeeded
+      wasBackgroundedDuringLoading.current = false;
+      backgroundRetryAttempt.current = 0;
+      
       if (analysisState.attempt > 1) {
         logAnalysisLifecycleEvent({
           name: "analysis_recovered_success",
