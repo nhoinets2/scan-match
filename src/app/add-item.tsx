@@ -1212,7 +1212,6 @@ export default function AddItemScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
-      aspect: [3, 4],
       quality: 0.8,
     });
 
