@@ -453,7 +453,6 @@ export default function AccountScreen() {
       />
 
       {/* Sign Out Loading Overlay - Landing image with dim overlay */}
-      {/* Dark background ensures no light edges show through if image doesn't fully cover */}
       {loading && (
         <View
           style={{
@@ -462,7 +461,7 @@ export default function AccountScreen() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "#000",
+            backgroundColor: colors.bg.primary,
             overflow: "hidden",
           }}
         >
@@ -473,14 +472,14 @@ export default function AccountScreen() {
             cachePolicy="memory-disk"
             priority="high"
           />
-          {/* Dim overlay to make spinner more prominent */}
+          {/* Dim overlay to make spinner more prominent - extends slightly beyond edges to cover any gaps */}
           <View
             style={{
               position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
+              top: -2,
+              left: -2,
+              right: -2,
+              bottom: -2,
               backgroundColor: "rgba(0, 0, 0, 0.35)",
             }}
           />
