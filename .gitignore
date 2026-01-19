@@ -42,3 +42,9 @@ yarn-error.*
 
 # Expo log
 expo.log
+
+# Test coverage
+coverage/
+
+# Supabase
+supabase/.temp/
