@@ -4,7 +4,7 @@
 
 ### Security
 - Moved OpenAI API key to server-side Edge Function (no longer exposed in client bundle)
-- Added server-side rate limiting to prevent abuse (per-user hourly + global per-minute limits)
+- Added server-side rate limiting to prevent abuse (50 requests/user/hour, 100 requests/minute globally)
 
 ### Added
 - **Monthly quota limits** for all users (including Pro) to prevent runaway API costs

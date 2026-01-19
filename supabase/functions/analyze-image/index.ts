@@ -34,7 +34,7 @@ const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 const globalRateLimit = { count: 0, resetAt: 0 };
 
 const RATE_LIMITS = {
-  PER_USER_HOUR: 30, // Max 30 requests per user per hour
+  PER_USER_HOUR: 50, // Max 50 requests per user per hour
   GLOBAL_MINUTE: 100, // Max 100 requests globally per minute
 };
 

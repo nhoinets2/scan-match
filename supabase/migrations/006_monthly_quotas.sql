@@ -36,7 +36,7 @@ CREATE OR REPLACE FUNCTION get_free_scan_monthly_limit() RETURNS INTEGER AS $$ S
 CREATE OR REPLACE FUNCTION get_free_wardrobe_add_monthly_limit() RETURNS INTEGER AS $$ SELECT 15; $$ LANGUAGE sql IMMUTABLE;
 
 -- Pro tier monthly limits (safety cap)
-CREATE OR REPLACE FUNCTION get_pro_scan_monthly_limit() RETURNS INTEGER AS $$ SELECT 200; $$ LANGUAGE sql IMMUTABLE;
+CREATE OR REPLACE FUNCTION get_pro_scan_monthly_limit() RETURNS INTEGER AS $$ SELECT 500; $$ LANGUAGE sql IMMUTABLE;
 CREATE OR REPLACE FUNCTION get_pro_wardrobe_add_monthly_limit() RETURNS INTEGER AS $$ SELECT 500; $$ LANGUAGE sql IMMUTABLE;
 
 -- ─────────────────────────────────────────────
