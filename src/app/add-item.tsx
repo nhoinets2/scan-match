@@ -879,6 +879,8 @@ export default function AddItemScreen() {
   const wasBackgroundedDuringAnalysis = useRef(false);
   const pendingRetryUri = useRef<string | null>(null);
   const pendingRetryKey = useRef<string | null>(null);
+  const backgroundRetryAttempt = useRef(0);
+  const MAX_BACKGROUND_RETRIES = 2;
 
   // Quota and Pro status (usage-based, synced across devices)
   const { isPro, refetch: refetchProStatus } = useProStatus();
@@ -932,19 +934,20 @@ export default function AddItemScreen() {
         pendingRetryKey.current = currentIdempotencyKey;
       } else if (nextState === 'active' && wasBackgroundedDuringAnalysis.current) {
         // Returned to foreground after backgrounding during analysis
-        wasBackgroundedDuringAnalysis.current = false;
         const retryUri = pendingRetryUri.current;
         const retryKey = pendingRetryKey.current;
-        pendingRetryUri.current = null;
-        pendingRetryKey.current = null;
         
-        // Auto-retry if analysis failed while backgrounded (state reset to 'ready')
+        // Auto-retry if still in processing state (error handler kept us in loading)
         // Use the same idempotency key to prevent double quota charge
-        if (retryUri && screenState === 'ready') {
-          console.log('[AddItem] Returning from background, auto-retrying analysis');
+        if (retryUri && screenState === 'processing') {
+          console.log('[AddItem] Returning from background, auto-retrying analysis (attempt:', backgroundRetryAttempt.current + 1, ')');
           processImage(retryUri, retryKey ?? undefined);
         } else if (screenState === 'analyzed') {
-          console.log('[AddItem] Returning from background, analysis already succeeded');
+          console.log('[AddItem] Returning from background, analysis already completed');
+          // Reset state for next analysis
+          wasBackgroundedDuringAnalysis.current = false;
+          pendingRetryUri.current = null;
+          pendingRetryKey.current = null;
         }
       }
     };
@@ -1021,11 +1024,12 @@ export default function AddItemScreen() {
     analysisAbortRef.current?.abort(); // Cancel any previous in-flight analysis
     analysisAbortRef.current = controller;
 
-    // For new attempts, generate new idempotency key
-    // For retries, reuse the existing key to prevent double-charging
+    // For new attempts (not retries), reset the background retry counter
+    // For retries, keep the counter to track total attempts
     const idempotencyKey = retryKey ?? generateIdempotencyKey();
     if (!retryKey) {
       setCurrentIdempotencyKey(idempotencyKey);
+      backgroundRetryAttempt.current = 0; // Reset retry counter for fresh attempts
     }
 
     try {
@@ -1078,13 +1082,28 @@ export default function AddItemScreen() {
           return;
         }
         
-        // Other errors: let user proceed with manual form
+        // If error happened while backgrounded and we haven't exceeded max retries,
+        // stay in 'processing' state - the AppState handler will trigger auto-retry
+        if (wasBackgroundedDuringAnalysis.current && backgroundRetryAttempt.current < MAX_BACKGROUND_RETRIES) {
+          console.log('[AddItem] Error during background (attempt', backgroundRetryAttempt.current + 1, '/', MAX_BACKGROUND_RETRIES, '), staying in loading for auto-retry');
+          backgroundRetryAttempt.current += 1;
+          return; // Stay in 'processing' state, don't show manual form
+        }
+        
+        // Other errors (or max retries exceeded): let user proceed with manual form
+        console.log('[AddItem] Showing manual form - error:', result.error.kind, 'bgRetries:', backgroundRetryAttempt.current);
         setAnalysisFailed(true);
         setScreenState("analyzed");
         return;
       }
       
       // Success - extract analysis data
+      // Reset background retry state since we succeeded
+      wasBackgroundedDuringAnalysis.current = false;
+      pendingRetryUri.current = null;
+      pendingRetryKey.current = null;
+      backgroundRetryAttempt.current = 0;
+      
       const analysisData = result.data;
       setAnalysis(analysisData);
       
