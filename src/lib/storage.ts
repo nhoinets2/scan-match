@@ -396,6 +396,23 @@ async function uploadWorker(job: UploadJob): Promise<void> {
   
   console.log('[UploadWorker] Processing job:', { id: jobId, kind, bucket });
   
+  // 0) Verify user is authenticated before upload (prevents RLS errors)
+  const { data: { session }, error: authError } = await supabase.auth.getSession();
+  if (authError || !session) {
+    console.warn('[UploadWorker] No valid session, deferring upload:', jobId);
+    throw new Error('Not authenticated - upload will retry when session is restored');
+  }
+  
+  // Verify the job userId matches the authenticated user (prevents stale jobs)
+  if (session.user.id !== job.userId) {
+    console.warn('[UploadWorker] Job userId mismatch, skipping:', {
+      jobId,
+      jobUserId: job.userId,
+      sessionUserId: session.user.id,
+    });
+    throw new Error('User ID mismatch - job was created by a different user');
+  }
+  
   // 1) Read file and prepare for upload
   const base64Data = await FileSystem.readAsStringAsync(job.localUri, {
     encoding: FileSystem.EncodingType.Base64,

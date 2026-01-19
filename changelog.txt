@@ -16,6 +16,7 @@
 - Credit consumption details added to Help Center (explains when credits are used)
 
 ### Fixed
+- **Storage upload RLS errors**: Added session verification before background uploads to prevent "row-level security policy" errors when session expires or app restarts before auth is restored
 - Wardrobe adds now consume from correct quota pool (was incorrectly using scan credits)
 - Dark overlay on logout/transition screens now covers full screen edge-to-edge
 - Analysis failures when app goes to background now auto-retry on return
