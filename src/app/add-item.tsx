@@ -9,6 +9,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
+  AppState,
+  AppStateStatus,
 } from "react-native";
 import { Image } from "expo-image";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -872,6 +874,11 @@ export default function AddItemScreen() {
   // isActiveRef prevents state updates after unmount
   const analysisAbortRef = useRef<AbortController | null>(null);
   const isActiveRef = useRef(true);
+  
+  // Background state tracking for auto-retry
+  const wasBackgroundedDuringAnalysis = useRef(false);
+  const pendingRetryUri = useRef<string | null>(null);
+  const pendingRetryKey = useRef<string | null>(null);
 
   // Quota and Pro status (usage-based, synced across devices)
   const { isPro, refetch: refetchProStatus } = useProStatus();
@@ -885,14 +892,17 @@ export default function AddItemScreen() {
   }, [isPro, wardrobeAddsUsed, hasWardrobeAddsRemaining]);
 
   // Check quota on mount and when usage changes - show paywall if exceeded and not Pro
+  // BUT only if we're in "ready" state - don't interrupt if analysis already succeeded
   useEffect(() => {
     // Wait for quota to load before checking
     if (isLoadingQuota) return;
+    // Don't show paywall if analysis already succeeded (credit was used for this session)
+    if (screenState === "analyzed" || screenState === "processing") return;
     if (!isPro && !hasWardrobeAddsRemaining) {
       console.log("[Quota Debug] Showing paywall - quota exceeded");
       setShowPaywall(true);
     }
-  }, [isPro, hasWardrobeAddsRemaining, isLoadingQuota]);
+  }, [isPro, hasWardrobeAddsRemaining, isLoadingQuota, screenState]);
 
   // Rotate tips every 4 seconds (same as Scan)
   useEffect(() => {
@@ -909,6 +919,39 @@ export default function AddItemScreen() {
       analysisAbortRef.current?.abort();
     };
   }, []);
+
+  // AppState listener for auto-retry when returning from background
+  // If user backgrounds the app during analysis, retry automatically when they return
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === 'background' && screenState === 'processing') {
+        // Mark that we went background during analysis
+        console.log('[AddItem] App went background during analysis, will retry on return');
+        wasBackgroundedDuringAnalysis.current = true;
+        pendingRetryUri.current = imageUri;
+        pendingRetryKey.current = currentIdempotencyKey;
+      } else if (nextState === 'active' && wasBackgroundedDuringAnalysis.current) {
+        // Returned to foreground after backgrounding during analysis
+        wasBackgroundedDuringAnalysis.current = false;
+        const retryUri = pendingRetryUri.current;
+        const retryKey = pendingRetryKey.current;
+        pendingRetryUri.current = null;
+        pendingRetryKey.current = null;
+        
+        // Auto-retry if analysis failed while backgrounded (state reset to 'ready')
+        // Use the same idempotency key to prevent double quota charge
+        if (retryUri && screenState === 'ready') {
+          console.log('[AddItem] Returning from background, auto-retrying analysis');
+          processImage(retryUri, retryKey ?? undefined);
+        } else if (screenState === 'analyzed') {
+          console.log('[AddItem] Returning from background, analysis already succeeded');
+        }
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription.remove();
+  }, [screenState, imageUri, currentIdempotencyKey]);
 
   // Optional preselect from route params (used by "Helpful additions" flows)
   useEffect(() => {

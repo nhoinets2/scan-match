@@ -7,6 +7,8 @@ import {
   Pressable,
   Modal,
   useWindowDimensions,
+  AppState,
+  AppStateStatus,
 } from "react-native";
 import { Image } from "expo-image";
 import { BlurView } from "expo-blur";
@@ -1409,6 +1411,44 @@ export default function ResultsScreen() {
     if (!shouldUseImageUriFlow || !imageUri) return null;
     return { status: "loading", imageUri, attempt: 1 };
   });
+  
+  // Background state tracking for auto-retry
+  const wasBackgroundedDuringLoading = useRef(false);
+  
+  // AppState listener for auto-retry when returning from background
+  useEffect(() => {
+    if (!shouldUseImageUriFlow) return;
+    
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === 'background' && analysisState?.status === 'loading') {
+        // Mark that we went background during loading
+        console.log('[Results] App went background during analysis, will auto-retry on return if failed');
+        wasBackgroundedDuringLoading.current = true;
+      } else if (nextState === 'active' && wasBackgroundedDuringLoading.current) {
+        // Returned to foreground after backgrounding during loading
+        wasBackgroundedDuringLoading.current = false;
+        
+        // Auto-retry if analysis failed while backgrounded
+        if (analysisState?.status === 'failed' && analysisState.attempt < MAX_RETRIES) {
+          console.log('[Results] Returning from background, auto-retrying analysis');
+          logAnalysisLifecycleEvent({
+            name: "analysis_retry_background",
+            props: { attempt: analysisState.attempt + 1, analysisKey, source },
+          });
+          setAnalysisState({
+            status: "loading",
+            imageUri: analysisState.imageUri,
+            attempt: analysisState.attempt + 1,
+          });
+        } else if (analysisState?.status === 'success') {
+          console.log('[Results] Returning from background, analysis already succeeded');
+        }
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription.remove();
+  }, [shouldUseImageUriFlow, analysisState, analysisKey, source]);
   
   // Retry handler
   const handleRetry = useCallback(() => {
