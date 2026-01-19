@@ -369,15 +369,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    // Clear the ephemeral store cache
-    clearCache();
-    // Reset quota counters so new user starts fresh
-    useQuotaStore.getState().resetQuotas();
-    // Logout from RevenueCat to unlink user
-    await logoutUser().catch((err) => {
-      console.log("[Auth] Failed to logout from RevenueCat:", err);
-    });
-    await supabase.auth.signOut();
+    console.log("[Auth] 🚪 signOut started");
+    
+    // Clear cache and quotas, but don't let errors block signOut
+    try {
+      console.log("[Auth] Clearing cache...");
+      clearCache();
+    } catch (cacheError) {
+      console.error("[Auth] Error clearing cache (non-fatal):", cacheError);
+    }
+    
+    try {
+      console.log("[Auth] Resetting quotas...");
+      useQuotaStore.getState().resetQuotas();
+    } catch (quotaError) {
+      console.error("[Auth] Error resetting quotas (non-fatal):", quotaError);
+    }
+    
+    // Logout from RevenueCat (non-fatal if fails)
+    try {
+      console.log("[Auth] Logging out from RevenueCat...");
+      const rcResult = await logoutUser();
+      if (!rcResult.ok) {
+        console.log("[Auth] RevenueCat logout failed:", rcResult.reason, "- continuing");
+      } else {
+        console.log("[Auth] ✅ RevenueCat logout successful");
+      }
+    } catch (rcError) {
+      console.error("[Auth] RevenueCat logout error (non-fatal):", rcError);
+    }
+    
+    // Always sign out from Supabase - this is the critical part
+    console.log("[Auth] Signing out from Supabase...");
+    const { error } = await supabase.auth.signOut();
+    
+    if (error) {
+      // Check if the error is "session missing" - this means user is already signed out
+      const errorMessage = error.message || String(error);
+      if (errorMessage.includes("Auth session missing") || errorMessage.includes("AuthSessionMissingError")) {
+        console.log("[Auth] ⚠️ Session already missing - clearing storage and state");
+        // Clear Supabase session from AsyncStorage to prevent restoration
+        await clearInvalidTokens();
+        // Manually clear the auth state to trigger redirect
+        setSession(null);
+        setUser(null);
+        console.log("[Auth] ✅ Storage and auth state cleared");
+        return;
+      }
+      
+      // For other errors, log and throw
+      console.error("[Auth] ❌ Supabase signOut failed:", error);
+      throw error;
+    }
+    
+    console.log("[Auth] ✅ Supabase signOut completed - auth state should update soon");
   };
 
   const deleteAccount = async () => {

@@ -148,10 +148,23 @@ function RootLayoutNav({
             contentStyle: { backgroundColor: colors.bg.primary },
           }}
         >
-          <Stack.Screen name="(tabs)" options={{ headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen 
+            name="(tabs)" 
+            options={{ 
+              headerShown: false, 
+              gestureEnabled: false,
+              animation: "fade",
+              animationDuration: 100,
+            }} 
+          />
           <Stack.Screen
             name="login"
-            options={{ headerShown: false, gestureEnabled: false }}
+            options={{ 
+              headerShown: false, 
+              gestureEnabled: false,
+              animation: "fade",
+              animationDuration: 100,
+            }}
           />
           <Stack.Screen
             name="signup"
@@ -209,6 +222,8 @@ function RootLayoutNav({
             options={{
               headerShown: false,
               presentation: "modal",
+              animation: "fade",
+              animationDuration: 200,
             }}
           />
           <Stack.Screen
@@ -323,7 +338,7 @@ export default function RootLayout() {
         <SplashHider fontsLoaded={fontsLoaded} fontError={fontError} />
         <BackgroundUploadInitializer />
         <DeepLinkHandler />
-        <GestureHandlerRootView style={{ flex: 1 }}>
+        <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg.primary }}>
           <KeyboardProvider>
             <StatusBar style="dark" />
             <RootLayoutNav colorScheme={colorScheme} />

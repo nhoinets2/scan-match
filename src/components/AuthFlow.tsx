@@ -826,119 +826,43 @@ export default function AuthFlow(props: AuthFlowProps) {
   const canLogin = isValidEmail(email) && password.length >= 6 && !emailError;
   const canSignup = isValidEmail(email) && isValidPassword(password) && !emailError && !passwordError;
 
-  // If user is logged in, show logout screen
+  // If user is logged in, AuthGuard will handle redirect
+  // Show landing page image with dimmed overlay and spinner
   if (props.isAuthed) {
     return (
-      <View style={{ flex: 1 }}>
-        <ImageBackground
-          source={{
-            uri: "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=800&q=80",
-            cache: "force-cache",
+      <View style={{ flex: 1, backgroundColor: colors.bg.primary, overflow: "hidden" }}>
+        <Image
+          source={HERO_LANDING_IMAGE}
+          style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          priority="high"
+          recyclingKey="landing-hero"
+        />
+        {/* Dim overlay to make spinner more prominent */}
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.35)",
           }}
-          style={{ flex: 1 }}
-          blurRadius={25}
+        />
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
         >
-          {/* Dark overlay for readability */}
-          <View
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: colors.overlay.light,
-            }}
-          />
-          <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
-            <SafeAreaView style={{ flex: 1 }}>
-              <View
-                style={{
-                  flex: 1,
-                  paddingHorizontal: spacing.lg,
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                {/* Header */}
-                <Animated.View
-                  entering={FadeInDown.duration(500)}
-                  style={{ alignItems: "center", marginBottom: spacing.xl }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: "BodoniModa_600SemiBold",
-                      fontSize: 22,
-                      lineHeight: 30,
-                      color: colors.text.primary,
-                      textAlign: "center",
-                      marginBottom: spacing.xs,
-                    }}
-                  >
-                    You're signed in
-                  </Text>
-                  <Text
-                    style={{
-                      fontFamily: "Inter_400Regular",
-                      fontSize: 14,
-                      color: colors.text.secondary,
-                      textAlign: "center",
-                      maxWidth: 260,
-                      lineHeight: 20,
-                    }}
-                  >
-                    Sign out to switch accounts
-                  </Text>
-                </Animated.View>
-
-                {/* Glass Card */}
-                <Animated.View
-                  entering={FadeInDown.delay(150).duration(500)}
-                  style={{
-                    backgroundColor: colors.bg.elevated,
-                    borderRadius: borderRadius.card,
-                    padding: spacing.lg,
-                    borderWidth: 1,
-                    borderColor: colors.border.subtle,
-                    width: "100%",
-                  }}
-                >
-                  {/* Sign Out Button */}
-                  <Pressable
-                    onPress={() => handleAction(() => props.onLogout())}
-                    disabled={loading}
-                    style={({ pressed }) => ({
-                      opacity: pressed ? 0.9 : 1,
-                    })}
-                  >
-                    <View
-                      style={{
-                        height: 56,
-                        borderRadius: borderRadius.pill,
-                        backgroundColor: colors.state.destructiveBg,
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      {loading ? (
-                        <ActivityIndicator color={colors.state.destructive} />
-                      ) : (
-                        <Text
-                          style={{
-                            fontFamily: "Inter_600SemiBold",
-                            fontSize: 16,
-                            color: colors.state.destructive,
-                          }}
-                        >
-                          Sign out
-                        </Text>
-                      )}
-                    </View>
-                  </Pressable>
-                </Animated.View>
-              </View>
-            </SafeAreaView>
-          </View>
-        </ImageBackground>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+        </View>
       </View>
     );
   }

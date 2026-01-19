@@ -10,8 +10,11 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { BlurView } from "expo-blur";
+import { Image } from "expo-image";
 import { router } from "expo-router";
+
+// Landing page image for sign out loading state
+const HERO_LANDING_IMAGE = require("../../assets/onboarding_screens/landing_page/landing_page.webp");
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { ChevronLeft, ChevronRight, KeyRound, FileText, Shield, Mail, LogOut, Settings, HelpCircle, AlertCircle, Star, Crown } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
@@ -150,20 +153,12 @@ export default function AccountScreen() {
       setLoading(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await signOut();
-      // Close the account modal first by going back
-      // This ensures we exit modal mode before navigating to login
-      if (router.canGoBack()) {
-        router.back();
-        setTimeout(() => {
-          router.replace("/login");
-        }, 300);
-      } else {
-        router.replace("/login");
-      }
+      // Don't manually navigate - let AuthGuard handle the redirect
+      // setLoading will stay true during the redirect to prevent UI flicker
     } catch (error) {
-      console.error("Sign out error:", error);
-    } finally {
+      console.error("[Account] Sign out error:", error);
       setLoading(false);
+      Alert.alert("Error", "Failed to sign out. Please try again.");
     }
   };
 
@@ -457,7 +452,7 @@ export default function AccountScreen() {
         reason="wardrobe_limit"
       />
 
-      {/* Sign Out Loading Overlay */}
+      {/* Sign Out Loading Overlay - Landing image with dim overlay */}
       {loading && (
         <View
           style={{
@@ -466,45 +461,40 @@ export default function AccountScreen() {
             left: 0,
             right: 0,
             bottom: 0,
-            alignItems: "center",
-            justifyContent: "center",
+            backgroundColor: colors.bg.primary,
+            overflow: "hidden",
           }}
         >
-          <BlurView
-            intensity={20}
-            tint="light"
+          <Image
+            source={HERO_LANDING_IMAGE}
+            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            priority="high"
+          />
+          {/* Dim overlay to make spinner more prominent */}
+          <View
             style={{
               position: "absolute",
               top: 0,
               left: 0,
               right: 0,
               bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.35)",
             }}
           />
           <View
             style={{
-              backgroundColor: colors.bg.primary,
-              borderRadius: borderRadius.card,
-              padding: spacing.xl,
-              alignItems: "center",
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
               justifyContent: "center",
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.1,
-              shadowRadius: 12,
-              elevation: 5,
+              alignItems: "center",
             }}
           >
-            <ActivityIndicator size="large" color={colors.accent.terracotta} />
-            <Text
-              style={{
-                ...typography.ui.bodyMedium,
-                color: colors.text.primary,
-                marginTop: spacing.md,
-              }}
-            >
-              Signing out...
-            </Text>
+            <ActivityIndicator size="large" color="#FFFFFF" />
           </View>
         </View>
       )}

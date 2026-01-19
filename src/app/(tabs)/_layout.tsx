@@ -1,7 +1,8 @@
 import React, { useEffect, useCallback } from "react";
 import { Tabs, router } from "expo-router";
-import { View, Pressable } from "react-native";
+import { View, Pressable, ActivityIndicator } from "react-native";
 import { Home, Camera, Shirt, Bookmark } from "lucide-react-native";
+import { Image } from "expo-image";
 import {
   useFonts,
   Inter_400Regular,
@@ -17,6 +18,9 @@ import { useAuth } from "@/lib/auth-context";
 import { useWinbackOffer } from "@/lib/useWinbackOffer";
 import { WinbackOffer } from "@/components/WinbackOffer";
 import { colors, spacing, borderRadius, shadows, tabBar } from "@/lib/design-tokens";
+
+// Landing page image for loading states
+const HERO_LANDING_IMAGE = require("../../../assets/onboarding_screens/landing_page/landing_page.webp");
 
 interface CustomTabBarProps {
   state: any;
@@ -176,16 +180,81 @@ export default function TabLayout() {
   }, [fontsLoaded, isAuthLoading, user, isOnboardingLoading, onboardingComplete]);
 
   // Don't render tabs until we know onboarding status to prevent flash
+  // Show landing image with dim overlay during loading to match auth flow
   if (!fontsLoaded || isAuthLoading || isOnboardingLoading) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg.primary }} />
+      <View style={{ flex: 1, backgroundColor: colors.bg.primary, overflow: "hidden" }}>
+        <Image
+          source={HERO_LANDING_IMAGE}
+          style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          priority="high"
+        />
+        {/* Dim overlay to make spinner more prominent */}
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.35)",
+          }}
+        />
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <ActivityIndicator size="large" color="#FFFFFF" />
+        </View>
+      </View>
     );
   }
 
-  // If user needs onboarding, show gradient background while redirect happens
+  // If user needs onboarding, show landing image while redirect happens
   if (user && !onboardingComplete) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg.primary }} />
+      <View style={{ flex: 1, backgroundColor: colors.bg.primary, overflow: "hidden" }}>
+        <Image
+          source={HERO_LANDING_IMAGE}
+          style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%" }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          priority="high"
+        />
+        {/* Dim overlay to make spinner more prominent */}
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.35)",
+          }}
+        />
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <ActivityIndicator size="large" color="#FFFFFF" />
+        </View>
+      </View>
     );
   }
 
