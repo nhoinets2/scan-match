@@ -20,6 +20,8 @@
 - Dark overlay on logout/transition screens now covers full screen edge-to-edge
 - Analysis failures when app goes to background now auto-retry on return
 - Paywall no longer interrupts users who used their last credit successfully (was showing paywall after analysis completed)
+- **Scan flow now shows paywall BEFORE capture** when quota exceeded (previously let users scan then blocked them after)
+- Scan paywall now shows correct title "You've used your 5 free scans" (was showing wrong paywall type)
 
 ### Improved
 - **Add wardrobe item performance**: Removed redundant client-side quota check (~100-200ms faster)
