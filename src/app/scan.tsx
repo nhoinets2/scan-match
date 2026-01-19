@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { View, Text, Pressable, Modal, ScrollView, Image } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import Animated, {
   FadeIn,
   FadeOut,
@@ -311,6 +312,7 @@ export default function ScanScreen() {
   const [showHelp, setShowHelp] = useState(false);
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [isFocused, setIsFocused] = useState(true);
 
   const clearScan = useSnapToMatchStore((s) => s.clearScan);
 
@@ -346,6 +348,23 @@ export default function ScanScreen() {
     }, 4000);
     return () => clearInterval(interval);
   }, []);
+
+  // Reset processing state when screen regains focus
+  // This fixes the issue where the processing overlay stays visible
+  // when navigating back from results (e.g., after tapping X or "Scan another item")
+  useFocusEffect(
+    useCallback(() => {
+      // Screen is now focused
+      setIsFocused(true);
+      setIsProcessing(false);
+      setIsCapturing(false);
+
+      return () => {
+        // Screen is losing focus
+        setIsFocused(false);
+      };
+    }, [])
+  );
 
   const captureButtonStyle = useAnimatedStyle(() => ({
     transform: [{ scale: captureScale.value }],
@@ -545,8 +564,8 @@ export default function ScanScreen() {
         {/* Scan overlay with rotating tips */}
         <ScanOverlay currentTip={TIPS[currentTipIndex]} />
 
-        {/* Processing overlay */}
-        {isProcessing && <ProcessingOverlay />}
+        {/* Processing overlay - only show when screen is focused */}
+        {isProcessing && isFocused && <ProcessingOverlay />}
 
         {/* Top bar - simplified */}
         <View
