@@ -1005,7 +1005,11 @@ export default function AddItemScreen() {
       // Credit consumed (or idempotent replay) - now safe to make AI call
       console.log("[Quota] Credit allowed (reason:", consumeResult.reason, "), proceeding with AI call");
       
-      const result = await analyzeClothingImage({ imageUri: uri, signal: controller.signal });
+      const result = await analyzeClothingImage({ 
+        imageUri: uri, 
+        idempotencyKey, // Required for Edge Function
+        signal: controller.signal,
+      });
       
       // Check if user closed screen or component unmounted during analysis
       if (!isActiveRef.current || controller.signal.aborted) {
