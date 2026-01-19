@@ -356,6 +356,8 @@ export interface AnalysisContext {
 export interface AnalyzeParams {
   imageUri: string;
   idempotencyKey: string; // Now required - must be generated before calling
+  operationType?: 'scan' | 'wardrobe_add'; // Which quota pool to use (default: scan)
+  skipCache?: boolean; // Skip cache lookup for new images (default: false)
   timeoutMs?: number;
   signal?: AbortSignal;
   ctx?: AnalysisContext;
@@ -382,11 +384,18 @@ export async function analyzeClothingImage(
     ? { imageUri: params, idempotencyKey: `legacy_${Date.now()}`, ctx }
     : params;
   
-  const { imageUri, idempotencyKey, timeoutMs = 45000, signal: externalSignal } = normalizedParams;
+  const { 
+    imageUri, 
+    idempotencyKey, 
+    operationType = 'scan',
+    skipCache = false,
+    timeoutMs = 45000, 
+    signal: externalSignal 
+  } = normalizedParams;
   const telemetryCtx = normalizedParams.ctx ?? ctx;
   const startTime = Date.now();
   
-  console.log("[analyzeClothingImage] Starting analysis via Edge Function");
+  console.log(`[analyzeClothingImage] Starting ${operationType} analysis via Edge Function`);
 
   // Check if Edge Function URL is configured
   if (!ANALYZE_IMAGE_URL) {
@@ -481,34 +490,36 @@ export async function analyzeClothingImage(
     const dataUrl = await getImageDataUrl(optimizedUri);
     console.log(`[Perf] Base64 conversion: ${Date.now() - base64Start}ms, size: ${Math.round(dataUrl.length / 1024)}KB`);
 
-    // Check local cache first
-    const hashStart = Date.now();
-    let imageSha256: string;
-    let cacheKey: string;
+    // Check local cache first (skip if requested - e.g., for wardrobe adds with new photos)
+    let imageSha256 = '';
+    let cacheKey = '';
     
-    try {
-      imageSha256 = await sha256Hex(dataUrl);
-      cacheKey = generateCacheKey(imageSha256);
-      console.log(`[Perf] Hash computation: ${Date.now() - hashStart}ms, hash: ${imageSha256.slice(0, 8)}`);
-    } catch (hashError) {
-      console.log(`[Perf] Hash failed, skipping cache:`, hashError);
-      imageSha256 = '';
-      cacheKey = '';
-    }
-
-    // Try local cache
-    if (cacheKey) {
-      const cacheStart = Date.now();
-      const cachedResult = await getCachedAnalysis(cacheKey);
-      if (cachedResult) {
-        logCacheTelemetry(true, imageSha256, telemetryCtx?.scan_session_id);
-        console.log(`[Perf] Cache HIT in ${Date.now() - cacheStart}ms, total: ${Date.now() - startTime}ms`);
-        logTelemetry(cachedResult, true, imageSha256.slice(0, 8));
-        clearTimeout(timeoutId);
-        return { ok: true, data: cachedResult, cacheHit: true };
+    if (!skipCache) {
+      const hashStart = Date.now();
+      try {
+        imageSha256 = await sha256Hex(dataUrl);
+        cacheKey = generateCacheKey(imageSha256);
+        console.log(`[Perf] Hash computation: ${Date.now() - hashStart}ms, hash: ${imageSha256.slice(0, 8)}`);
+      } catch (hashError) {
+        console.log(`[Perf] Hash failed, skipping cache:`, hashError);
       }
-      logCacheTelemetry(false, imageSha256, telemetryCtx?.scan_session_id);
-      console.log(`[Perf] Cache miss (lookup: ${Date.now() - cacheStart}ms)`);
+
+      // Try local cache
+      if (cacheKey) {
+        const cacheStart = Date.now();
+        const cachedResult = await getCachedAnalysis(cacheKey);
+        if (cachedResult) {
+          logCacheTelemetry(true, imageSha256, telemetryCtx?.scan_session_id);
+          console.log(`[Perf] Cache HIT in ${Date.now() - cacheStart}ms, total: ${Date.now() - startTime}ms`);
+          logTelemetry(cachedResult, true, imageSha256.slice(0, 8));
+          clearTimeout(timeoutId);
+          return { ok: true, data: cachedResult, cacheHit: true };
+        }
+        logCacheTelemetry(false, imageSha256, telemetryCtx?.scan_session_id);
+        console.log(`[Perf] Cache miss (lookup: ${Date.now() - cacheStart}ms)`);
+      }
+    } else {
+      console.log(`[Perf] Cache lookup skipped (skipCache=true)`);
     }
 
     // Get auth token for Edge Function
@@ -525,7 +536,7 @@ export async function analyzeClothingImage(
     }
 
     // Call Edge Function
-    console.log("[Perf] Calling analyze-image Edge Function...");
+    console.log(`[Perf] Calling analyze-image Edge Function (${operationType})...`);
     const apiStart = Date.now();
     
     const response = await fetch(ANALYZE_IMAGE_URL, {
@@ -537,6 +548,7 @@ export async function analyzeClothingImage(
       body: JSON.stringify({
         imageDataUrl: dataUrl,
         idempotencyKey,
+        operationType,
       }),
       signal: controller.signal,
     });

@@ -172,6 +172,7 @@ Respond with ONLY the JSON object.`;
 interface AnalyzeRequest {
   imageDataUrl: string; // base64 data URL
   idempotencyKey: string;
+  operationType?: 'scan' | 'wardrobe_add'; // Which quota pool to use (default: scan)
 }
 
 interface AnalyzeResponse {
@@ -258,11 +259,19 @@ Deno.serve(async (req) => {
 
     // Parse request body
     const body: AnalyzeRequest = await req.json();
-    const { imageDataUrl, idempotencyKey } = body;
+    const { imageDataUrl, idempotencyKey, operationType = 'scan' } = body;
 
     if (!imageDataUrl || !idempotencyKey) {
       return new Response(
         JSON.stringify({ ok: false, error: { kind: "bad_request", message: "Missing imageDataUrl or idempotencyKey" } }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate operationType
+    if (operationType !== 'scan' && operationType !== 'wardrobe_add') {
+      return new Response(
+        JSON.stringify({ ok: false, error: { kind: "bad_request", message: "Invalid operationType" } }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -276,9 +285,14 @@ Deno.serve(async (req) => {
     }
 
     // Check quota using the user's auth context (RPC uses auth.uid())
-    console.log(`[analyze-image] Consuming quota for user: ${userId}, key: ${idempotencyKey}`);
+    // Use correct quota function based on operation type
+    const quotaFunction = operationType === 'wardrobe_add' 
+      ? 'consume_wardrobe_add_credit' 
+      : 'consume_scan_credit';
+    
+    console.log(`[analyze-image] Consuming ${operationType} quota for user: ${userId}, key: ${idempotencyKey}`);
     const { data: quotaData, error: quotaError } = await supabaseUser.rpc(
-      "consume_scan_credit",
+      quotaFunction,
       { p_idempotency_key: idempotencyKey }
     );
 
@@ -296,14 +310,15 @@ Deno.serve(async (req) => {
     if (!quotaResult?.allowed) {
       const reason = quotaResult?.reason || "quota_exceeded";
       const isMonthly = reason === "monthly_quota_exceeded";
+      const quotaType = operationType === 'wardrobe_add' ? 'wardrobe add' : 'scan';
       return new Response(
         JSON.stringify({
           ok: false,
           error: {
             kind: "quota_exceeded",
             message: isMonthly 
-              ? "You've reached your monthly scan limit. Resets next month."
-              : "You've used all your free scans. Upgrade to Pro for more.",
+              ? `You've reached your monthly ${quotaType} limit. Resets next month.`
+              : `You've used all your free ${quotaType}s. Upgrade to Pro for more.`,
           },
           quotaInfo: {
             monthlyUsed: quotaResult?.monthly_used ?? 0,

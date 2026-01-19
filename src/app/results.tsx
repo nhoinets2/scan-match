@@ -1444,6 +1444,7 @@ export default function ResultsScreen() {
       const result = await analyzeClothingImage({
         imageUri,
         idempotencyKey: analysisKey, // Required for server-side quota enforcement
+        operationType: 'scan', // Use scan quota pool
         signal: ac.signal,
       });
       

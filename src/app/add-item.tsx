@@ -65,7 +65,7 @@ import { useProStatus } from "@/lib/useProStatus";
 import { useAuth } from "@/lib/auth-context";
 import { saveImageLocally, queueBackgroundUpload } from "@/lib/storage";
 import { Paywall } from "@/components/Paywall";
-import { useUsageQuota, useConsumeWardrobeAddCredit, generateIdempotencyKey } from "@/lib/database";
+import { useUsageQuota, generateIdempotencyKey } from "@/lib/database";
 
 type ScreenState = "ready" | "processing" | "analyzed";
 
@@ -876,7 +876,6 @@ export default function AddItemScreen() {
   // Quota and Pro status (usage-based, synced across devices)
   const { isPro, refetch: refetchProStatus } = useProStatus();
   const { wardrobeAddsUsed, hasWardrobeAddsRemaining, isLoading: isLoadingQuota } = useUsageQuota();
-  const consumeWardrobeAddCredit = useConsumeWardrobeAddCredit();
 
   const captureScale = useSharedValue(1);
 
@@ -987,27 +986,17 @@ export default function AddItemScreen() {
     }
 
     try {
-      // CRITICAL: Consume credit BEFORE AI call to prevent over-quota usage
-      // This is atomic and server-side enforced
-      // Pass idempotency key - same key for retries prevents double-charge
-      console.log("[Quota] Attempting to consume wardrobe add credit with key:", idempotencyKey);
-      const consumeResult = await consumeWardrobeAddCredit.mutateAsync(idempotencyKey);
-      console.log("[Quota] Consume result:", consumeResult.reason, consumeResult);
-      
-      if (!consumeResult.allowed) {
-        // Credit denied - show paywall, DO NOT make AI call
-        console.log("[Quota] Credit denied (reason:", consumeResult.reason, "), showing paywall");
-        setScreenState("ready");
-        setShowPaywall(true);
-        return;
-      }
-      
-      // Credit consumed (or idempotent replay) - now safe to make AI call
-      console.log("[Quota] Credit allowed (reason:", consumeResult.reason, "), proceeding with AI call");
+      // Call Edge Function which handles quota + AI call atomically
+      // No separate client-side quota check - Edge Function is the single source of truth
+      // Using operationType: 'wardrobe_add' to consume from the correct quota pool
+      // Using skipCache: true since wardrobe photos are user's own images (unlikely to be cached)
+      console.log("[AddItem] Starting analysis with key:", idempotencyKey);
       
       const result = await analyzeClothingImage({ 
         imageUri: uri, 
-        idempotencyKey, // Required for Edge Function
+        idempotencyKey,
+        operationType: 'wardrobe_add', // Use wardrobe add quota pool
+        skipCache: true, // Skip cache lookup for user's own photos
         signal: controller.signal,
       });
       
@@ -1025,6 +1014,14 @@ export default function AddItemScreen() {
         if (result.error.kind === "cancelled") {
           console.log("Analysis cancelled by user, resetting");
           setScreenState("ready");
+          return;
+        }
+        
+        // Quota exceeded: show paywall
+        if (result.error.kind === "quota_exceeded") {
+          console.log("Quota exceeded, showing paywall");
+          setScreenState("ready");
+          setShowPaywall(true);
           return;
         }
         
