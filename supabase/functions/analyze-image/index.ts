@@ -117,6 +117,12 @@ styleTags (REQUIRED - must include 1-3 tags from this list):
 
 IMPORTANT: styleTags must NEVER be empty. Always include at least one tag.
 
+styleNotes (REQUIRED - 2 descriptive sentences about the item):
+Write 2 natural, helpful sentences that describe the item's character and styling potential.
+Focus on: material/texture feel, silhouette details, versatility, occasion suitability, or styling tips.
+Example: ["Soft cotton fabric with a relaxed fit that drapes nicely.", "Versatile enough for casual weekends or layered under a blazer for work."]
+Do NOT write single words or short phrases - write complete, informative sentences.
+
 contextSufficient: Set to false if photo is blurry, item is partially visible, or item type is ambiguous.
 
 confidenceSignals:

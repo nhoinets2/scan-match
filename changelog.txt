@@ -1,0 +1,32 @@
+# Changelog
+
+## January 19, 2026
+
+### Security
+- Moved OpenAI API key to server-side Edge Function (no longer exposed in client bundle)
+- Added server-side rate limiting to prevent abuse (per-user hourly + global per-minute limits)
+
+### Added
+- **Monthly quota limits** for all users (including Pro) to prevent runaway API costs
+  - Free: 5 scans/month, 15 wardrobe adds/month
+  - Pro: 500 scans/month, 1000 wardrobe adds/month
+- Server-side quota enforcement via Supabase Edge Function
+- Idempotency keys to prevent double-charging on retries
+- Auto-retry when app returns from background during analysis
+- Credit consumption details added to Help Center (explains when credits are used)
+
+### Fixed
+- Wardrobe adds now consume from correct quota pool (was incorrectly using scan credits)
+- Dark overlay on logout/transition screens now covers full screen edge-to-edge
+- Analysis failures when app goes to background now auto-retry on return
+
+### Improved
+- **Add wardrobe item performance**: Removed redundant client-side quota check (~100-200ms faster)
+- Skip cache lookup for wardrobe adds (user photos are unlikely to be cached, saves ~189ms on misses)
+- Image picker cropping is now flexible (previously locked to 3:4 aspect ratio)
+- AI now generates richer style notes (2 descriptive sentences instead of short phrases)
+
+### Technical
+- New Edge Function: `analyze-image` handles auth, quota, rate limits, and OpenAI calls
+- Database migration: `006_monthly_quotas.sql` adds monthly tracking columns and functions
+- `analyzeClothingImage` now accepts `operationType` ('scan' | 'wardrobe_add') and `skipCache` params
