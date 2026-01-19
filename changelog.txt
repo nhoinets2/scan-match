@@ -34,3 +34,4 @@
 - Database migration: `006_monthly_quotas.sql` adds monthly tracking columns and functions
 - `analyzeClothingImage` now accepts `operationType` ('scan' | 'wardrobe_add') and `skipCache` params
 - Changes made by agent 2026-01-19T21:07:32Z
+- Changes made by agent 2026-01-19T21:12:53Z
