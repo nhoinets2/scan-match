@@ -14,6 +14,7 @@ import { Image } from "expo-image";
 import { BlurView } from "expo-blur";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -152,7 +153,7 @@ import {
   incrementAndGetScanCount,
 } from "@/lib/analytics";
 
-import type { UseMutationResult } from "@tanstack/react-query";
+import { useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import type { ScannedItem as ScannedItemType } from "@/lib/types";
 
 /**
@@ -1392,8 +1393,20 @@ export default function ResultsScreen() {
   const clearScan = useSnapToMatchStore((s) => s.clearScan);
   const currentScan = useSnapToMatchStore((s) => s.currentScan);
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const addRecentCheckMutation = useAddRecentCheck();
   const updateRecentCheckOutcomeMutation = useUpdateRecentCheckOutcome();
+
+  // Refresh wardrobe data when screen regains focus
+  // This ensures wardrobe updates from add-item are reflected immediately
+  useFocusEffect(
+    useCallback(() => {
+      // Invalidate wardrobe query to ensure fresh data when returning from add-item
+      // This is especially important after adding new items to the wardrobe
+      console.log('[Results] Screen focused, invalidating wardrobe query');
+      queryClient.invalidateQueries({ queryKey: ["wardrobe", user?.id] });
+    }, [queryClient, user?.id])
+  );
   
   // ============================================
   // STATE MACHINE FOR imageUri FLOW
@@ -1411,6 +1424,33 @@ export default function ResultsScreen() {
     if (!shouldUseImageUriFlow || !imageUri) return null;
     return { status: "loading", imageUri, attempt: 1 };
   });
+  
+  // Track the previous imageUri to detect changes
+  const prevImageUriRef = useRef(imageUri);
+  
+  // Reset analysis state when imageUri changes (e.g., screen reused with new params)
+  // This is critical because useState initializer only runs once on mount
+  useEffect(() => {
+    const prevImageUri = prevImageUriRef.current;
+    prevImageUriRef.current = imageUri;
+    
+    // Skip if imageUri didn't change or if we don't need imageUri flow
+    if (prevImageUri === imageUri || !shouldUseImageUriFlow || !imageUri) {
+      return;
+    }
+    
+    console.log('[Results] imageUri changed, resetting analysis state:', {
+      from: prevImageUri?.slice(0, 30),
+      to: imageUri?.slice(0, 30),
+    });
+    
+    // Reset to loading state for the new image
+    setAnalysisState({
+      status: "loading",
+      imageUri,
+      attempt: 1,
+    });
+  }, [imageUri, shouldUseImageUriFlow]);
   
   // Background state tracking for auto-retry
   const wasBackgroundedDuringLoading = useRef(false);

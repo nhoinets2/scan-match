@@ -2,6 +2,10 @@
 
 ## January 19, 2026
 
+### Fixed
+- **Scan flow instability**: Analysis state now properly resets when scanning a new item (was showing stale results from previous scans when screen was reused)
+- **Wardrobe updates not reflected**: Results screen now refreshes wardrobe data when returning from add-item (matches now update immediately after adding wardrobe items)
+
 ### Security
 - Moved OpenAI API key to server-side Edge Function (no longer exposed in client bundle)
 - Added server-side rate limiting to prevent abuse (50 requests/user/hour, 100 requests/minute globally)
