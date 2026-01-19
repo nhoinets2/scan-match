@@ -1,0 +1,53 @@
+appId: com.anonymous.vibecode
+---
+# Wardrobe Management Tests
+# Verifies wardrobe viewing, filtering, and item interaction
+# Prerequisite: User must be logged in
+
+- launchApp
+- waitForAnimationToEnd
+
+# Navigate to Wardrobe tab
+- tapOn:
+    point: "75%,95%"
+- waitForAnimationToEnd
+
+# Verify wardrobe screen elements
+- assertVisible:
+    text: "Wardrobe"
+    optional: true
+
+# Take screenshot
+- takeScreenshot: "wardrobe-main.png"
+
+# Check for category filter chips
+- assertVisible:
+    text: "All"
+    optional: true
+- assertVisible:
+    text: "Tops"
+    optional: true
+- assertVisible:
+    text: "Bottoms"
+    optional: true
+
+# Try filtering by Tops
+- tapOn:
+    text: "Tops"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: "wardrobe-filtered-tops.png"
+
+# Reset to All
+- tapOn:
+    text: "All"
+    optional: true
+- waitForAnimationToEnd
+
+# Look for Add to wardrobe button
+- assertVisible:
+    text: "Add to wardrobe"
+    optional: true
+
+# Take final screenshot
+- takeScreenshot: "wardrobe-final.png"

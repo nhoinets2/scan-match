@@ -1,0 +1,78 @@
+appId: com.anonymous.vibecode
+---
+# Authentication Login Flow Tests
+# Verifies the login screen and form elements
+# Prerequisite: App should start on login/signup screen (logged out)
+
+- launchApp
+- waitForAnimationToEnd
+
+# Swipe up to reveal auth options
+- swipe:
+    direction: UP
+    duration: 500
+
+- waitForAnimationToEnd
+
+# Verify landing auth elements
+- assertVisible:
+    text: "Sign in with email"
+- assertVisible:
+    text: "Create account"
+
+# Take screenshot
+- takeScreenshot: "auth-landing-login.png"
+
+# Tap Sign in with email
+- tapOn:
+    text: "Sign in with email"
+- waitForAnimationToEnd
+
+# Verify login screen elements
+- assertVisible:
+    text: "Welcome back"
+- assertVisible:
+    text: "Email"
+- assertVisible:
+    text: "Password"
+- assertVisible:
+    text: "Sign in"
+
+# Take screenshot
+- takeScreenshot: "login-screen-full.png"
+
+# Verify forgot password link exists
+- assertVisible:
+    text: "Forgot password"
+    optional: true
+
+# Verify social login options
+- assertVisible:
+    text: "or"
+    optional: true
+
+# Verify switch to signup exists
+- assertVisible:
+    text: "New here"
+    optional: true
+
+# Test forgot password flow
+- tapOn:
+    text: "Forgot password"
+    optional: true
+- waitForAnimationToEnd
+
+# Verify reset password screen
+- assertVisible:
+    text: "Reset password"
+    optional: true
+- assertVisible:
+    text: "Send reset link"
+    optional: true
+
+- takeScreenshot: "forgot-password-screen.png"
+
+# Go back to login
+- back
+- waitForAnimationToEnd
+- takeScreenshot: "back-to-login.png"

@@ -938,7 +938,8 @@ export default function HomeScreen() {
       // Keep wardrobeItemToDelete so "Try again" can work
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       
-      const errMessage = error instanceof Error ? error.message : String(error || "");
+      // Note: Supabase errors have .message but aren't Error instances
+      const errMessage = (error as any)?.message || (error instanceof Error ? error.message : String(error || ""));
       const errLower = errMessage.toLowerCase();
       const isNetworkErr =
         errMessage.includes("Network request failed") ||
@@ -960,6 +961,7 @@ export default function HomeScreen() {
         errLower.includes("socket is not connected") ||
         errLower.includes("timed out");
 
+      console.log("[Home] Wardrobe delete error:", errMessage, "isNetwork:", isNetworkErr);
       setWardrobeDeleteError(isNetworkErr ? 'network' : 'other');
     }
   };
@@ -1014,7 +1016,8 @@ export default function HomeScreen() {
       // Keep scanItemToDelete so "Try again" can work
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       
-      const errMessage = error instanceof Error ? error.message : String(error || "");
+      // Note: Supabase errors have .message but aren't Error instances
+      const errMessage = (error as any)?.message || (error instanceof Error ? error.message : String(error || ""));
       const errLower = errMessage.toLowerCase();
       const isNetworkErr =
         errMessage.includes("Network request failed") ||
@@ -1036,6 +1039,7 @@ export default function HomeScreen() {
         errLower.includes("socket is not connected") ||
         errLower.includes("timed out");
 
+      console.log("[Home] Scan delete error:", errMessage, "isNetwork:", isNetworkErr);
       setScanDeleteError(isNetworkErr ? 'network' : 'other');
     }
   };
@@ -1485,7 +1489,7 @@ export default function HomeScreen() {
         <Pressable 
           style={{ 
             flex: 1, 
-            backgroundColor: "rgba(0,0,0,0.7)", 
+            backgroundColor: colors.overlay.dark, 
             justifyContent: "center", 
             alignItems: "center",
             padding: spacing.lg,
@@ -1498,12 +1502,13 @@ export default function HomeScreen() {
           <Pressable 
             onPress={(e) => e.stopPropagation()}
             style={{
-              backgroundColor: colors.bg.primary,
-              borderRadius: 24,
-              padding: spacing.xl,
-              alignItems: "center",
+              backgroundColor: cards.elevated.backgroundColor,
+              borderRadius: cards.elevated.borderRadius,
+              padding: spacing.lg,
               width: "100%",
-              maxWidth: 320,
+              maxWidth: 340,
+              alignItems: "center",
+              ...shadows.lg,
             }}
           >
             {/* Icon */}
@@ -1528,9 +1533,7 @@ export default function HomeScreen() {
             {/* Title */}
             <Text
               style={{
-                fontFamily: typography.ui.cardTitle.fontFamily,
-                fontSize: typography.ui.cardTitle.fontSize,
-                color: colors.text.primary,
+                ...typography.ui.cardTitle,
                 textAlign: "center",
                 marginBottom: spacing.sm,
               }}
@@ -1541,12 +1544,10 @@ export default function HomeScreen() {
             {/* Subtitle */}
             <Text
               style={{
-                fontFamily: typography.ui.body.fontFamily,
-                fontSize: typography.ui.body.fontSize,
+                ...typography.ui.body,
                 color: colors.text.secondary,
                 textAlign: "center",
-                marginBottom: spacing.lg,
-                lineHeight: 22,
+                marginBottom: spacing.xl,
               }}
             >
               {wardrobeDeleteError === 'network'
@@ -1554,22 +1555,20 @@ export default function HomeScreen() {
                 : 'Please try again in a moment.'}
             </Text>
 
-            {/* Primary Button - reopen confirmation modal */}
-            <ButtonPrimary
-              label="Try again"
-              onPress={() => setWardrobeDeleteError(null)}
-              style={{ width: "100%" }}
-            />
-
-            {/* Secondary Button - close everything */}
-            <ButtonTertiary
-              label="Close"
-              onPress={() => {
-                setWardrobeDeleteError(null);
-                setWardrobeItemToDelete(null);
-              }}
-              style={{ marginTop: spacing.sm }}
-            />
+            {/* Buttons */}
+            <View style={{ gap: spacing.sm, width: "100%" }}>
+              <ButtonPrimary
+                label="Try again"
+                onPress={() => setWardrobeDeleteError(null)}
+              />
+              <ButtonTertiary
+                label="Close"
+                onPress={() => {
+                  setWardrobeDeleteError(null);
+                  setWardrobeItemToDelete(null);
+                }}
+              />
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -1770,7 +1769,7 @@ export default function HomeScreen() {
         <Pressable 
           style={{ 
             flex: 1, 
-            backgroundColor: "rgba(0,0,0,0.7)", 
+            backgroundColor: colors.overlay.dark, 
             justifyContent: "center", 
             alignItems: "center",
             padding: spacing.lg,
@@ -1783,12 +1782,13 @@ export default function HomeScreen() {
           <Pressable 
             onPress={(e) => e.stopPropagation()}
             style={{
-              backgroundColor: colors.bg.primary,
-              borderRadius: 24,
-              padding: spacing.xl,
-              alignItems: "center",
+              backgroundColor: cards.elevated.backgroundColor,
+              borderRadius: cards.elevated.borderRadius,
+              padding: spacing.lg,
               width: "100%",
-              maxWidth: 320,
+              maxWidth: 340,
+              alignItems: "center",
+              ...shadows.lg,
             }}
           >
             {/* Icon */}
@@ -1813,9 +1813,7 @@ export default function HomeScreen() {
             {/* Title */}
             <Text
               style={{
-                fontFamily: typography.ui.cardTitle.fontFamily,
-                fontSize: typography.ui.cardTitle.fontSize,
-                color: colors.text.primary,
+                ...typography.ui.cardTitle,
                 textAlign: "center",
                 marginBottom: spacing.sm,
               }}
@@ -1826,12 +1824,10 @@ export default function HomeScreen() {
             {/* Subtitle */}
             <Text
               style={{
-                fontFamily: typography.ui.body.fontFamily,
-                fontSize: typography.ui.body.fontSize,
+                ...typography.ui.body,
                 color: colors.text.secondary,
                 textAlign: "center",
-                marginBottom: spacing.lg,
-                lineHeight: 22,
+                marginBottom: spacing.xl,
               }}
             >
               {scanDeleteError === 'network'
@@ -1839,22 +1835,20 @@ export default function HomeScreen() {
                 : 'Please try again in a moment.'}
             </Text>
 
-            {/* Primary Button - reopen confirmation modal */}
-            <ButtonPrimary
-              label="Try again"
-              onPress={() => setScanDeleteError(null)}
-              style={{ width: "100%" }}
-            />
-
-            {/* Secondary Button - close everything */}
-            <ButtonTertiary
-              label="Close"
-              onPress={() => {
-                setScanDeleteError(null);
-                setScanItemToDelete(null);
-              }}
-              style={{ marginTop: spacing.sm }}
-            />
+            {/* Buttons */}
+            <View style={{ gap: spacing.sm, width: "100%" }}>
+              <ButtonPrimary
+                label="Try again"
+                onPress={() => setScanDeleteError(null)}
+              />
+              <ButtonTertiary
+                label="Close"
+                onPress={() => {
+                  setScanDeleteError(null);
+                  setScanItemToDelete(null);
+                }}
+              />
+            </View>
           </Pressable>
         </Pressable>
       </Modal>

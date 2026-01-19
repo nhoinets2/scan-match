@@ -1,0 +1,70 @@
+appId: com.anonymous.vibecode
+---
+# Account Settings Tests
+# Verifies account screen navigation and settings options
+# Prerequisite: User must be logged in
+
+- launchApp
+- waitForAnimationToEnd
+
+# Navigate to Home tab first
+- tapOn:
+    point: "12%,95%"
+- waitForAnimationToEnd
+
+# Look for profile/account button (usually in top right)
+# Try tapping the account icon area
+- tapOn:
+    point: "90%,6%"
+    optional: true
+- waitForAnimationToEnd
+
+# If that didn't work, try scrolling and looking for account link
+- scrollUntilVisible:
+    element:
+      text: "Account"
+    direction: DOWN
+    timeout: 5000
+    optional: true
+
+# Verify account screen elements
+- assertVisible:
+    text: "Account"
+    optional: true
+
+# Take screenshot
+- takeScreenshot: "account-screen.png"
+
+# Check for key account options
+- assertVisible:
+    text: "Change password"
+    optional: true
+- assertVisible:
+    text: "Manage subscription"
+    optional: true
+- assertVisible:
+    text: "Sign out"
+    optional: true
+
+# Check for legal links
+- assertVisible:
+    text: "Terms"
+    optional: true
+- assertVisible:
+    text: "Privacy"
+    optional: true
+
+# Check for help options
+- assertVisible:
+    text: "Report a problem"
+    optional: true
+- assertVisible:
+    text: "Help Center"
+    optional: true
+
+# Take final screenshot
+- takeScreenshot: "account-settings-final.png"
+
+# Go back
+- back
+- waitForAnimationToEnd

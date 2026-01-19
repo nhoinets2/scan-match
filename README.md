@@ -46,3 +46,17 @@ The app requires environment variables for:
 - OpenAI API key
 
 Use the ENV tab in Vibecode to configure these.
+
+## Documentation
+
+Comprehensive documentation is available:
+
+- **[docs/NAVIGATION.md](docs/NAVIGATION.md)** - Complete documentation index
+- **[COMPREHENSIVE_SYSTEM_DOCUMENTATION.md](COMPREHENSIVE_SYSTEM_DOCUMENTATION.md)** - System architecture guide
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+
+Documentation is organized into:
+- `docs/` - Active feature documentation
+- `docs/historical/` - Completed fixes and legacy info
+- `docs/guides/` - Setup and workflow guides  
+- `docs/specs/` - Technical specifications

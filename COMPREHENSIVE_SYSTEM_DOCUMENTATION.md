@@ -2,9 +2,9 @@
 
 **Complete guide to the Confidence Engine and Results Screen UI**
 
-> **Note:** This document predates the tabs redesign. The "More Options CTA" and `NearMatchesSheet` references are outdated. The results screen now uses a segmented "Wear now" / "Worth trying" tab control. See `README.md` for current architecture.
-
 This document provides a complete explanation of how the Confidence Engine works, how UI states are determined, how suggestions are generated, and how everything renders on the results screen.
+
+> **Architecture:** The results screen uses a segmented "Wear now" / "Worth trying" tab control. HIGH confidence matches appear in the "Wear now" tab, while MEDIUM tier matches appear in the "Worth trying" tab.
 
 ---
 
@@ -333,8 +333,8 @@ function getUiState(confidenceResult: ConfidenceEngineResult): UiState {
 - At least one HIGH confidence match exists (`highMatchCount > 0`)
 
 **What Users See:**
-- ✅ **Matches Section**: Visible, shows HIGH matches (up to 3)
-- ✅ **More Options CTA**: Visible if `nearMatchCount > 0`
+- ✅ **"Wear now" Tab**: Visible, shows HIGH matches
+- ✅ **"Worth trying" Tab**: Visible if `nearMatchCount > 0`
 - 💡 **Suggestions Section**: Optional (only if Mode A bullets remain after filtering)
 - ❌ **Rescan CTA**: Hidden
 
@@ -352,7 +352,6 @@ function getUiState(confidenceResult: ConfidenceEngineResult): UiState {
 
 **What Users See:**
 - ❌ **Matches Section**: Hidden (or empty-cta if wardrobe is empty)
-- ❌ **More Options CTA**: Hidden
 - 💡 **Suggestions Section**: Visible (Mode B preferred, Mode A fallback)
 - ❌ **Rescan CTA**: Hidden
 
@@ -374,7 +373,6 @@ function getUiState(confidenceResult: ConfidenceEngineResult): UiState {
 
 **What Users See:**
 - ❌ **Matches Section**: Hidden (or empty-cta if wardrobe is empty)
-- ❌ **More Options CTA**: Hidden
 - 📝 **Suggestions Section**: Visible (Mode A) OR Rescan CTA (if no suggestions)
 - ✅ **Rescan CTA**: Visible (if no actionable content)
 
@@ -521,7 +519,7 @@ The UI rendering follows a **four-phase decision process**. Each phase determine
 **Output:**
 - **UI State**: HIGH
 - **Matches Section**: ✅ Visible (shows HIGH matches)
-- **More Options CTA**: ✅ Visible (if `nearMatchCount > 0`)
+- **"Worth trying" Tab**: ✅ Visible (if `nearMatchCount > 0`)
 - **Suggestions Section**: ✅ Visible (if `hasModeABullets`) or ❌ Hidden
 - **Title**: "If you want to expand this look"
 - **Intro**: "Optional ideas to try:"

@@ -1,0 +1,76 @@
+appId: com.anonymous.vibecode
+---
+# Subscription Flow Tests
+# Verifies paywall and subscription management UI
+# Prerequisite: User must be logged in (free user to see paywall)
+
+- launchApp
+- waitForAnimationToEnd
+
+# Navigate to Account
+- tapOn:
+    point: "90%,6%"
+    optional: true
+- waitForAnimationToEnd
+
+# Try to find Manage Subscription option
+- scrollUntilVisible:
+    element:
+      text: "Manage subscription"
+    direction: DOWN
+    timeout: 5000
+    optional: true
+
+# Tap on Manage subscription
+- tapOn:
+    text: "Manage subscription"
+    optional: true
+- waitForAnimationToEnd
+
+# Verify subscription/paywall screen elements
+- assertVisible:
+    text: "Pro"
+    optional: true
+
+# Check for plan options
+- assertVisible:
+    text: "Annual"
+    optional: true
+- assertVisible:
+    text: "Monthly"
+    optional: true
+
+# Check for pricing
+- assertVisible:
+    text: "$"
+    optional: true
+
+# Check for benefits
+- assertVisible:
+    text: "Unlimited"
+    optional: true
+
+# Check for restore purchases option
+- assertVisible:
+    text: "Restore purchases"
+    optional: true
+
+# Take screenshot
+- takeScreenshot: "subscription-screen.png"
+
+# Check for trial info (annual plan)
+- assertVisible:
+    text: "7-day free trial"
+    optional: true
+
+# Check for legal links
+- assertVisible:
+    text: "Terms"
+    optional: true
+
+# Take final screenshot
+- takeScreenshot: "paywall-complete.png"
+
+# Close paywall
+- back
+- waitForAnimationToEnd

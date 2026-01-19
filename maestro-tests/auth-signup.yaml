@@ -1,0 +1,59 @@
+appId: com.anonymous.vibecode
+---
+# Authentication Signup Flow Tests
+# Verifies the signup screen and form validation
+# Prerequisite: App should start on login/signup screen (logged out)
+
+- launchApp
+- waitForAnimationToEnd
+
+# Swipe up to reveal auth options on landing page
+- swipe:
+    direction: UP
+    duration: 500
+
+- waitForAnimationToEnd
+
+# Look for Create account link
+- assertVisible:
+    text: "Create account"
+
+# Take screenshot of landing
+- takeScreenshot: "auth-landing.png"
+
+# Tap Create account
+- tapOn:
+    text: "Create account"
+- waitForAnimationToEnd
+
+# Verify signup screen loaded
+- assertVisible:
+    text: "Create your account"
+- assertVisible:
+    text: "Email"
+- assertVisible:
+    text: "Password"
+
+# Take screenshot
+- takeScreenshot: "signup-screen.png"
+
+# Test form validation - empty submission should show errors
+# First verify the Create account button exists
+- assertVisible:
+    text: "Create account"
+
+# Verify social login options exist
+- assertVisible:
+    text: "or"
+    optional: true
+
+# Verify back navigation exists
+- back
+- waitForAnimationToEnd
+
+# Verify we're back on landing
+- assertVisible:
+    text: "Sign in with email"
+    optional: true
+
+- takeScreenshot: "back-to-landing.png"

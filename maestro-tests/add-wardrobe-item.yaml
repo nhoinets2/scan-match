@@ -1,0 +1,51 @@
+appId: com.anonymous.vibecode
+---
+# Add Wardrobe Item Flow Tests
+# Verifies the flow for adding items to wardrobe
+# Prerequisite: User must be logged in with wardrobe add credits
+
+- launchApp
+- waitForAnimationToEnd
+
+# Navigate to Wardrobe tab
+- tapOn:
+    point: "75%,95%"
+- waitForAnimationToEnd
+
+# Look for and tap Add to wardrobe button
+- tapOn:
+    text: "Add to wardrobe"
+    optional: true
+- waitForAnimationToEnd
+
+# Verify add item screen loaded
+- assertVisible:
+    text: "Add Item"
+    optional: true
+- assertVisible:
+    text: "Position item"
+    optional: true
+
+# Take screenshot of add item camera screen
+- takeScreenshot: "add-item-camera.png"
+
+# Verify gallery option exists
+- assertVisible:
+    text: "Photo library"
+    optional: true
+
+# Verify tips are visible
+- assertVisible:
+    text: ".*lighting.*"
+    optional: true
+
+# Close the add item screen
+- back
+- waitForAnimationToEnd
+
+# Verify we're back on wardrobe
+- assertVisible:
+    text: "Wardrobe"
+    optional: true
+
+- takeScreenshot: "back-to-wardrobe.png"

@@ -481,7 +481,8 @@ export default function AllChecksScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       
       // Check if it's a network error
-      const errMessage = error instanceof Error ? error.message : String(error || "");
+      // Note: Supabase errors have .message but aren't Error instances
+      const errMessage = (error as any)?.message || (error instanceof Error ? error.message : String(error || ""));
       const errLower = errMessage.toLowerCase();
       const isNetworkErr =
         errMessage.includes("Network request failed") ||
@@ -503,6 +504,7 @@ export default function AllChecksScreen() {
         errLower.includes("socket is not connected") ||
         errLower.includes("timed out");
 
+      console.log("[AllChecks] Delete error:", errMessage, "isNetwork:", isNetworkErr);
       setDeleteError(isNetworkErr ? 'network' : 'other');
     }
   };
@@ -616,11 +618,12 @@ export default function AllChecksScreen() {
             />
           }
           // Performance optimizations
-          initialNumToRender={8}
-          maxToRenderPerBatch={6}
-          windowSize={5}
+          initialNumToRender={10}
+          maxToRenderPerBatch={8}
+          windowSize={7}
           updateCellsBatchingPeriod={50}
-          removeClippedSubviews={false} // Keep false for iOS shadows + reanimated entering animations
+          removeClippedSubviews={true}
+          scrollEventThrottle={16} // 60fps scroll events
           ListFooterComponent={
             <Animated.View 
               entering={FadeIn.delay(600)}
@@ -667,18 +670,25 @@ export default function AllChecksScreen() {
         onRequestClose={() => setDeleteError(null)}
       >
         <Pressable 
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+          style={{ 
+            flex: 1, 
+            backgroundColor: colors.overlay.dark, 
+            justifyContent: "center", 
+            alignItems: "center",
+            padding: spacing.lg,
+          }}
           onPress={() => setDeleteError(null)}
         >
           <Pressable 
             onPress={(e) => e.stopPropagation()}
             style={{
-              backgroundColor: colors.bg.primary,
-              borderRadius: 24,
-              padding: spacing.xl,
-              marginHorizontal: spacing.lg,
+              backgroundColor: cards.elevated.backgroundColor,
+              borderRadius: cards.elevated.borderRadius,
+              padding: spacing.lg,
+              width: "100%",
+              maxWidth: 340,
               alignItems: "center",
-              maxWidth: 320,
+              ...shadows.lg,
             }}
           >
             {/* Icon */}
@@ -703,9 +713,7 @@ export default function AllChecksScreen() {
             {/* Title */}
             <Text
               style={{
-                fontFamily: typography.ui.cardTitle.fontFamily,
-                fontSize: typography.ui.cardTitle.fontSize,
-                color: colors.text.primary,
+                ...typography.ui.cardTitle,
                 textAlign: "center",
                 marginBottom: spacing.sm,
               }}
@@ -716,12 +724,10 @@ export default function AllChecksScreen() {
             {/* Subtitle */}
             <Text
               style={{
-                fontFamily: typography.ui.body.fontFamily,
-                fontSize: typography.ui.body.fontSize,
+                ...typography.ui.body,
                 color: colors.text.secondary,
                 textAlign: "center",
-                marginBottom: spacing.lg,
-                lineHeight: 22,
+                marginBottom: spacing.xl,
               }}
             >
               {deleteError === 'network'
@@ -729,22 +735,20 @@ export default function AllChecksScreen() {
                 : 'Please try again in a moment.'}
             </Text>
 
-            {/* Primary Button - reopen confirmation modal */}
-            <ButtonPrimary
-              label="Try again"
-              onPress={() => setDeleteError(null)}
-              style={{ width: "100%" }}
-            />
-
-            {/* Secondary Button - close everything */}
-            <ButtonTertiary
-              label="Close"
-              onPress={() => {
-                setDeleteError(null);
-                setItemToDelete(null);
-              }}
-              style={{ marginTop: spacing.sm }}
-            />
+            {/* Buttons */}
+            <View style={{ gap: spacing.sm, width: "100%" }}>
+              <ButtonPrimary
+                label="Try again"
+                onPress={() => setDeleteError(null)}
+              />
+              <ButtonTertiary
+                label="Close"
+                onPress={() => {
+                  setDeleteError(null);
+                  setItemToDelete(null);
+                }}
+              />
+            </View>
           </Pressable>
         </Pressable>
       </Modal>

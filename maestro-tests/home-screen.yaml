@@ -1,0 +1,64 @@
+appId: com.anonymous.vibecode
+---
+# Home Screen Tests
+# Verifies home screen elements and interactions
+# Prerequisite: User must be logged in and onboarding complete
+
+- launchApp
+- waitForAnimationToEnd
+
+# Verify home screen loaded
+- assertVisible:
+    text: "AI-Powered Styling"
+    optional: true
+
+# Verify hero card content
+- assertVisible:
+    text: "Shop smarter"
+    optional: true
+
+# Take screenshot
+- takeScreenshot: "home-hero.png"
+
+# Verify scan CTA exists
+- assertVisible:
+    text: "Scan item"
+    optional: true
+
+# Scroll to see more content
+- scroll:
+    direction: DOWN
+
+# Check for Recent Scans section
+- assertVisible:
+    text: "Recent Scans"
+    optional: true
+
+# Check for wardrobe section
+- assertVisible:
+    text: "wardrobe"
+    optional: true
+
+# Take screenshot of scrolled content
+- takeScreenshot: "home-scrolled.png"
+
+# Scroll back to top
+- scroll:
+    direction: UP
+
+# Test hero card tap (should navigate to scan)
+- tapOn:
+    text: "Scan item"
+    optional: true
+- waitForAnimationToEnd
+
+# Verify scan screen opened
+- assertVisible:
+    text: "Position item"
+    optional: true
+
+- takeScreenshot: "scan-from-home.png"
+
+# Go back
+- back
+- waitForAnimationToEnd

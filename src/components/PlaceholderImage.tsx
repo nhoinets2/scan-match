@@ -198,10 +198,13 @@ export function ImageWithFallback({
       style={[{ width: "100%", height: "100%" }, style]}
       contentFit={contentFit}
       onError={() => setHasError(true)}
-      // Smooth transition when URI changes (e.g., local → cloud after upload)
-      // This prevents the brief flash/disappearance during the transition
-      transition={200}
+      // Shorter transition (100ms) for snappier feel while still smooth
+      // Longer transitions cause visible "blinking" when scrolling lists
+      transition={100}
       cachePolicy="memory-disk"
+      // recyclingKey helps expo-image manage image recycling in lists
+      // Using the URI ensures the same image isn't re-animated when recycled
+      recyclingKey={uri}
     />
   );
 }
@@ -254,9 +257,11 @@ export function ThumbnailWithFallback({
       ]}
       contentFit="cover"
       onError={() => setHasError(true)}
-      // Smooth transition when URI changes (e.g., local → cloud after upload)
-      transition={200}
+      // Shorter transition for snappier feel in lists
+      transition={100}
       cachePolicy="memory-disk"
+      // recyclingKey helps expo-image manage image recycling in lists
+      recyclingKey={uri}
     />
   );
 }

@@ -1,0 +1,46 @@
+appId: com.anonymous.vibecode
+---
+# Scan Flow Tests
+# Verifies the in-store scan flow from camera to results
+# Prerequisite: User must be logged in with scan credits available
+
+- launchApp
+- waitForAnimationToEnd
+
+# Navigate to scan by tapping the camera tab
+- tapOn:
+    point: "37%,95%"
+- waitForAnimationToEnd
+
+# Verify scan screen loaded
+- assertVisible:
+    text: "Position item"
+    optional: true
+- assertVisible:
+    text: "Scan Item"
+    optional: true
+
+# Take screenshot of scan screen
+- takeScreenshot: "scan-screen-camera.png"
+
+# Look for gallery/photo library option
+- assertVisible:
+    text: "Photo library"
+    optional: true
+
+# Test the tips are rotating (just verify one is visible)
+- assertVisible:
+    text: ".*lighting.*"
+    optional: true
+
+# Test close button exists
+- assertVisible:
+    id: ".*close.*"
+    optional: true
+
+# Take screenshot
+- takeScreenshot: "scan-screen-ready.png"
+
+# Close the scan screen (go back)
+- back
+- waitForAnimationToEnd

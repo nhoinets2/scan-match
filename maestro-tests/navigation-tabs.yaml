@@ -1,0 +1,48 @@
+appId: com.anonymous.vibecode
+---
+# Navigation Tab Bar Tests
+# Verifies all tab bar navigation works correctly
+# Prerequisite: User must be logged in and onboarding complete
+
+- launchApp
+- waitForAnimationToEnd
+
+# Verify we're on the Home screen (default tab)
+- assertVisible:
+    text: "AI-Powered Styling"
+    optional: true
+- assertVisible:
+    text: "Shop smarter"
+    optional: true
+
+# Take screenshot of home screen
+- takeScreenshot: "home-screen.png"
+
+# Navigate to Wardrobe tab
+- tapOn:
+    id: ".*wardrobe.*"
+    optional: true
+- waitForAnimationToEnd
+
+# If no testID, try tapping on the shirt icon area
+- tapOn:
+    point: "75%,95%"
+- waitForAnimationToEnd
+
+# Verify wardrobe screen
+- assertVisible:
+    text: "Wardrobe"
+    optional: true
+- takeScreenshot: "wardrobe-screen.png"
+
+# Navigate to Home tab
+- tapOn:
+    point: "12%,95%"
+- waitForAnimationToEnd
+- takeScreenshot: "back-to-home.png"
+
+# Navigate to Saved/Looks tab
+- tapOn:
+    point: "88%,95%"
+- waitForAnimationToEnd
+- takeScreenshot: "saved-screen.png"

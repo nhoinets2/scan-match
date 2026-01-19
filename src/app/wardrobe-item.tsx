@@ -380,7 +380,8 @@ export default function WardrobeItemScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 
       // Check if it's a network error
-      const errMessage = error instanceof Error ? error.message : String(error || "");
+      // Note: Supabase errors have .message but aren't Error instances
+      const errMessage = (error as any)?.message || (error instanceof Error ? error.message : String(error || ""));
       const errLower = errMessage.toLowerCase();
       const isNetworkErr =
         errMessage.includes("Network request failed") ||
@@ -402,6 +403,7 @@ export default function WardrobeItemScreen() {
         errLower.includes("socket is not connected") ||
         errLower.includes("timed out");
 
+      console.log("[WardrobeItem] Delete error:", errMessage, "isNetwork:", isNetworkErr);
       setDeleteError(isNetworkErr ? 'network' : 'other');
     }
   };
@@ -493,7 +495,13 @@ export default function WardrobeItemScreen() {
           }}
         >
           <Pressable 
-            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+            style={{ 
+              flex: 1, 
+              backgroundColor: colors.overlay.dark, 
+              justifyContent: "center", 
+              alignItems: "center",
+              padding: spacing.lg,
+            }}
             onPress={() => {
               setDeleteError(null);
               handleClose();
@@ -502,12 +510,13 @@ export default function WardrobeItemScreen() {
             <Pressable 
               onPress={(e) => e.stopPropagation()}
               style={{
-                backgroundColor: colors.bg.primary,
-                borderRadius: 24,
-                padding: spacing.xl,
-                marginHorizontal: spacing.lg,
+                backgroundColor: cards.elevated.backgroundColor,
+                borderRadius: cards.elevated.borderRadius,
+                padding: spacing.lg,
+                width: "100%",
+                maxWidth: 340,
                 alignItems: "center",
-                maxWidth: 320,
+                ...shadows.lg,
               }}
             >
               {/* Icon */}
@@ -533,7 +542,6 @@ export default function WardrobeItemScreen() {
               <Text
                 style={{
                   ...typography.ui.cardTitle,
-                  color: colors.text.primary,
                   textAlign: "center",
                   marginBottom: spacing.sm,
                 }}
@@ -547,7 +555,7 @@ export default function WardrobeItemScreen() {
                   ...typography.ui.body,
                   color: colors.text.secondary,
                   textAlign: "center",
-                  marginBottom: spacing.lg,
+                  marginBottom: spacing.xl,
                 }}
               >
                 {deleteError === 'network'

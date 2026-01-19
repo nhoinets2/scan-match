@@ -1,68 +1,62 @@
-# Documentation Index
+# Documentation
 
-This folder contains technical documentation for the app's core systems.
+Welcome to the project documentation! This directory contains detailed guides, specifications, and references organized by category.
 
-## Available Documentation
+## 🗺️ Start Here
 
-| Document | Description |
+**[📚 NAVIGATION.md](./NAVIGATION.md)** - Complete documentation index with guides for finding what you need by role or task.
+
+---
+
+## 📁 Directory Structure
+
+```
+docs/
+├── NAVIGATION.md          # Complete documentation index (start here!)
+├── current/              # Active feature documentation
+├── historical/           # Completed fixes and legacy information
+├── guides/              # Setup and workflow guides
+└── specs/               # Technical specifications
+```
+
+---
+
+## Quick Access
+
+### Most Common Documents
+
+- [**System Overview**](../COMPREHENSIVE_SYSTEM_DOCUMENTATION.md) - How everything works together
+- [**Confidence Engine**](specs/CONFIDENCE_ENGINE_DOCUMENTATION.md) - Matching algorithm details
+- [**Results Screen States**](results-screen-states.md) - UI state machine
+- [**Testing Strategy**](guides/TESTING_STRATEGY.md) - How to test the app
+- [**Fresh Setup**](guides/FRESH_SETUP.md) - Getting started
+
+### By Category
+
+| Category | Quick Links |
 |----------|-------------|
-| [Results Screen States](./results-screen-states.md) | UI state rules, section visibility, and empty state handling |
-| [Outfit Selection Pipeline](./outfit-selection-pipeline.md) | How outfits are filtered, ranked, and displayed |
-| [Empty State Messaging](./empty-state-messaging.md) | Blocking vs weak slot classification for empty states |
-| [Tailor Suggestions Roadmap](./tailor-suggestions-roadmap.md) | Store preferences feature: Phase 1 + future phases |
-| [Tailor Suggestions Redesign](./tailor-suggestions-redesign.md) | Clean, minimal UI redesign for store preferences card |
-| [Typography System V2](./typography-system-v2.md) | Poppins + Inter dual-font system, usage guidelines |
-| [Typography Migration Example](./typography-migration-example.md) | Before/after example with implementation code |
-| [Typography Pitfalls](./typography-pitfalls.md) | **Critical:** 5 production pitfalls & fixes |
-| [Typography Visual Guide](./typography-visual-guide.md) | Visual hierarchy and decision trees |
-| [Hybrid Schema](./HYBRID_SCHEMA.md) | Data schema documentation |
-| [Style-Aware Suggestions Spec](./STYLE_AWARE_SUGGESTIONS_SPEC.md) | Styling suggestions system |
+| **Architecture** | [System Docs](../COMPREHENSIVE_SYSTEM_DOCUMENTATION.md) • [Engine](specs/CONFIDENCE_ENGINE_DOCUMENTATION.md) • [Schema](HYBRID_SCHEMA.md) |
+| **Features** | [Suggestions](specs/MODE_A_SUGGESTIONS_EXPLAINED.md) • [Roadmap](specs/DISABLED_AND_PLANNED_FEATURES.md) • [Tailor](tailor-suggestions-roadmap.md) |
+| **UI/UX** | [Results States](results-screen-states.md) • [Empty States](empty-state-messaging.md) • [Copy](STYLE_AWARE_SUGGESTIONS_SPEC.md) |
+| **Testing** | [Strategy](guides/TESTING_STRATEGY.md) • [Maestro](guides/MAESTRO_SETUP.md) • [CI/CD](guides/CI_CD_GUIDE.md) |
+| **Setup** | [Fresh Setup](guides/FRESH_SETUP.md) • [Workflows](guides/REMOTE_LOCAL_WORKFLOW.md) • [Xcode](guides/XCODE_GIT_WORKFLOW.md) |
 
-## Quick Links
+---
 
-### Outfit Selection Pipeline
+## 🔍 Finding What You Need
 
-The outfit selection pipeline transforms raw outfit combinations into a curated list for users:
+### By Role
+- **Backend Developer:** [Schema](HYBRID_SCHEMA.md) → [Engine](specs/CONFIDENCE_ENGINE_DOCUMENTATION.md) → [Caching](image-analysis-caching.md)
+- **Frontend Developer:** [System Docs](../COMPREHENSIVE_SYSTEM_DOCUMENTATION.md) → [Results States](results-screen-states.md) → [Copy](STYLE_AWARE_SUGGESTIONS_SPEC.md)
+- **QA Engineer:** [Testing Strategy](guides/TESTING_STRATEGY.md) → [Maestro](guides/MAESTRO_SETUP.md) → [CI/CD](guides/CI_CD_GUIDE.md)
+- **Product Manager:** [README](../README.md) → [Roadmap](tailor-suggestions-roadmap.md) → [Features](specs/DISABLED_AND_PLANNED_FEATURES.md)
 
-1. **Coherence Filter** — Removes incoherent combos (sport pants + heels)
-2. **Tier Split** — HIGH → "Wear now", MEDIUM → "Worth trying"
-3. **Ranking** — Penalty → mediumCount → avgScore
-4. **Diversity Picker** — Ensures variety (unique shoes/bottoms)
-5. **Display Caps** — Max 3-5 outfits per tab
+### By Task
+- **Setting up:** [Fresh Setup](guides/FRESH_SETUP.md) → [README](../README.md) → [CI/CD](guides/CI_CD_GUIDE.md)
+- **Understanding matching:** [System Docs](../COMPREHENSIVE_SYSTEM_DOCUMENTATION.md) → [Engine](specs/CONFIDENCE_ENGINE_DOCUMENTATION.md) → [Suggestions](specs/MODE_A_SUGGESTIONS_EXPLAINED.md)
+- **Adding features:** [System Docs](../COMPREHENSIVE_SYSTEM_DOCUMENTATION.md) → [Results States](results-screen-states.md) → [Features](specs/DISABLED_AND_PLANNED_FEATURES.md)
+- **Debugging:** [Debug System](debug-system.md) → [Historical Fixes](historical/) → [Testing](guides/TESTING_STRATEGY.md)
 
-[Read full documentation →](./outfit-selection-pipeline.md)
+---
 
-### Empty State Messaging
-
-When outfits can't be formed, the app distinguishes between:
-
-- **Missing Core** — User doesn't have items in a category → "Add bottoms..."
-- **Blocking** — User has items but 0 match → "None of your bottoms match..."
-- **Weak** — User has low-quality matches → Mentioned as "close" options
-
-This prevents misleading "add items" messages when users have items that just don't style-match.
-
-[Read full documentation →](./empty-state-messaging.md)
-
-### Results Screen States
-
-The results screen displays different content based on match tiers and wardrobe state:
-
-| Wardrobe | Matches | What Shows |
-|----------|---------|------------|
-| Empty | None | "Build your wardrobe" CTA + Mode A |
-| Has items | HIGH | Matches + "Complete the look" |
-| Has items | NEAR only | "Worth trying" + Mode B tips |
-| Has items | None | Mode A suggestions (or Rescan CTA) |
-
-[Read full documentation →](./results-screen-states.md)
-
-### Tailor Suggestions (Store Preferences)
-
-Users can pick up to 5 favorite stores for future shopping suggestions:
-
-- **Phase 1 (shipped):** Card + modal + persistence + analytics
-- **Phase 2 triggers:** Search (if users can't find stores), Notify toggle (if high engagement)
-
-[Read full roadmap →](./tailor-suggestions-roadmap.md)
-
+**For complete navigation and detailed index, see [NAVIGATION.md](./NAVIGATION.md)**

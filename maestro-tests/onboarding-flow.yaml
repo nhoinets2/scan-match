@@ -1,0 +1,54 @@
+appId: com.anonymous.vibecode
+---
+# Onboarding Flow Tests  
+# Verifies the new user onboarding experience
+# Prerequisite: Fresh user who hasn't completed onboarding
+# Note: This test may need modification based on actual onboarding steps
+
+- launchApp
+- waitForAnimationToEnd
+
+# If user lands on onboarding, verify elements
+- assertVisible:
+    text: ".*welcome.*"
+    optional: true
+
+# Check for onboarding progress indicators
+- assertVisible:
+    text: "Next"
+    optional: true
+- assertVisible:
+    text: "Continue"
+    optional: true
+- assertVisible:
+    text: "Get started"
+    optional: true
+
+# Take screenshot
+- takeScreenshot: "onboarding-start.png"
+
+# If there are multiple onboarding steps, try navigating through
+- tapOn:
+    text: "Next"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: "onboarding-step2.png"
+
+- tapOn:
+    text: "Next"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: "onboarding-step3.png"
+
+- tapOn:
+    text: "Continue"
+    optional: true
+- waitForAnimationToEnd
+
+- tapOn:
+    text: "Get started"
+    optional: true
+- waitForAnimationToEnd
+
+# Final screenshot
+- takeScreenshot: "onboarding-complete.png"

@@ -1083,7 +1083,8 @@ export default function AddItemScreen() {
     } catch (error) {
       // Unexpected errors (not from analyzeClothingImage)
       // Usually network errors during credit consumption
-      const errMessage = error instanceof Error ? error.message : String(error || "");
+      // Note: Supabase errors have .message but aren't Error instances
+      const errMessage = (error as any)?.message || (error instanceof Error ? error.message : String(error || ""));
       const isNetworkErr =
         errMessage.includes("Network request failed") ||
         errMessage.includes("The Internet connection appears to be offline") ||
@@ -1244,7 +1245,8 @@ export default function AddItemScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 
       // Check if it's a network error
-      const errMessage = error instanceof Error ? error.message : String(error || "");
+      // Note: Supabase errors have .message but aren't Error instances
+      const errMessage = (error as any)?.message || (error instanceof Error ? error.message : String(error || ""));
       const errLower = errMessage.toLowerCase();
       const isNetworkErr =
         errMessage.includes("Network request failed") ||
@@ -1531,18 +1533,25 @@ export default function AddItemScreen() {
           onRequestClose={() => setCreditCheckError(null)}
         >
           <Pressable 
-            style={{ flex: 1, backgroundColor: colors.overlay.dark, justifyContent: "center", alignItems: "center" }}
+            style={{ 
+              flex: 1, 
+              backgroundColor: colors.overlay.dark, 
+              justifyContent: "center", 
+              alignItems: "center",
+              padding: spacing.lg,
+            }}
             onPress={() => setCreditCheckError(null)}
           >
             <Pressable 
               onPress={(e) => e.stopPropagation()}
               style={{
-                backgroundColor: colors.bg.primary,
-                borderRadius: borderRadius.card,
-                padding: spacing.xl,
-                marginHorizontal: spacing.lg,
+                backgroundColor: cards.elevated.backgroundColor,
+                borderRadius: cards.elevated.borderRadius,
+                padding: spacing.lg,
+                width: "100%",
+                maxWidth: 340,
                 alignItems: "center",
-                maxWidth: 320,
+                ...shadows.lg,
               }}
             >
               {/* Icon */}
@@ -1568,7 +1577,6 @@ export default function AddItemScreen() {
               <Text
                 style={{
                   ...typography.ui.cardTitle,
-                  color: colors.text.primary,
                   textAlign: "center",
                   marginBottom: spacing.sm,
                 }}
@@ -1582,7 +1590,7 @@ export default function AddItemScreen() {
                   ...typography.ui.body,
                   color: colors.text.secondary,
                   textAlign: "center",
-                  marginBottom: spacing.lg,
+                  marginBottom: spacing.xl,
                 }}
               >
                 {creditCheckError === 'network' 
@@ -1590,19 +1598,17 @@ export default function AddItemScreen() {
                   : 'Please try again in a moment.'}
               </Text>
 
-              {/* Primary Button */}
-              <ButtonPrimary
-                label="Try again"
-                onPress={() => setCreditCheckError(null)}
-                style={{ width: "100%" }}
-              />
-
-              {/* Secondary Button */}
-              <ButtonTertiary
-                label="Close"
-                onPress={() => setCreditCheckError(null)}
-                style={{ marginTop: spacing.sm }}
-              />
+              {/* Buttons */}
+              <View style={{ gap: spacing.sm, width: "100%" }}>
+                <ButtonPrimary
+                  label="Try again"
+                  onPress={() => setCreditCheckError(null)}
+                />
+                <ButtonTertiary
+                  label="Close"
+                  onPress={() => setCreditCheckError(null)}
+                />
+              </View>
             </Pressable>
           </Pressable>
         </Modal>
@@ -2125,18 +2131,25 @@ export default function AddItemScreen() {
         onRequestClose={() => setSaveError(null)}
       >
         <Pressable 
-          style={{ flex: 1, backgroundColor: colors.overlay.dark, justifyContent: "center", alignItems: "center" }}
+          style={{ 
+            flex: 1, 
+            backgroundColor: colors.overlay.dark, 
+            justifyContent: "center", 
+            alignItems: "center",
+            padding: spacing.lg,
+          }}
           onPress={() => setSaveError(null)}
         >
           <Pressable 
             onPress={(e) => e.stopPropagation()}
             style={{
-              backgroundColor: colors.bg.primary,
-              borderRadius: borderRadius.card,
-              padding: spacing.xl,
-              marginHorizontal: spacing.lg,
+              backgroundColor: cards.elevated.backgroundColor,
+              borderRadius: cards.elevated.borderRadius,
+              padding: spacing.lg,
+              width: "100%",
+              maxWidth: 340,
               alignItems: "center",
-              maxWidth: 320,
+              ...shadows.lg,
             }}
           >
             {/* Icon */}
@@ -2162,7 +2175,6 @@ export default function AddItemScreen() {
             <Text
               style={{
                 ...typography.ui.cardTitle,
-                color: colors.text.primary,
                 textAlign: "center",
                 marginBottom: spacing.sm,
               }}
@@ -2176,7 +2188,7 @@ export default function AddItemScreen() {
                 ...typography.ui.body,
                 color: colors.text.secondary,
                 textAlign: "center",
-                marginBottom: spacing.lg,
+                marginBottom: spacing.xl,
               }}
             >
               {saveError === 'network' 
@@ -2184,19 +2196,17 @@ export default function AddItemScreen() {
                 : 'Please try again in a moment.'}
             </Text>
 
-            {/* Primary Button */}
-            <ButtonPrimary
-              label="Try again"
-              onPress={() => setSaveError(null)}
-              style={{ width: "100%" }}
-            />
-
-            {/* Secondary Button */}
-            <ButtonTertiary
-              label="Close"
-              onPress={() => setSaveError(null)}
-              style={{ marginTop: spacing.sm }}
-            />
+            {/* Buttons */}
+            <View style={{ gap: spacing.sm, width: "100%" }}>
+              <ButtonPrimary
+                label="Try again"
+                onPress={() => setSaveError(null)}
+              />
+              <ButtonTertiary
+                label="Close"
+                onPress={() => setSaveError(null)}
+              />
+            </View>
           </Pressable>
         </Pressable>
       </Modal>

@@ -13,7 +13,6 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { useFocusEffect } from "@react-navigation/native";
 import Animated, {
   FadeIn,
   FadeInUp,
@@ -436,13 +435,9 @@ export default function SavedChecksScreen() {
     }
   }, [showToast]);
 
-  // Refetch data when tab gains focus (ensures fresh data after app restart)
-  useFocusEffect(
-    useCallback(() => {
-      // Invalidate to get fresh data with updated image URIs
-      queryClient.invalidateQueries({ queryKey: ["recentChecks", user?.id] });
-    }, [queryClient, user?.id])
-  );
+  // Note: Removed useFocusEffect invalidation that was causing performance issues.
+  // React Query's staleTime (30s) handles freshness. Mutations still invalidate when needed.
+  // Fresh data after app restart is handled by React Query's cache persistence.
 
   // Filter to show only saved checks (outcome = "saved_to_revisit")
   const savedChecks = useMemo(() => 
@@ -624,7 +619,9 @@ export default function SavedChecksScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       
       // Check if it's a network error
-      const errMessage = error instanceof Error ? error.message : String(error || "");
+      // Note: Supabase errors have .message but aren't Error instances
+      const errMessage = (error as any)?.message || (error instanceof Error ? error.message : String(error || ""));
+      const errLower = errMessage.toLowerCase();
       const isNetworkErr =
         errMessage.includes("Network request failed") ||
         errMessage.includes("The Internet connection appears to be offline") ||
@@ -633,8 +630,19 @@ export default function SavedChecksScreen() {
         errMessage.includes("Failed to fetch") ||
         errMessage.includes("fetch failed") ||
         errMessage.includes("ENOTFOUND") ||
-        errMessage.includes("ECONNREFUSED");
+        errMessage.includes("ECONNREFUSED") ||
+        errMessage.includes("Could not connect to the server") ||
+        errMessage.includes("A server with the specified hostname could not be found") ||
+        errMessage.includes("A data connection is not currently allowed") ||
+        errMessage.includes("not connected to the internet") ||
+        errLower.includes("offline") ||
+        errLower.includes("no internet") ||
+        errLower.includes("network error") ||
+        errLower.includes("network is unreachable") ||
+        errLower.includes("socket is not connected") ||
+        errLower.includes("timed out");
       
+      console.log("[Looks] Delete error:", errMessage, "isNetwork:", isNetworkErr);
       setDeleteError(isNetworkErr ? 'network' : 'other');
     }
   };
@@ -652,6 +660,40 @@ export default function SavedChecksScreen() {
       params: { checkId: check.id, from: "saved-checks" },
     });
   }, []);
+
+  // Memoized renderItem for FlatList performance
+  const renderItem = useCallback(
+    ({ item, index }: { item: RecentCheck; index: number }) => (
+      <View style={{ width: tileSize, marginBottom: spacing.md }}>
+        <SavedCheckGridItem
+          check={item}
+          index={index}
+          onPress={handleCheckPress}
+          onLongPress={handleDeleteRequest}
+          syncStatus={getSyncStatus(item)}
+          onRetry={handleRetry}
+          tileSize={tileSize}
+          matchCount={matchCountMap[item.id]}
+        />
+      </View>
+    ),
+    [tileSize, handleCheckPress, handleDeleteRequest, getSyncStatus, handleRetry, matchCountMap]
+  );
+
+  // getItemLayout for FlatList scroll performance optimization
+  // Each row contains 2 items, row height = tileSize + marginBottom (spacing.md)
+  const getItemLayout = useCallback(
+    (_data: ArrayLike<RecentCheck> | null | undefined, index: number) => {
+      const rowHeight = tileSize + spacing.md;
+      const rowIndex = Math.floor(index / 2); // 2 columns
+      return {
+        length: tileSize,
+        offset: rowIndex * rowHeight,
+        index,
+      };
+    },
+    [tileSize]
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
@@ -676,20 +718,8 @@ export default function SavedChecksScreen() {
           data={savedChecks}
           numColumns={2}
           keyExtractor={(item) => item.id}
-          renderItem={({ item, index }) => (
-            <View style={{ width: tileSize, marginBottom: spacing.md }}>
-              <SavedCheckGridItem
-                check={item}
-                index={index}
-                onPress={handleCheckPress}
-                onLongPress={handleDeleteRequest}
-                syncStatus={getSyncStatus(item)}
-                onRetry={handleRetry}
-                tileSize={tileSize}
-                matchCount={matchCountMap[item.id]}
-              />
-            </View>
-          )}
+          renderItem={renderItem}
+          getItemLayout={getItemLayout}
           extraData={retryingIds} // Ensures tiles update when retry status changes
           showsVerticalScrollIndicator
           indicatorStyle="black"
@@ -706,11 +736,13 @@ export default function SavedChecksScreen() {
               tintColor={colors.text.secondary}
             />
           }
-          initialNumToRender={8}
-          maxToRenderPerBatch={6}
-          windowSize={5}
+          // Performance optimizations
+          initialNumToRender={10}
+          maxToRenderPerBatch={8}
+          windowSize={7}
           updateCellsBatchingPeriod={50}
-          removeClippedSubviews={false} // Safer for iOS shadows + reanimated
+          removeClippedSubviews={true}
+          scrollEventThrottle={16} // 60fps scroll events
         />
       ) : (
         <EmptyState />
@@ -741,7 +773,13 @@ export default function SavedChecksScreen() {
         }}
       >
         <Pressable 
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}
+          style={{ 
+            flex: 1, 
+            backgroundColor: colors.overlay.dark, 
+            justifyContent: "center", 
+            alignItems: "center",
+            padding: spacing.lg,
+          }}
           onPress={() => {
             setDeleteError(null);
             setItemToDelete(null);
@@ -750,12 +788,13 @@ export default function SavedChecksScreen() {
           <Pressable 
             onPress={(e) => e.stopPropagation()}
             style={{
-              backgroundColor: colors.bg.primary,
-              borderRadius: 24,
-              padding: spacing.xl,
-              marginHorizontal: spacing.lg,
+              backgroundColor: cards.elevated.backgroundColor,
+              borderRadius: cards.elevated.borderRadius,
+              padding: spacing.lg,
+              width: "100%",
+              maxWidth: 340,
               alignItems: "center",
-              maxWidth: 320,
+              ...shadows.lg,
             }}
           >
             {/* Icon */}
@@ -780,11 +819,9 @@ export default function SavedChecksScreen() {
             {/* Title */}
             <Text
               style={{
-                fontFamily: "PlayfairDisplay_600SemiBold",
-                fontSize: typography.sizes.h3,
-                color: colors.text.primary,
+                ...typography.ui.cardTitle,
                 textAlign: "center",
-                marginBottom: spacing.xs,
+                marginBottom: spacing.sm,
               }}
             >
               {deleteError === 'network' ? 'Connection unavailable' : "Couldn't remove scan"}
@@ -793,12 +830,10 @@ export default function SavedChecksScreen() {
             {/* Subtitle */}
             <Text
               style={{
-                fontFamily: "Inter_400Regular",
-                fontSize: typography.sizes.body,
+                ...typography.ui.body,
                 color: colors.text.secondary,
                 textAlign: "center",
-                marginBottom: spacing.lg,
-                lineHeight: 22,
+                marginBottom: spacing.xl,
               }}
             >
               {deleteError === 'network' 
@@ -806,22 +841,20 @@ export default function SavedChecksScreen() {
                 : 'Please try again in a moment.'}
             </Text>
 
-            {/* Primary Button - reopen confirmation modal */}
-            <ButtonPrimary
-              label="Try again"
-              onPress={() => setDeleteError(null)}
-              style={{ width: "100%" }}
-            />
-
-            {/* Secondary Button - close everything */}
-            <ButtonTertiary
-              label="Close"
-              onPress={() => {
-                setDeleteError(null);
-                setItemToDelete(null);
-              }}
-              style={{ marginTop: spacing.sm }}
-            />
+            {/* Buttons */}
+            <View style={{ gap: spacing.sm, width: "100%" }}>
+              <ButtonPrimary
+                label="Try again"
+                onPress={() => setDeleteError(null)}
+              />
+              <ButtonTertiary
+                label="Close"
+                onPress={() => {
+                  setDeleteError(null);
+                  setItemToDelete(null);
+                }}
+              />
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
