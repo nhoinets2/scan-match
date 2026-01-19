@@ -33,3 +33,4 @@
 - New Edge Function: `analyze-image` handles auth, quota, rate limits, and OpenAI calls
 - Database migration: `006_monthly_quotas.sql` adds monthly tracking columns and functions
 - `analyzeClothingImage` now accepts `operationType` ('scan' | 'wardrobe_add') and `skipCache` params
+- Changes made by agent 2026-01-19T21:07:32Z

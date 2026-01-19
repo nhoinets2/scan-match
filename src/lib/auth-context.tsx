@@ -64,18 +64,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial session and initialize RevenueCat
     const initializeSession = async () => {
       try {
-        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        let initialSession = null;
+        let error = null;
+
+        try {
+          const result = await supabase.auth.getSession();
+          initialSession = result.data?.session;
+          error = result.error;
+        } catch (getSessionError: any) {
+          // Catch errors thrown during getSession (e.g., invalid refresh token)
+          console.error("[Auth] getSession threw error:", getSessionError);
+          error = getSessionError;
+        }
 
         if (error) {
           console.error("[Auth] Error getting session:", error);
+          const errorMessage = error.message || String(error);
           // Handle invalid refresh token - sign out the user gracefully
           if (
-            error.message?.includes("Refresh Token") ||
-            error.message?.includes("refresh_token") ||
-            error.message?.includes("Invalid") ||
+            errorMessage.includes("Refresh Token") ||
+            errorMessage.includes("refresh_token") ||
+            errorMessage.includes("Invalid") ||
+            errorMessage.includes("not found") ||
             (error as any)?.code === "invalid_refresh_token"
           ) {
             console.log("[Auth] Invalid refresh token detected, clearing session...");
+            await clearInvalidTokens();
             try {
               await supabase.auth.signOut();
             } catch (signOutError) {
