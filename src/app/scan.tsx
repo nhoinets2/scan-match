@@ -34,7 +34,9 @@ import { colors, typography, spacing, components, borderRadius, cards, shadows }
 import { ButtonTertiary } from "@/components/ButtonTertiary";
 import { IconButton } from "@/components/IconButton";
 import { ButtonPrimary } from "@/components/ButtonPrimary";
-import { generateIdempotencyKey } from "@/lib/database";
+import { generateIdempotencyKey, useUsageQuota } from "@/lib/database";
+import { useProStatus } from "@/lib/useProStatus";
+import { Paywall } from "@/components/Paywall";
 
 const TIPS = [
   "Lay flat or hang up for best results",
@@ -308,8 +310,13 @@ export default function ScanScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
+  const [showPaywall, setShowPaywall] = useState(false);
 
   const clearScan = useSnapToMatchStore((s) => s.clearScan);
+
+  // Quota and Pro status
+  const { isPro, refetch: refetchProStatus } = useProStatus();
+  const { scansUsed, hasScansRemaining, isLoading: isLoadingQuota } = useUsageQuota();
 
   const captureScale = useSharedValue(1);
 
@@ -323,6 +330,15 @@ export default function ScanScreen() {
     prewarmCacheConnection();
   }, []);
 
+  // Check quota on mount - show paywall if exceeded
+  useEffect(() => {
+    if (isLoadingQuota) return;
+    if (!isPro && !hasScansRemaining) {
+      console.log("[Scan] Quota exceeded, showing paywall");
+      setShowPaywall(true);
+    }
+  }, [isPro, hasScansRemaining, isLoadingQuota]);
+
   // Rotate tips every 4 seconds
   useEffect(() => {
     const interval = setInterval(() => {
@@ -335,8 +351,20 @@ export default function ScanScreen() {
     transform: [{ scale: captureScale.value }],
   }));
 
+  // Check quota before allowing capture
+  const checkQuotaAndProceed = (): boolean => {
+    if (isPro) return true;
+    if (hasScansRemaining) return true;
+    console.log("[Scan] Quota check failed, showing paywall");
+    setShowPaywall(true);
+    return false;
+  };
+
   const handleCapture = async () => {
     if (!cameraRef.current || isCapturing || isProcessing) return;
+
+    // Check quota before capture
+    if (!checkQuotaAndProceed()) return;
 
     setIsCapturing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -362,6 +390,9 @@ export default function ScanScreen() {
 
   const handlePickImage = async () => {
     if (isProcessing) return;
+
+    // Check quota before gallery pick
+    if (!checkQuotaAndProceed()) return;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -426,6 +457,17 @@ export default function ScanScreen() {
   const handleSkip = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.back();
+  };
+
+  // Paywall handlers
+  const handlePaywallClose = () => {
+    setShowPaywall(false);
+    router.back(); // Go back when closing paywall (user can't scan without quota)
+  };
+
+  const handlePaywallSuccess = () => {
+    setShowPaywall(false);
+    refetchProStatus(); // Refresh Pro status after purchase
   };
 
   // Permission handling
@@ -616,6 +658,14 @@ export default function ScanScreen() {
 
       {/* Help bottom sheet */}
       <HelpBottomSheet visible={showHelp} onClose={() => setShowHelp(false)} />
+
+      {/* Paywall modal */}
+      <Paywall
+        visible={showPaywall}
+        onClose={handlePaywallClose}
+        onPurchaseComplete={handlePaywallSuccess}
+        reason="scan_limit"
+      />
     </View>
   );
 }
