@@ -3,6 +3,7 @@
 ## January 19, 2026
 
 ### Fixed
+- **CRITICAL: Quota not consumed on cache hits**: Fixed bug where cached scan results bypassed quota consumption entirely, allowing unlimited free scans. Now properly consumes quota via RPC even when returning cached analysis results.
 - **Scan flow instability**: Analysis state now properly resets when scanning a new item (was showing stale results from previous scans when screen was reused)
 - **Wardrobe updates not reflected**: Results screen now refreshes wardrobe data when returning from add-item (matches now update immediately after adding wardrobe items)
 - **Scan camera processing overlay issues**: Fixed "Checking scan access..." overlay appearing incorrectly when returning to scan screen from results, and eliminated flash of previous camera screen when tapping "Scan another item"

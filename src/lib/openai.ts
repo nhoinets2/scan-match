@@ -511,9 +511,72 @@ export async function analyzeClothingImage(
         if (cachedResult) {
           logCacheTelemetry(true, imageSha256, telemetryCtx?.scan_session_id);
           console.log(`[Perf] Cache HIT in ${Date.now() - cacheStart}ms, total: ${Date.now() - startTime}ms`);
+          
+          // CRITICAL: Still consume quota on cache hits!
+          // Without this, users can scan unlimited times if images are cached.
+          console.log(`[Perf] Cache hit - consuming quota via RPC...`);
+          const quotaStart = Date.now();
+          const quotaFunction = operationType === 'wardrobe_add' 
+            ? 'consume_wardrobe_add_credit' 
+            : 'consume_scan_credit';
+          
+          const { data: quotaData, error: quotaError } = await supabase.rpc(
+            quotaFunction,
+            { p_idempotency_key: idempotencyKey }
+          );
+          
+          console.log(`[Perf] Quota RPC: ${Date.now() - quotaStart}ms`);
+          
+          if (quotaError) {
+            console.error('[analyzeClothingImage] Quota check failed on cache hit:', quotaError);
+            clearTimeout(timeoutId);
+            const error: AnalyzeError = {
+              kind: "api_error",
+              message: "Failed to check quota.",
+              debug: quotaError.message,
+            };
+            logFailureTelemetry(error);
+            return { ok: false, error };
+          }
+          
+          const quotaResult = quotaData?.[0];
+          console.log(`[analyzeClothingImage] Cache hit quota result:`, quotaResult);
+          
+          if (!quotaResult?.allowed) {
+            clearTimeout(timeoutId);
+            const reason = quotaResult?.reason || "quota_exceeded";
+            const isMonthly = reason === "monthly_quota_exceeded";
+            const quotaType = operationType === 'wardrobe_add' ? 'wardrobe add' : 'scan';
+            const error: AnalyzeError = {
+              kind: "quota_exceeded",
+              message: isMonthly 
+                ? `You've reached your monthly ${quotaType} limit. Resets next month.`
+                : `You've used all your free ${quotaType}s. Upgrade to Pro for more.`,
+            };
+            logFailureTelemetry(error);
+            return { 
+              ok: false, 
+              error,
+              quotaInfo: {
+                monthlyUsed: quotaResult?.monthly_used ?? 0,
+                monthlyLimit: quotaResult?.monthly_limit ?? 0,
+                monthlyRemaining: quotaResult?.monthly_remaining ?? 0,
+              },
+            };
+          }
+          
           logTelemetry(cachedResult, true, imageSha256.slice(0, 8));
           clearTimeout(timeoutId);
-          return { ok: true, data: cachedResult, cacheHit: true };
+          return { 
+            ok: true, 
+            data: cachedResult, 
+            cacheHit: true,
+            quotaInfo: {
+              monthlyUsed: quotaResult?.monthly_used ?? 0,
+              monthlyLimit: quotaResult?.monthly_limit ?? 0,
+              monthlyRemaining: quotaResult?.monthly_remaining ?? 0,
+            },
+          };
         }
         logCacheTelemetry(false, imageSha256, telemetryCtx?.scan_session_id);
         console.log(`[Perf] Cache miss (lookup: ${Date.now() - cacheStart}ms)`);
