@@ -16,7 +16,7 @@ import { Eye, EyeOff, Check } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 
 import { supabase } from "@/lib/supabase";
-import { colors, spacing, borderRadius, typography, button } from "@/lib/design-tokens";
+import { colors, spacing, borderRadius, typography, button, iconContainer } from "@/lib/design-tokens";
 import { ButtonPrimary } from "@/components/ButtonPrimary";
 
 export default function ResetPasswordConfirmScreen() {
@@ -28,19 +28,41 @@ export default function ResetPasswordConfirmScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [validatingLink, setValidatingLink] = useState(true);
 
-  // Check if user has a valid reset token
+  // Validate that we have a valid recovery session on mount
   useEffect(() => {
-    checkSession();
-  }, []);
+    const validateRecoverySession = async () => {
+      console.log("[ResetPassword] Validating recovery session...");
+      
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("[ResetPassword] Error getting session:", error);
+          setError("Unable to validate reset link. Please try again.");
+          setValidatingLink(false);
+          return;
+        }
+        
+        if (!session) {
+          console.log("[ResetPassword] No session found - link may be expired or invalid");
+          setError("Reset link has expired or is invalid. Please request a new password reset.");
+          setValidatingLink(false);
+          return;
+        }
+        
+        console.log("[ResetPassword] ✅ Valid recovery session found");
+        setValidatingLink(false);
+      } catch (e) {
+        console.error("[ResetPassword] Exception validating session:", e);
+        setError("An error occurred. Please request a new password reset.");
+        setValidatingLink(false);
+      }
+    };
 
-  const checkSession = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      // No valid session, redirect to login
-      router.replace("/login");
-    }
-  };
+    validateRecoverySession();
+  }, []);
 
   // Password validation
   const isValidPassword = (password: string): boolean => {
@@ -62,12 +84,29 @@ export default function ResetPasswordConfirmScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
+      // First check if we have a valid session from the recovery token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        setError("Reset link has expired or is invalid. Please request a new password reset.");
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        setLoading(false);
+        return;
+      }
+
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
       });
 
       if (updateError) {
-        setError(updateError.message);
+        // Provide more helpful error messages
+        const errorMessage = updateError.message.includes("same as the old password")
+          ? "New password must be different from your current password"
+          : updateError.message.includes("session")
+          ? "Reset link has expired. Please request a new password reset."
+          : updateError.message;
+        
+        setError(errorMessage);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       } else {
         setSuccess(true);
@@ -78,7 +117,7 @@ export default function ResetPasswordConfirmScreen() {
         }, 2000);
       }
     } catch (e) {
-      setError("An unexpected error occurred");
+      setError("An unexpected error occurred. Please try requesting a new password reset.");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
@@ -102,7 +141,7 @@ export default function ResetPasswordConfirmScreen() {
                 marginBottom: spacing.lg,
               }}
             >
-              <Check size={40} color={colors.verdict.great.text} strokeWidth={2} />
+              <Check size={iconContainer.brass.size} color={colors.verdict.great.text} strokeWidth={2} />
             </Animated.View>
             <Animated.Text
               entering={FadeInDown.delay(100).springify()}
@@ -124,6 +163,80 @@ export default function ResetPasswordConfirmScreen() {
             >
               Your password has been updated successfully
             </Animated.Text>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  // Show loading state while validating the reset link
+  if (validatingLink) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
+        <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: spacing.lg }}>
+            <ActivityIndicator size="large" color={colors.accent.terracotta} />
+            <Text
+              style={{
+                ...typography.ui.body,
+                color: colors.text.secondary,
+                marginTop: spacing.lg,
+                textAlign: "center",
+              }}
+            >
+              Validating reset link...
+            </Text>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  // Show error state if link is invalid/expired
+  if (error && !newPassword && !confirmPassword) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg.primary }}>
+        <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: spacing.lg }}>
+            <Animated.View
+              entering={FadeInDown.springify()}
+              style={{
+                width: spacing.xxl * 2,
+                height: spacing.xxl * 2,
+                borderRadius: borderRadius.pill,
+                backgroundColor: colors.state.destructiveBg,
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: spacing.lg,
+              }}
+            >
+              <Text style={{ fontSize: 40 }}>⚠️</Text>
+            </Animated.View>
+            <Animated.Text
+              entering={FadeInDown.delay(100).springify()}
+              style={{
+                ...typography.display.screenTitle,
+                textAlign: "center",
+                marginBottom: spacing.sm,
+              }}
+            >
+              Link expired
+            </Animated.Text>
+            <Animated.Text
+              entering={FadeInDown.delay(200).springify()}
+              style={{
+                ...typography.ui.body,
+                color: colors.text.secondary,
+                textAlign: "center",
+                marginBottom: spacing.xl,
+              }}
+            >
+              {error}
+            </Animated.Text>
+            <ButtonPrimary
+              label="Back to login"
+              onPress={() => router.replace("/login")}
+            />
           </View>
         </SafeAreaView>
       </View>
@@ -213,9 +326,9 @@ export default function ResetPasswordConfirmScreen() {
                 />
                 <Pressable onPress={() => setShowNewPassword(!showNewPassword)}>
                   {showNewPassword ? (
-                    <EyeOff size={20} color={colors.text.tertiary} />
+                    <EyeOff size={button.icon.size} color={colors.text.tertiary} />
                   ) : (
-                    <Eye size={20} color={colors.text.tertiary} />
+                    <Eye size={button.icon.size} color={colors.text.tertiary} />
                   )}
                 </Pressable>
               </View>
@@ -261,9 +374,9 @@ export default function ResetPasswordConfirmScreen() {
                 />
                 <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
                   {showConfirmPassword ? (
-                    <EyeOff size={20} color={colors.text.tertiary} />
+                    <EyeOff size={button.icon.size} color={colors.text.tertiary} />
                   ) : (
-                    <Eye size={20} color={colors.text.tertiary} />
+                    <Eye size={button.icon.size} color={colors.text.tertiary} />
                   )}
                 </Pressable>
               </View>

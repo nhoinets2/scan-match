@@ -1,5 +1,10 @@
 # Changelog
 
+## January 20, 2026
+
+### Fixed
+- **Password reset flow**: Fixed navigation loop causing landing page to blink when user tapped reset password link from email. AuthGuard now properly allows reset-password-confirm screen without redirecting. Added comprehensive error handling with proper validation states (link expired, invalid session) and user-friendly error messages aligned with app-wide design patterns.
+
 ## January 19, 2026
 
 ### Fixed

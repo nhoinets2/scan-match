@@ -352,9 +352,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resetPassword = async (email: string) => {
+    // Use the full app URL with type parameter to ensure proper routing
+    const redirectUrl = 'snaptomatch://reset-password-confirm';
+    console.log('[Auth] Sending password reset email with redirectTo:', redirectUrl);
+    
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'snaptomatch://reset-password',
+      redirectTo: redirectUrl,
     });
+    
+    if (error) {
+      console.error('[Auth] Password reset error:', error);
+    } else {
+      console.log('[Auth] ✅ Password reset email sent successfully');
+    }
+    
     return { error: error as Error | null };
   };
 

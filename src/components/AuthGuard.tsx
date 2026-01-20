@@ -58,6 +58,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     const inAuthGroup = segments[0] === "login" || segments[0] === "signup";
     const inOnboarding = segments[0] === "onboarding";
     const inMainApp = segments[0] === "(tabs)";
+    const inPasswordReset = segments[0] === "reset-password-confirm";
 
     console.log("[AuthGuard] Check redirect:", {
       user: !!user,
@@ -65,6 +66,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       inAuthGroup,
       inOnboarding,
       inMainApp,
+      inPasswordReset,
       isOnboardingLoading,
       onboardingComplete,
     });
@@ -80,11 +82,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       }, 0);
     };
 
-    if (!user && !inAuthGroup) {
-      // User is not signed in and not on auth screens, redirect to login
+    if (!user && !inAuthGroup && !inPasswordReset) {
+      // User is not signed in and not on auth screens or password reset, redirect to login
       performRedirect("/login");
-    } else if (user && inAuthGroup) {
-      // User is signed in but on auth screens
+    } else if (user && inAuthGroup && !inPasswordReset) {
+      // User is signed in but on auth screens (not password reset)
       // Wait for onboarding status to load before redirecting
       if (isOnboardingLoading) {
         console.log("[AuthGuard] Onboarding loading, waiting...");
@@ -96,9 +98,12 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       } else {
         performRedirect("/onboarding");
       }
-    } else if (user && !inOnboarding && !inAuthGroup && !inMainApp && !isOnboardingLoading && !onboardingComplete) {
-      // User is signed in, not on onboarding or main app, but hasn't completed onboarding
+    } else if (user && !inOnboarding && !inAuthGroup && !inMainApp && !inPasswordReset && !isOnboardingLoading && !onboardingComplete) {
+      // User is signed in, not on onboarding or main app or password reset, but hasn't completed onboarding
       performRedirect("/onboarding");
+    } else if (inPasswordReset) {
+      // Allow password reset screen to render without interference
+      console.log("[AuthGuard] On password reset screen, allowing access");
     } else {
       console.log("[AuthGuard] No redirect needed");
     }
@@ -107,14 +112,15 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const inAuthGroup = segments[0] === "login" || segments[0] === "signup";
   const inMainApp = segments[0] === "(tabs)";
   const inOnboarding = segments[0] === "onboarding";
+  const inPasswordReset = segments[0] === "reset-password-confirm";
 
   // Clear redirecting state when we reach any valid authenticated screen
   useEffect(() => {
-    if (isRedirecting && (inMainApp || inOnboarding || (!inAuthGroup && user))) {
+    if (isRedirecting && (inMainApp || inOnboarding || inPasswordReset || (!inAuthGroup && user))) {
       console.log("[AuthGuard] Arrived at target, clearing redirect state");
       setIsRedirecting(false);
     }
-  }, [isRedirecting, inMainApp, inOnboarding, inAuthGroup, user]);
+  }, [isRedirecting, inMainApp, inOnboarding, inPasswordReset, inAuthGroup, user]);
 
   // Show landing page image while auth is loading to prevent white flash
   if (isAuthLoading) {

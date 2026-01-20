@@ -153,31 +153,56 @@ function DeepLinkHandler() {
   }, []);
 
   const handleDeepLink = (url: string) => {
+    console.log("[DeepLink] ========================================");
     console.log("[DeepLink] Received URL:", url);
+    console.log("[DeepLink] URL length:", url.length);
     
-    // Check if this is a password reset link FIRST (before OAuth check)
-    // Password reset URLs contain both access_token AND type=recovery
-    if (url.includes("type=recovery") || url.includes("reset-password")) {
-      console.log("[DeepLink] ✅ Password reset link detected");
-      console.log("[DeepLink] URL contains type=recovery:", url.includes("type=recovery"));
-      console.log("[DeepLink] URL contains reset-password:", url.includes("reset-password"));
-      console.log("[DeepLink] Navigating to /reset-password-confirm");
+    // Parse the URL to extract parameters
+    try {
+      const urlObj = new URL(url);
+      console.log("[DeepLink] Protocol:", urlObj.protocol);
+      console.log("[DeepLink] Host:", urlObj.host);
+      console.log("[DeepLink] Pathname:", urlObj.pathname);
+      console.log("[DeepLink] Search params:", urlObj.search);
+      console.log("[DeepLink] Hash:", urlObj.hash);
       
-      // Small delay to ensure Supabase has processed the session from URL
-      setTimeout(() => {
-        router.push("/reset-password-confirm");
-      }, 100);
-      return;
+      // Extract all params from both search and hash
+      const params = new URLSearchParams(urlObj.search + urlObj.hash.replace('#', '&'));
+      console.log("[DeepLink] All params:", Array.from(params.entries()));
+      
+      const hasAccessToken = params.has('access_token');
+      const hasRefreshToken = params.has('refresh_token');
+      const type = params.get('type');
+      
+      console.log("[DeepLink] Has access_token:", hasAccessToken);
+      console.log("[DeepLink] Has refresh_token:", hasRefreshToken);
+      console.log("[DeepLink] Type parameter:", type);
+      
+      // Check if this is a password reset link FIRST (before OAuth check)
+      // Password reset URLs contain type=recovery
+      if (type === "recovery" || url.includes("reset-password-confirm")) {
+        console.log("[DeepLink] ✅ Password reset link detected (type=recovery or reset-password-confirm)");
+        console.log("[DeepLink] Navigating to /reset-password-confirm");
+        
+        // Small delay to ensure Supabase has processed the session from URL
+        setTimeout(() => {
+          router.push("/reset-password-confirm");
+        }, 150);
+        return;
+      }
+      
+      // Check if this is an OAuth callback (access_token or code in URL but NOT recovery)
+      if ((hasAccessToken || params.has('code')) && type !== "recovery") {
+        console.log("[DeepLink] OAuth callback detected - Supabase will handle session automatically");
+        // Supabase's detectSessionInUrl: true will automatically handle this
+        return;
+      }
+      
+      console.log("[DeepLink] ⚠️ URL did not match any handlers");
+    } catch (error) {
+      console.error("[DeepLink] Error parsing URL:", error);
     }
-    
-    // Check if this is an OAuth callback (access_token or code in URL)
-    if (url.includes("access_token") || url.includes("code=")) {
-      console.log("[DeepLink] OAuth callback detected - Supabase will handle session automatically");
-      // Supabase's detectSessionInUrl: true will automatically handle this
-      return;
-    }
-    
-    console.log("[DeepLink] ⚠️ URL did not match any handlers");
+    console.log("[DeepLink] ========================================");
   };
 
   return null; // This component renders nothing
