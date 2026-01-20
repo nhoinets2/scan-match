@@ -122,26 +122,54 @@ function FocusManagerInitializer() {
 /**
  * Handles deep links for password reset.
  * When user clicks the reset link in email, this navigates them to the password reset screen.
+ * 
+ * IMPORTANT: We use a ref to track if we've already handled a recovery URL to prevent
+ * double navigation (both getInitialURL and addEventListener can fire for the same link).
  */
 function DeepLinkHandler() {
   const router = useRouter();
-  const handledUrl = useRef<string | null>(null);
+  const handledUrls = useRef<Set<string>>(new Set());
+  const hasNavigatedToReset = useRef(false);
 
   useEffect(() => {
+    // Helper to extract a canonical key from URL (without tokens, which change)
+    const getUrlKey = (url: string): string => {
+      try {
+        const urlObj = new URL(url);
+        // Use protocol + host + pathname + type param as the key
+        // Don't include tokens as they're unique per request
+        const params = new URLSearchParams(urlObj.search + urlObj.hash.replace('#', '&'));
+        const type = params.get('type') || 'unknown';
+        return `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}?type=${type}`;
+      } catch {
+        return url;
+      }
+    };
+
     // Handle initial URL if app was opened from a link
     const handleInitialUrl = async () => {
       const initialUrl = await Linking.getInitialURL();
-      if (initialUrl && initialUrl !== handledUrl.current) {
-        handledUrl.current = initialUrl;
-        handleDeepLink(initialUrl);
+      if (initialUrl) {
+        const urlKey = getUrlKey(initialUrl);
+        if (!handledUrls.current.has(urlKey)) {
+          handledUrls.current.add(urlKey);
+          handleDeepLink(initialUrl);
+        } else {
+          console.log("[DeepLink] Initial URL already handled, skipping:", urlKey);
+        }
       }
     };
 
     // Listen for URL changes while app is running
     const subscription = Linking.addEventListener("url", (event) => {
-      if (event.url && event.url !== handledUrl.current) {
-        handledUrl.current = event.url;
-        handleDeepLink(event.url);
+      if (event.url) {
+        const urlKey = getUrlKey(event.url);
+        if (!handledUrls.current.has(urlKey)) {
+          handledUrls.current.add(urlKey);
+          handleDeepLink(event.url);
+        } else {
+          console.log("[DeepLink] Event URL already handled, skipping:", urlKey);
+        }
       }
     });
 
@@ -183,6 +211,14 @@ function DeepLinkHandler() {
       if (type === "recovery" || url.includes("reset-password-confirm")) {
         console.log("[DeepLink] ✅ Password reset link detected (type=recovery or reset-password-confirm)");
         console.log("[DeepLink] Has tokens in URL:", hasAccessToken, hasRefreshToken);
+        
+        // Prevent double navigation to reset screen
+        if (hasNavigatedToReset.current) {
+          console.log("[DeepLink] Already navigated to reset screen, skipping duplicate navigation");
+          return;
+        }
+        hasNavigatedToReset.current = true;
+        
         console.log("[DeepLink] Navigating to /reset-password-confirm");
         
         // Longer delay to ensure Supabase has fully processed the session from URL

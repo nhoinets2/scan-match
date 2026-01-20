@@ -20,7 +20,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [isRedirecting, setIsRedirecting] = useState(false);
   
   // Track if we're processing a password reset deep link
-  const [isPendingPasswordReset, setIsPendingPasswordReset] = useState(true); // Start true to block redirects
+  // Start false - we'll set true only if we detect a reset link
+  const [isPendingPasswordReset, setIsPendingPasswordReset] = useState(false);
   const checkedInitialUrl = useRef(false);
 
   // Check initial URL on mount to see if we're coming from a password reset link
@@ -39,22 +40,22 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
             initialUrl.includes("reset-password");
           
           if (isPasswordReset) {
-            console.log("[AuthGuard] 🔐 Password reset deep link detected, blocking redirects");
+            console.log("[AuthGuard] 🔐 Password reset deep link detected, blocking redirects temporarily");
             setIsPendingPasswordReset(true);
-            // Keep blocking for a while to let DeepLinkHandler navigate
+            // Keep blocking for a short time to let DeepLinkHandler navigate
+            // Reduced from 3s to 2s since DeepLinkHandler now has better deduplication
             setTimeout(() => {
               console.log("[AuthGuard] Releasing password reset block");
               setIsPendingPasswordReset(false);
-            }, 3000); // 3 seconds should be plenty
+            }, 2000);
             return;
           }
         }
         
         // No password reset link, allow normal flow
-        setIsPendingPasswordReset(false);
+        console.log("[AuthGuard] No password reset link detected, allowing normal flow");
       } catch (error) {
         console.error("[AuthGuard] Error checking initial URL:", error);
-        setIsPendingPasswordReset(false);
       }
     };
     

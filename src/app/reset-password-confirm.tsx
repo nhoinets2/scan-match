@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -29,55 +29,82 @@ export default function ResetPasswordConfirmScreen() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [validatingLink, setValidatingLink] = useState(true);
+  const hasValidatedSession = useRef(false);
 
-  // Validate that we have a valid recovery session on mount
+  // Validate recovery session using auth state listener
+  // This is more reliable than polling because Supabase fires PASSWORD_RECOVERY event
   useEffect(() => {
-    const validateRecoverySession = async () => {
-      console.log("[ResetPassword] Validating recovery session...");
+    // Prevent running validation multiple times (e.g., if screen mounts twice)
+    if (hasValidatedSession.current) {
+      console.log("[ResetPassword] Already validated, skipping duplicate validation");
+      return;
+    }
+
+    console.log("[ResetPassword] Setting up auth state listener for recovery session...");
+    
+    let validationTimeout: NodeJS.Timeout;
+    let hasCompleted = false;
+    
+    const completeValidation = (isValid: boolean, errorMessage?: string) => {
+      if (hasCompleted) return;
+      hasCompleted = true;
+      hasValidatedSession.current = true;
       
-      // Give Supabase extra time to process the URL and create the session
-      // When coming from email -> Safari -> app, detectSessionInUrl needs time to parse
-      await new Promise(resolve => setTimeout(resolve, 800));
+      if (validationTimeout) clearTimeout(validationTimeout);
       
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error("[ResetPassword] Error getting session:", error);
-          setError("Unable to validate reset link. Please try again.");
-          setValidatingLink(false);
-          return;
-        }
-        
-        if (!session) {
-          console.log("[ResetPassword] No session found - link may be expired or invalid");
-          console.log("[ResetPassword] Waiting an additional 1 second in case session is still processing...");
-          
-          // Try one more time after additional delay
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          const { data: { session: retrySession } } = await supabase.auth.getSession();
-          
-          if (!retrySession) {
-            setError("Reset link has expired or is invalid. Please request a new password reset.");
-            setValidatingLink(false);
-            return;
-          }
-          
-          console.log("[ResetPassword] ✅ Valid recovery session found (after retry)");
-          setValidatingLink(false);
-          return;
-        }
-        
-        console.log("[ResetPassword] ✅ Valid recovery session found");
+      if (isValid) {
+        console.log("[ResetPassword] ✅ Valid recovery session confirmed");
         setValidatingLink(false);
-      } catch (e) {
-        console.error("[ResetPassword] Exception validating session:", e);
-        setError("An error occurred. Please request a new password reset.");
+      } else {
+        console.log("[ResetPassword] ❌ Invalid or expired recovery session");
+        setError(errorMessage || "Reset link has expired or is invalid. Please request a new password reset.");
         setValidatingLink(false);
       }
     };
 
-    validateRecoverySession();
+    // Listen for auth state changes - Supabase fires PASSWORD_RECOVERY when it processes recovery URL
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[ResetPassword] Auth state change:", event, "Session:", !!session);
+      
+      if (event === "PASSWORD_RECOVERY" && session) {
+        console.log("[ResetPassword] PASSWORD_RECOVERY event received with valid session");
+        completeValidation(true);
+      } else if (event === "SIGNED_IN" && session) {
+        // Sometimes recovery comes as SIGNED_IN instead of PASSWORD_RECOVERY
+        console.log("[ResetPassword] SIGNED_IN event received, treating as valid recovery session");
+        completeValidation(true);
+      }
+    });
+    
+    // Also check existing session (in case event already fired before listener was set up)
+    const checkExistingSession = async () => {
+      // Give Supabase time to process the URL tokens
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      if (hasCompleted) return; // Event listener already handled it
+      
+      const { data: { session }, error } = await supabase.auth.getSession();
+      console.log("[ResetPassword] Checking existing session:", !!session, "Error:", error?.message);
+      
+      if (session) {
+        completeValidation(true);
+      }
+    };
+    
+    checkExistingSession();
+    
+    // Set a timeout to fail gracefully if no session is established
+    validationTimeout = setTimeout(() => {
+      if (!hasCompleted) {
+        console.log("[ResetPassword] Validation timeout reached");
+        completeValidation(false, "Reset link has expired or is invalid. Please request a new password reset.");
+      }
+    }, 5000); // 5 second timeout
+    
+    return () => {
+      subscription.unsubscribe();
+      if (validationTimeout) clearTimeout(validationTimeout);
+    };
   }, []);
 
   // Password validation

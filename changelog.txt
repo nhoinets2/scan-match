@@ -4,6 +4,7 @@
 
 ### Fixed
 - **Password reset flow**: Fixed navigation loop causing landing page to blink when user tapped reset password link from email. AuthGuard now properly allows reset-password-confirm screen without redirecting. Added comprehensive error handling with proper validation states (link expired, invalid session) and user-friendly error messages aligned with app-wide design patterns.
+- **Password reset double-screen and link expired bug**: Fixed issue where clicking password reset link from email would open two reset screens and show "link expired" error. Root causes: (1) Race condition between `getInitialURL()` and URL event listener caused duplicate navigation, (2) Session validation was polling instead of listening for Supabase auth events. Fixes: DeepLinkHandler now uses a Set to track handled URLs and prevents duplicate navigation via `hasNavigatedToReset` ref; reset-password-confirm screen now listens for `PASSWORD_RECOVERY` auth event instead of polling.
 
 ## January 19, 2026
 
