@@ -35,6 +35,10 @@ export default function ResetPasswordConfirmScreen() {
     const validateRecoverySession = async () => {
       console.log("[ResetPassword] Validating recovery session...");
       
+      // Give Supabase extra time to process the URL and create the session
+      // When coming from email -> Safari -> app, detectSessionInUrl needs time to parse
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         
@@ -47,7 +51,19 @@ export default function ResetPasswordConfirmScreen() {
         
         if (!session) {
           console.log("[ResetPassword] No session found - link may be expired or invalid");
-          setError("Reset link has expired or is invalid. Please request a new password reset.");
+          console.log("[ResetPassword] Waiting an additional 1 second in case session is still processing...");
+          
+          // Try one more time after additional delay
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          const { data: { session: retrySession } } = await supabase.auth.getSession();
+          
+          if (!retrySession) {
+            setError("Reset link has expired or is invalid. Please request a new password reset.");
+            setValidatingLink(false);
+            return;
+          }
+          
+          console.log("[ResetPassword] ✅ Valid recovery session found (after retry)");
           setValidatingLink(false);
           return;
         }

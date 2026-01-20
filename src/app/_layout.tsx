@@ -182,12 +182,15 @@ function DeepLinkHandler() {
       // Password reset URLs contain type=recovery
       if (type === "recovery" || url.includes("reset-password-confirm")) {
         console.log("[DeepLink] ✅ Password reset link detected (type=recovery or reset-password-confirm)");
+        console.log("[DeepLink] Has tokens in URL:", hasAccessToken, hasRefreshToken);
         console.log("[DeepLink] Navigating to /reset-password-confirm");
         
-        // Small delay to ensure Supabase has processed the session from URL
+        // Longer delay to ensure Supabase has fully processed the session from URL
+        // When coming from email -> Safari -> app, Supabase needs time to parse tokens
         setTimeout(() => {
+          console.log("[DeepLink] Delay complete, navigating now...");
           router.push("/reset-password-confirm");
-        }, 150);
+        }, 500);
         return;
       }
       
