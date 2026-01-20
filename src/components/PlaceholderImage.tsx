@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, StyleSheet, ViewStyle } from "react-native";
+import { View, StyleSheet, ViewStyle, ActivityIndicator } from "react-native";
 import { Image, ImageStyle } from "expo-image";
 import { ImageOff } from "lucide-react-native";
 import { colors, borderRadius } from "@/lib/design-tokens";
@@ -178,13 +178,15 @@ export function ImageWithFallback({
   contentFit?: "cover" | "contain" | "fill" | "none" | "scale-down";
 }) {
   const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const prevUriRef = useRef(uri);
 
-  // Reset error state when URI actually changes (e.g., from local to cloud URL after upload)
+  // Reset error and loading state when URI actually changes (e.g., from local to cloud URL after upload)
   useEffect(() => {
     if (uri !== prevUriRef.current) {
       prevUriRef.current = uri;
       setHasError(false);
+      setIsLoading(true); // Start loading when URI changes
     }
   }, [uri]);
 
@@ -193,19 +195,44 @@ export function ImageWithFallback({
   }
 
   return (
-    <Image
-      source={{ uri }}
-      style={[{ width: "100%", height: "100%" }, style]}
-      contentFit={contentFit}
-      onError={() => setHasError(true)}
-      // Shorter transition (100ms) for snappier feel while still smooth
-      // Longer transitions cause visible "blinking" when scrolling lists
-      transition={100}
-      cachePolicy="memory-disk"
-      // recyclingKey helps expo-image manage image recycling in lists
-      // Using the URI ensures the same image isn't re-animated when recycled
-      recyclingKey={uri}
-    />
+    <>
+      <Image
+        source={{ uri }}
+        style={[{ width: "100%", height: "100%" }, style]}
+        contentFit={contentFit}
+        onLoadStart={() => setIsLoading(true)}
+        onLoad={() => setIsLoading(false)}
+        onError={() => {
+          setHasError(true);
+          setIsLoading(false);
+        }}
+        // Shorter transition (100ms) for snappier feel while still smooth
+        // Longer transitions cause visible "blinking" when scrolling lists
+        transition={100}
+        cachePolicy="memory-disk"
+        // recyclingKey helps expo-image manage image recycling in lists
+        // Using the URI ensures the same image isn't re-animated when recycled
+        recyclingKey={uri}
+      />
+      
+      {/* Loading Spinner Overlay */}
+      {isLoading && (
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: colors.bg.elevated,
+          }}
+        >
+          <ActivityIndicator size="small" color={colors.accent.terracotta} />
+        </View>
+      )}
+    </>
   );
 }
 
@@ -224,13 +251,15 @@ export function ThumbnailWithFallback({
   style?: ImageStyle;
 }) {
   const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const prevUriRef = useRef(uri);
 
-  // Reset error state when URI actually changes (e.g., from local to cloud URL after upload)
+  // Reset error and loading state when URI actually changes (e.g., from local to cloud URL after upload)
   useEffect(() => {
     if (uri !== prevUriRef.current) {
       prevUriRef.current = uri;
       setHasError(false);
+      setIsLoading(true); // Start loading when URI changes
     }
   }, [uri]);
 
@@ -245,24 +274,50 @@ export function ThumbnailWithFallback({
   }
 
   return (
-    <Image
-      source={{ uri }}
-      style={[
-        { 
-          width: size, 
-          height: size, 
-          borderRadius: customBorderRadius ?? borderRadius.image,
-        },
-        style,
-      ]}
-      contentFit="cover"
-      onError={() => setHasError(true)}
-      // Shorter transition for snappier feel in lists
-      transition={100}
-      cachePolicy="memory-disk"
-      // recyclingKey helps expo-image manage image recycling in lists
-      recyclingKey={uri}
-    />
+    <View style={{ position: "relative" }}>
+      <Image
+        source={{ uri }}
+        style={[
+          { 
+            width: size, 
+            height: size, 
+            borderRadius: customBorderRadius ?? borderRadius.image,
+          },
+          style,
+        ]}
+        contentFit="cover"
+        onLoadStart={() => setIsLoading(true)}
+        onLoad={() => setIsLoading(false)}
+        onError={() => {
+          setHasError(true);
+          setIsLoading(false);
+        }}
+        // Shorter transition for snappier feel in lists
+        transition={100}
+        cachePolicy="memory-disk"
+        // recyclingKey helps expo-image manage image recycling in lists
+        recyclingKey={uri}
+      />
+      
+      {/* Loading Spinner Overlay */}
+      {isLoading && (
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: colors.bg.elevated,
+            borderRadius: customBorderRadius ?? borderRadius.image,
+          }}
+        >
+          <ActivityIndicator size="small" color={colors.accent.terracotta} />
+        </View>
+      )}
+    </View>
   );
 }
 

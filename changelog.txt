@@ -31,6 +31,7 @@
 - **Scan item background flash eliminated**: Fixed brief flash of "Couldn't analyze" error screen when returning from background during scan analysis. Now stays in loading state for seamless retry (up to 3 attempts).
 - **Wardrobe images not refreshing after background upload**: Fixed placeholder images appearing on wardrobe cards after returning from background. React Query now properly integrates with AppState to refetch data when app returns from background, ensuring uploaded images are immediately visible.
 - **Wardrobe card loading states**: Added loading spinner to wardrobe item cards when images are loading (e.g., during URI transition from file:// to https:// after upload). Prevents white placeholder flash and provides better visual feedback.
+- **Saved scans loading states**: Added loading spinner to saved scan images (ImageWithFallback and ThumbnailWithFallback components) during URI transitions and network loads. Consistent loading experience across all image types.
 - Paywall no longer interrupts users who used their last credit successfully (was showing paywall after analysis completed)
 - **Scan flow now shows paywall BEFORE capture** when quota exceeded (previously let users scan then blocked them after)
 - Scan paywall now shows correct title "You've used your 5 free scans" (was showing wrong paywall type)
