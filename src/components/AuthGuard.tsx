@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { router, useSegments, useRootNavigationState, useNavigationContainerRef } from "expo-router";
 import { View, ActivityIndicator } from "react-native";
 import { Image } from "expo-image";
+import * as Linking from "expo-linking";
 import { useAuth } from "@/lib/auth-context";
 import { useOnboardingComplete } from "@/lib/database";
 import { colors } from "@/lib/design-tokens";
@@ -17,6 +18,48 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const rootNavigation = useNavigationContainerRef();
   const hasRedirected = useRef(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  
+  // Track if we're processing a password reset deep link
+  const [isPendingPasswordReset, setIsPendingPasswordReset] = useState(true); // Start true to block redirects
+  const checkedInitialUrl = useRef(false);
+
+  // Check initial URL on mount to see if we're coming from a password reset link
+  useEffect(() => {
+    if (checkedInitialUrl.current) return;
+    checkedInitialUrl.current = true;
+    
+    const checkInitialUrl = async () => {
+      try {
+        const initialUrl = await Linking.getInitialURL();
+        console.log("[AuthGuard] Initial URL:", initialUrl);
+        
+        if (initialUrl) {
+          const isPasswordReset = 
+            initialUrl.includes("type=recovery") || 
+            initialUrl.includes("reset-password");
+          
+          if (isPasswordReset) {
+            console.log("[AuthGuard] 🔐 Password reset deep link detected, blocking redirects");
+            setIsPendingPasswordReset(true);
+            // Keep blocking for a while to let DeepLinkHandler navigate
+            setTimeout(() => {
+              console.log("[AuthGuard] Releasing password reset block");
+              setIsPendingPasswordReset(false);
+            }, 3000); // 3 seconds should be plenty
+            return;
+          }
+        }
+        
+        // No password reset link, allow normal flow
+        setIsPendingPasswordReset(false);
+      } catch (error) {
+        console.error("[AuthGuard] Error checking initial URL:", error);
+        setIsPendingPasswordReset(false);
+      }
+    };
+    
+    checkInitialUrl();
+  }, []);
 
   // Preload landing page image on mount
   useEffect(() => {
@@ -46,6 +89,12 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     // Don't redirect while loading auth or onboarding status
     if (isAuthLoading) {
       console.log("[AuthGuard] Auth is loading, waiting...");
+      return;
+    }
+    
+    // Don't redirect while processing a password reset deep link
+    if (isPendingPasswordReset) {
+      console.log("[AuthGuard] Pending password reset link, blocking redirects...");
       return;
     }
 
@@ -107,7 +156,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     } else {
       console.log("[AuthGuard] No redirect needed");
     }
-  }, [user, segments, isAuthLoading, isOnboardingLoading, onboardingComplete, navigationState?.key, rootNavigation]);
+  }, [user, segments, isAuthLoading, isOnboardingLoading, onboardingComplete, navigationState?.key, rootNavigation, isPendingPasswordReset]);
 
   const inAuthGroup = segments[0] === "login" || segments[0] === "signup";
   const inMainApp = segments[0] === "(tabs)";
@@ -139,7 +188,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   // User not logged in but not on auth screens yet - show landing image while redirecting to login
   // Uses same dark overlay + spinner as sign-out for seamless transition
-  if (!user && !inAuthGroup) {
+  // BUT: Don't show if we're processing a password reset link - let that flow through
+  if (!user && !inAuthGroup && !inPasswordReset && !isPendingPasswordReset) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg.primary, overflow: "hidden" }}>
         <Image
