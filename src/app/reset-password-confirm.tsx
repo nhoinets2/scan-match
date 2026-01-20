@@ -31,8 +31,9 @@ export default function ResetPasswordConfirmScreen() {
   const [validatingLink, setValidatingLink] = useState(true);
   const hasValidatedSession = useRef(false);
 
-  // Validate recovery session using auth state listener
-  // This is more reliable than polling because Supabase fires PASSWORD_RECOVERY event
+  // Validate recovery session by polling for session
+  // DeepLinkHandler calls setSession() which may happen after this screen mounts,
+  // so we need to poll and wait for it to complete
   useEffect(() => {
     // Prevent running validation multiple times (e.g., if screen mounts twice)
     if (hasValidatedSession.current) {
@@ -40,9 +41,10 @@ export default function ResetPasswordConfirmScreen() {
       return;
     }
 
-    console.log("[ResetPassword] Setting up auth state listener for recovery session...");
+    console.log("[ResetPassword] Starting session validation...");
     
     let validationTimeout: NodeJS.Timeout;
+    let pollInterval: NodeJS.Timeout;
     let hasCompleted = false;
     
     const completeValidation = (isValid: boolean, errorMessage?: string) => {
@@ -51,6 +53,7 @@ export default function ResetPasswordConfirmScreen() {
       hasValidatedSession.current = true;
       
       if (validationTimeout) clearTimeout(validationTimeout);
+      if (pollInterval) clearInterval(pollInterval);
       
       if (isValid) {
         console.log("[ResetPassword] ✅ Valid recovery session confirmed");
@@ -62,48 +65,46 @@ export default function ResetPasswordConfirmScreen() {
       }
     };
 
-    // Listen for auth state changes - Supabase fires PASSWORD_RECOVERY when it processes recovery URL
+    // Listen for auth state changes (SIGNED_IN fires when setSession is called)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("[ResetPassword] Auth state change:", event, "Session:", !!session);
       
-      if (event === "PASSWORD_RECOVERY" && session) {
-        console.log("[ResetPassword] PASSWORD_RECOVERY event received with valid session");
-        completeValidation(true);
-      } else if (event === "SIGNED_IN" && session) {
-        // Sometimes recovery comes as SIGNED_IN instead of PASSWORD_RECOVERY
-        console.log("[ResetPassword] SIGNED_IN event received, treating as valid recovery session");
+      if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session) {
+        console.log("[ResetPassword] Session established via auth event");
         completeValidation(true);
       }
     });
     
-    // Also check existing session (in case event already fired before listener was set up)
-    const checkExistingSession = async () => {
-      // Give Supabase time to process the URL tokens
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      if (hasCompleted) return; // Event listener already handled it
+    // Poll for session - DeepLinkHandler may set it after we mount
+    const checkSession = async () => {
+      if (hasCompleted) return;
       
       const { data: { session }, error } = await supabase.auth.getSession();
-      console.log("[ResetPassword] Checking existing session:", !!session, "Error:", error?.message);
+      console.log("[ResetPassword] Polling session:", !!session, "Error:", error?.message);
       
       if (session) {
         completeValidation(true);
       }
     };
     
-    checkExistingSession();
+    // Check immediately
+    checkSession();
     
-    // Set a timeout to fail gracefully if no session is established
+    // Then poll every 300ms (DeepLinkHandler needs time to process URL and call setSession)
+    pollInterval = setInterval(checkSession, 300);
+    
+    // Set a timeout to fail gracefully if no session is established after 6 seconds
     validationTimeout = setTimeout(() => {
       if (!hasCompleted) {
-        console.log("[ResetPassword] Validation timeout reached");
+        console.log("[ResetPassword] Validation timeout reached after 6 seconds");
         completeValidation(false, "Reset link has expired or is invalid. Please request a new password reset.");
       }
-    }, 5000); // 5 second timeout
+    }, 6000);
     
     return () => {
       subscription.unsubscribe();
       if (validationTimeout) clearTimeout(validationTimeout);
+      if (pollInterval) clearInterval(pollInterval);
     };
   }, []);
 

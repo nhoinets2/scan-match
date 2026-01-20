@@ -19,8 +19,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const hasRedirected = useRef(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   
-  // Track if we're processing a password reset deep link
-  // Start false - we'll set true only if we detect a reset link
+  // Track if we detected a password reset deep link on initial load
+  // This prevents AuthGuard from redirecting away before the reset screen can mount
   const [isPendingPasswordReset, setIsPendingPasswordReset] = useState(false);
   const checkedInitialUrl = useRef(false);
 
@@ -32,7 +32,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     const checkInitialUrl = async () => {
       try {
         const initialUrl = await Linking.getInitialURL();
-        console.log("[AuthGuard] Initial URL:", initialUrl);
         
         if (initialUrl) {
           const isPasswordReset = 
@@ -40,20 +39,16 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
             initialUrl.includes("reset-password");
           
           if (isPasswordReset) {
-            console.log("[AuthGuard] 🔐 Password reset deep link detected, blocking redirects temporarily");
+            console.log("[AuthGuard] 🔐 Password reset deep link detected");
             setIsPendingPasswordReset(true);
-            // Keep blocking for a short time to let DeepLinkHandler navigate
-            // Reduced from 3s to 2s since DeepLinkHandler now has better deduplication
+            // Block redirects briefly while Expo Router navigates to reset screen
+            // and Supabase processes the recovery tokens
             setTimeout(() => {
               console.log("[AuthGuard] Releasing password reset block");
               setIsPendingPasswordReset(false);
-            }, 2000);
-            return;
+            }, 1500);
           }
         }
-        
-        // No password reset link, allow normal flow
-        console.log("[AuthGuard] No password reset link detected, allowing normal flow");
       } catch (error) {
         console.error("[AuthGuard] Error checking initial URL:", error);
       }

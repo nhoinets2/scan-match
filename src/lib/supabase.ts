@@ -32,7 +32,7 @@ if (supabaseUrl && supabaseAnonKey) {
       storage: AsyncStorage,
       autoRefreshToken: true,
       persistSession: true,
-      detectSessionInUrl: true, // Enable URL detection for password reset links
+      detectSessionInUrl: false, // Must be false for React Native - we handle deep links manually
     },
   });
 

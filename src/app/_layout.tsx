@@ -22,6 +22,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { AuthGuard } from "@/components/AuthGuard";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
+import { supabase } from "@/lib/supabase";
 import { colors } from "@/lib/design-tokens";
 import { initializeBackgroundUploads } from "@/lib/storage";
 
@@ -120,24 +121,23 @@ function FocusManagerInitializer() {
 }
 
 /**
- * Handles deep links for password reset.
- * When user clicks the reset link in email, this navigates them to the password reset screen.
+ * Handles deep links for password reset and OAuth callbacks.
  * 
- * IMPORTANT: We use a ref to track if we've already handled a recovery URL to prevent
- * double navigation (both getInitialURL and addEventListener can fire for the same link).
+ * CRITICAL: In React Native, Supabase's detectSessionInUrl does NOT work because
+ * there's no URL bar. We must MANUALLY extract tokens from deep links and call
+ * supabase.auth.setSession() to establish the session.
+ * 
+ * Expo Router handles navigation to /reset-password-confirm automatically via
+ * file-based routing when the URL path matches.
  */
 function DeepLinkHandler() {
-  const router = useRouter();
   const handledUrls = useRef<Set<string>>(new Set());
-  const hasNavigatedToReset = useRef(false);
 
   useEffect(() => {
     // Helper to extract a canonical key from URL (without tokens, which change)
     const getUrlKey = (url: string): string => {
       try {
         const urlObj = new URL(url);
-        // Use protocol + host + pathname + type param as the key
-        // Don't include tokens as they're unique per request
         const params = new URLSearchParams(urlObj.search + urlObj.hash.replace('#', '&'));
         const type = params.get('type') || 'unknown';
         return `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}?type=${type}`;
@@ -153,9 +153,7 @@ function DeepLinkHandler() {
         const urlKey = getUrlKey(initialUrl);
         if (!handledUrls.current.has(urlKey)) {
           handledUrls.current.add(urlKey);
-          handleDeepLink(initialUrl);
-        } else {
-          console.log("[DeepLink] Initial URL already handled, skipping:", urlKey);
+          await handleDeepLink(initialUrl);
         }
       }
     };
@@ -167,8 +165,6 @@ function DeepLinkHandler() {
         if (!handledUrls.current.has(urlKey)) {
           handledUrls.current.add(urlKey);
           handleDeepLink(event.url);
-        } else {
-          console.log("[DeepLink] Event URL already handled, skipping:", urlKey);
         }
       }
     });
@@ -180,71 +176,78 @@ function DeepLinkHandler() {
     };
   }, []);
 
-  const handleDeepLink = (url: string) => {
+  const handleDeepLink = async (url: string) => {
     console.log("[DeepLink] ========================================");
     console.log("[DeepLink] Received URL:", url);
-    console.log("[DeepLink] URL length:", url.length);
     
-    // Parse the URL to extract parameters
     try {
       const urlObj = new URL(url);
-      console.log("[DeepLink] Protocol:", urlObj.protocol);
-      console.log("[DeepLink] Host:", urlObj.host);
-      console.log("[DeepLink] Pathname:", urlObj.pathname);
-      console.log("[DeepLink] Search params:", urlObj.search);
-      console.log("[DeepLink] Hash:", urlObj.hash);
       
-      // Extract all params from both search and hash
-      const params = new URLSearchParams(urlObj.search + urlObj.hash.replace('#', '&'));
-      console.log("[DeepLink] All params:", Array.from(params.entries()));
+      // Extract tokens from both query string and hash fragment
+      // Supabase sends tokens in the hash fragment: myapp://#access_token=...&refresh_token=...
+      const hashParams = urlObj.hash ? new URLSearchParams(urlObj.hash.replace('#', '')) : new URLSearchParams();
+      const searchParams = new URLSearchParams(urlObj.search);
       
-      const hasAccessToken = params.has('access_token');
-      const hasRefreshToken = params.has('refresh_token');
-      const type = params.get('type');
+      // Merge params (hash takes precedence as that's where Supabase puts tokens)
+      const access_token = hashParams.get('access_token') || searchParams.get('access_token');
+      const refresh_token = hashParams.get('refresh_token') || searchParams.get('refresh_token');
+      const type = hashParams.get('type') || searchParams.get('type');
       
-      console.log("[DeepLink] Has access_token:", hasAccessToken);
-      console.log("[DeepLink] Has refresh_token:", hasRefreshToken);
-      console.log("[DeepLink] Type parameter:", type);
+      console.log("[DeepLink] Type:", type, "Path:", urlObj.pathname);
+      console.log("[DeepLink] Has access_token:", !!access_token);
+      console.log("[DeepLink] Has refresh_token:", !!refresh_token);
       
-      // Check if this is a password reset link FIRST (before OAuth check)
-      // Password reset URLs contain type=recovery
-      if (type === "recovery" || url.includes("reset-password-confirm")) {
-        console.log("[DeepLink] ✅ Password reset link detected (type=recovery or reset-password-confirm)");
-        console.log("[DeepLink] Has tokens in URL:", hasAccessToken, hasRefreshToken);
+      // Password reset link - manually set session from tokens
+      if (type === "recovery" || urlObj.pathname.includes("reset-password-confirm")) {
+        console.log("[DeepLink] ✅ Password reset link detected");
         
-        // Prevent double navigation to reset screen
-        if (hasNavigatedToReset.current) {
-          console.log("[DeepLink] Already navigated to reset screen, skipping duplicate navigation");
-          return;
+        if (access_token && refresh_token) {
+          console.log("[DeepLink] Setting session from recovery tokens...");
+          
+          // CRITICAL: Manually set the session - this is required in React Native
+          // because detectSessionInUrl doesn't work
+          const { data, error } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+          
+          if (error) {
+            console.error("[DeepLink] ❌ Failed to set session:", error.message);
+          } else {
+            console.log("[DeepLink] ✅ Session set successfully, user:", data.user?.email);
+          }
+        } else {
+          console.log("[DeepLink] ⚠️ No tokens in URL - session may already be set or link is invalid");
         }
-        hasNavigatedToReset.current = true;
         
-        console.log("[DeepLink] Navigating to /reset-password-confirm");
-        
-        // Longer delay to ensure Supabase has fully processed the session from URL
-        // When coming from email -> Safari -> app, Supabase needs time to parse tokens
-        setTimeout(() => {
-          console.log("[DeepLink] Delay complete, navigating now...");
-          router.push("/reset-password-confirm");
-        }, 500);
+        // Expo Router will handle navigation to /reset-password-confirm
+        console.log("[DeepLink] Expo Router will navigate to reset screen");
         return;
       }
       
-      // Check if this is an OAuth callback (access_token or code in URL but NOT recovery)
-      if ((hasAccessToken || params.has('code')) && type !== "recovery") {
-        console.log("[DeepLink] OAuth callback detected - Supabase will handle session automatically");
-        // Supabase's detectSessionInUrl: true will automatically handle this
+      // OAuth callback - also need to manually set session
+      if ((access_token && refresh_token) && type !== "recovery") {
+        console.log("[DeepLink] OAuth callback - setting session manually");
+        const { error } = await supabase.auth.setSession({
+          access_token,
+          refresh_token,
+        });
+        if (error) {
+          console.error("[DeepLink] ❌ Failed to set OAuth session:", error.message);
+        } else {
+          console.log("[DeepLink] ✅ OAuth session set successfully");
+        }
         return;
       }
       
-      console.log("[DeepLink] ⚠️ URL did not match any handlers");
+      console.log("[DeepLink] ⚠️ URL did not match any handlers or had no tokens");
     } catch (error) {
       console.error("[DeepLink] Error parsing URL:", error);
     }
     console.log("[DeepLink] ========================================");
   };
 
-  return null; // This component renders nothing
+  return null;
 }
 
 // Custom light theme for Scan & Match - using design tokens
