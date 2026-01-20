@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef } from "react";
 import { useFonts } from "expo-font";
 import * as Linking from "expo-linking";
+import { AppState, type AppStateStatus } from "react-native";
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -15,7 +16,7 @@ import {
   BodoniModa_700Bold,
 } from "@expo-google-fonts/bodoni-moda";
 import { useColorScheme } from "@/lib/useColorScheme";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, focusManager } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
@@ -31,7 +32,20 @@ export const unstable_settings = {
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient();
+// Configure QueryClient with React Native optimizations
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Prevent immediate refetch on mount if data is fresh (within staleTime)
+      // Individual queries can override this
+      refetchOnMount: true,
+      // Retry failed queries once before showing error
+      retry: 1,
+      // Keep queries in cache for 5 minutes after last usage
+      gcTime: 5 * 60 * 1000,
+    },
+  },
+});
 
 /**
  * Initializes background uploads only after auth is ready.
@@ -51,6 +65,54 @@ function BackgroundUploadInitializer() {
       initialized.current = true;
       console.log("[BackgroundUpload] Auth ready, initializing upload queue...");
       void initializeBackgroundUploads();
+    }
+  }, [isLoading, user]);
+
+  return null; // This component renders nothing
+}
+
+/**
+ * Configures React Query's focusManager to work with React Native's AppState.
+ * Only enables after auth is ready to prevent query refetches before session restoration.
+ * 
+ * This makes React Query automatically refetch stale queries when:
+ * - App returns from background to foreground
+ * - User switches back to the app
+ * 
+ * Critical for seeing uploaded images after background sync completes.
+ */
+function FocusManagerInitializer() {
+  const { user, isLoading } = useAuth();
+  const focusManagerSetup = useRef(false);
+
+  useEffect(() => {
+    // Wait for auth to finish loading
+    if (isLoading) return;
+    
+    // Only set up once, and only when user is authenticated
+    // This prevents queries from refetching before auth session is restored
+    if (!focusManagerSetup.current && user) {
+      focusManagerSetup.current = true;
+      console.log("[FocusManager] Setting up AppState integration for React Query...");
+      
+      // Configure focusManager to use React Native's AppState
+      focusManager.setEventListener((handleFocus) => {
+        const handleAppStateChange = (state: AppStateStatus) => {
+          // Notify React Query when app becomes active (foreground)
+          // This triggers refetch of stale queries
+          handleFocus(state === 'active');
+        };
+
+        // Listen to AppState changes
+        const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+        // Return cleanup function
+        return () => {
+          subscription.remove();
+        };
+      });
+      
+      console.log("[FocusManager] AppState integration enabled");
     }
   }, [isLoading, user]);
 
@@ -337,6 +399,7 @@ export default function RootLayout() {
       <AuthProvider>
         <SplashHider fontsLoaded={fontsLoaded} fontError={fontError} />
         <BackgroundUploadInitializer />
+        <FocusManagerInitializer />
         <DeepLinkHandler />
         <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg.primary }}>
           <KeyboardProvider>

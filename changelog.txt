@@ -29,6 +29,7 @@
 - Analysis failures when app goes to background now auto-retry on return
 - **Add wardrobe item background recovery**: Fixed bug where adding a wardrobe item while app goes to background would fail to manual form instead of auto-retrying. Now stays in loading state (up to 2 retries) for seamless recovery when returning from background.
 - **Scan item background flash eliminated**: Fixed brief flash of "Couldn't analyze" error screen when returning from background during scan analysis. Now stays in loading state for seamless retry (up to 3 attempts).
+- **Wardrobe images not refreshing after background upload**: Fixed placeholder images appearing on wardrobe cards after returning from background. React Query now properly integrates with AppState to refetch data when app returns from background, ensuring uploaded images are immediately visible.
 - Paywall no longer interrupts users who used their last credit successfully (was showing paywall after analysis completed)
 - **Scan flow now shows paywall BEFORE capture** when quota exceeded (previously let users scan then blocked them after)
 - Scan paywall now shows correct title "You've used your 5 free scans" (was showing wrong paywall type)
