@@ -11,6 +11,8 @@ import {
   Modal,
   AppState,
   AppStateStatus,
+  Alert,
+  Linking,
 } from "react-native";
 import { Image } from "expo-image";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -867,6 +869,10 @@ export default function AddItemScreen() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [isSaving, setIsSaving] = useState(false); // Loading state for Add to Wardrobe button
+  const [showPrePrompt, setShowPrePrompt] = useState(false);
+  const isRefreshingPermission = useRef(false);
+  const refreshAbortController = useRef<AbortController | null>(null);
+  const openedSettingsRef = useRef(false);
   // Idempotency key for current attempt - reused if AI fails and user retries
   const [currentIdempotencyKey, setCurrentIdempotencyKey] = useState<string | null>(null);
   
@@ -906,6 +912,13 @@ export default function AddItemScreen() {
     }
   }, [isPro, hasWardrobeAddsRemaining, isLoadingQuota, screenState]);
 
+  // Determine if we should show pre-prompt on mount
+  useEffect(() => {
+    if (permission && permission.status === 'undetermined') {
+      setShowPrePrompt(true);
+    }
+  }, [permission?.status]);
+
   // Rotate tips every 4 seconds (same as Scan)
   useEffect(() => {
     const interval = setInterval(() => {
@@ -913,6 +926,77 @@ export default function AddItemScreen() {
     }, 4000);
     return () => clearInterval(interval);
   }, []);
+
+  // Determine current screen state for UI-driven logic
+  const showPostDenied = permission && !permission.granted && permission.status !== 'undetermined' && !showPrePrompt;
+  const showRestricted = permission?.status === 'restricted';
+  const isCameraGateScreen = showPrePrompt || showPostDenied || showRestricted;
+
+  // Listen for app returning from background after user opens Settings
+  // Only refresh if user explicitly tapped "Open Settings"
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextAppState) => {
+      if (nextAppState === 'active' && openedSettingsRef.current && !isRefreshingPermission.current) {
+        // User returned after opening Settings - re-check permission
+        const shouldRefresh = isCameraGateScreen && permission && !permission.granted;
+        
+        if (shouldRefresh) {
+          isRefreshingPermission.current = true;
+          refreshAbortController.current = new AbortController();
+          console.log('[AddItem] User returned from Settings, re-checking camera permission...');
+          
+          // Retry with backoff in case permission status is stale
+          const maxRetries = 3;
+          const delays = [150, 300, 500];
+          
+          for (let i = 0; i < maxRetries; i++) {
+            // Check if aborted
+            if (refreshAbortController.current?.signal.aborted) {
+              console.log('[AddItem] Permission refresh aborted');
+              break;
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, delays[i]));
+            
+            // Check abort again after delay
+            if (refreshAbortController.current?.signal.aborted) {
+              console.log('[AddItem] Permission refresh aborted');
+              break;
+            }
+            
+            const freshPermission = await requestPermission();
+            console.log(`[AddItem] Permission check ${i + 1}/${maxRetries}:`, freshPermission.status);
+            
+            if (freshPermission.granted) {
+              console.log('[AddItem] Permission granted! Showing camera.');
+              setShowPrePrompt(false);
+              break;
+            }
+            
+            // If it's still denied after all retries, we're done
+            if (i === maxRetries - 1) {
+              console.log('[AddItem] Permission still denied after retries.');
+            }
+          }
+          
+          isRefreshingPermission.current = false;
+          refreshAbortController.current = null;
+        }
+        
+        // Reset flag after handling return from Settings
+        openedSettingsRef.current = false;
+      }
+    });
+    
+    return () => {
+      subscription.remove();
+      // Cleanup: abort any in-flight refresh
+      if (refreshAbortController.current) {
+        refreshAbortController.current.abort();
+        refreshAbortController.current = null;
+      }
+    };
+  }, [permission?.granted, isCameraGateScreen, requestPermission]);
 
   // Cleanup: mark inactive + abort any in-flight analysis on unmount
   useEffect(() => {
@@ -995,6 +1079,17 @@ export default function AddItemScreen() {
     // Don't null the ref here - let finally clean it up safely
     analysisAbortRef.current?.abort();
     router.back();
+  };
+
+  // Handle camera permission request
+  const handleRequestPermission = async () => {
+    const result = await requestPermission();
+    
+    // Hide pre-prompt regardless of outcome
+    setShowPrePrompt(false);
+    
+    // Don't auto-navigate away - let the UI state machine handle showing post-denial screen
+    // User can choose to go back via "Not now" button
   };
 
   const handlePaywallClose = () => {
@@ -1351,7 +1446,35 @@ export default function AddItemScreen() {
     );
   }
 
-  if (!permission.granted) {
+  // Permission state machine - single source of truth
+  if (!permission) {
+    // Loading permission status
+    return (
+      <View 
+        style={{ 
+          flex: 1, 
+          backgroundColor: colors.bg.primary, 
+          alignItems: "center", 
+          justifyContent: "center",
+          paddingHorizontal: spacing.xl 
+        }}
+      >
+        <Text
+          style={{ 
+            ...typography.ui.body,
+            color: colors.text.secondary,
+          }}
+        >
+          Loading camera...
+        </Text>
+      </View>
+    );
+  }
+
+  if (permission.granted) {
+    // Permission granted - show camera (handled below)
+  } else if (permission.status === 'undetermined' || showPrePrompt) {
+    // Show pre-prompt before system dialog
     return (
       <View 
         style={{ 
@@ -1396,14 +1519,78 @@ export default function AddItemScreen() {
           Scan & Match needs camera access to{"\n"}capture your wardrobe items
         </Text>
         <ButtonPrimary
-          label="Allow Camera"
-          onPress={requestPermission}
-          style={{ marginBottom: spacing.md }}
+          label="Continue"
+          onPress={handleRequestPermission}
         />
-        <ButtonTertiary
-          label="Maybe Later"
-          onPress={handleClose}
-        />
+      </View>
+    );
+  } else {
+    // Permission denied or restricted - show post-denial screen
+    const isRestricted = permission.status === 'restricted';
+    
+    const handleOpenSettings = () => {
+      openedSettingsRef.current = true;
+      Linking.openSettings();
+    };
+    
+    return (
+      <View 
+        style={{ 
+          flex: 1, 
+          backgroundColor: colors.bg.primary, 
+          alignItems: "center", 
+          justifyContent: "center",
+          paddingHorizontal: spacing.xl 
+        }}
+      >
+        <View 
+          style={{
+            width: 96,
+            height: 96,
+            borderRadius: 48,
+            backgroundColor: colors.accent.terracottaLight,
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: spacing.lg,
+          }}
+        >
+          <Camera size={40} color={colors.accent.terracotta} strokeWidth={1.5} />
+        </View>
+        <Text
+          style={{ 
+            ...typography.display.screenTitle,
+            color: colors.text.primary,
+            textAlign: "center",
+            marginBottom: spacing.sm,
+          }}
+        >
+          Scan & Match can't access your camera
+        </Text>
+        <Text
+          style={{ 
+            ...typography.ui.body,
+            color: colors.text.secondary,
+            textAlign: "center",
+            marginBottom: spacing.xl,
+          }}
+        >
+          {isRestricted 
+            ? "Camera access is restricted on this device. You may not be able to change this in Settings."
+            : "To add wardrobe items, allow Camera access in Settings."}
+        </Text>
+        {!isRestricted && (
+          <ButtonPrimary
+            label="Open Settings"
+            onPress={handleOpenSettings}
+            style={{ marginBottom: spacing.md }}
+          />
+        )}
+        <View style={{ marginTop: isRestricted ? 0 : spacing.md }}>
+          <ButtonTertiary
+            label="Not now"
+            onPress={handleClose}
+          />
+        </View>
       </View>
     );
   }

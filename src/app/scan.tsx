@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { View, Text, Pressable, Modal, ScrollView, Image } from "react-native";
+import { View, Text, Pressable, Modal, ScrollView, Image, Alert, Linking, AppState } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -313,6 +313,10 @@ export default function ScanScreen() {
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [showPaywall, setShowPaywall] = useState(false);
   const [isFocused, setIsFocused] = useState(true);
+  const [showPrePrompt, setShowPrePrompt] = useState(false);
+  const isRefreshingPermission = useRef(false);
+  const refreshAbortController = useRef<AbortController | null>(null);
+  const openedSettingsRef = useRef(false);
 
   const clearScan = useSnapToMatchStore((s) => s.clearScan);
 
@@ -341,6 +345,13 @@ export default function ScanScreen() {
     }
   }, [isPro, hasScansRemaining, isLoadingQuota]);
 
+  // Determine if we should show pre-prompt on mount
+  useEffect(() => {
+    if (permission && permission.status === 'undetermined') {
+      setShowPrePrompt(true);
+    }
+  }, [permission?.status]);
+
   // Rotate tips every 4 seconds
   useEffect(() => {
     const interval = setInterval(() => {
@@ -348,6 +359,77 @@ export default function ScanScreen() {
     }, 4000);
     return () => clearInterval(interval);
   }, []);
+
+  // Determine current screen state for UI-driven logic
+  const showPostDenied = permission && !permission.granted && permission.status !== 'undetermined' && !showPrePrompt;
+  const showRestricted = permission?.status === 'restricted';
+  const isCameraGateScreen = showPrePrompt || showPostDenied || showRestricted;
+
+  // Listen for app returning from background after user opens Settings
+  // Only refresh if user explicitly tapped "Open Settings"
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextAppState) => {
+      if (nextAppState === 'active' && openedSettingsRef.current && !isRefreshingPermission.current) {
+        // User returned after opening Settings - re-check permission
+        const shouldRefresh = isCameraGateScreen && permission && !permission.granted;
+        
+        if (shouldRefresh) {
+          isRefreshingPermission.current = true;
+          refreshAbortController.current = new AbortController();
+          console.log('[Scan] User returned from Settings, re-checking camera permission...');
+          
+          // Retry with backoff in case permission status is stale
+          const maxRetries = 3;
+          const delays = [150, 300, 500];
+          
+          for (let i = 0; i < maxRetries; i++) {
+            // Check if aborted
+            if (refreshAbortController.current?.signal.aborted) {
+              console.log('[Scan] Permission refresh aborted');
+              break;
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, delays[i]));
+            
+            // Check abort again after delay
+            if (refreshAbortController.current?.signal.aborted) {
+              console.log('[Scan] Permission refresh aborted');
+              break;
+            }
+            
+            const freshPermission = await requestPermission();
+            console.log(`[Scan] Permission check ${i + 1}/${maxRetries}:`, freshPermission.status);
+            
+            if (freshPermission.granted) {
+              console.log('[Scan] Permission granted! Showing camera.');
+              setShowPrePrompt(false);
+              break;
+            }
+            
+            // If it's still denied after all retries, we're done
+            if (i === maxRetries - 1) {
+              console.log('[Scan] Permission still denied after retries.');
+            }
+          }
+          
+          isRefreshingPermission.current = false;
+          refreshAbortController.current = null;
+        }
+        
+        // Reset flag after handling return from Settings
+        openedSettingsRef.current = false;
+      }
+    });
+    
+    return () => {
+      subscription.remove();
+      // Cleanup: abort any in-flight refresh
+      if (refreshAbortController.current) {
+        refreshAbortController.current.abort();
+        refreshAbortController.current = null;
+      }
+    };
+  }, [permission?.granted, isCameraGateScreen, requestPermission]);
 
   // Reset processing state when screen regains focus
   // This fixes the issue where the processing overlay stays visible
@@ -489,8 +571,20 @@ export default function ScanScreen() {
     refetchProStatus(); // Refresh Pro status after purchase
   };
 
-  // Permission handling
+  // Handle camera permission request
+  const handleRequestPermission = async () => {
+    const result = await requestPermission();
+    
+    // Hide pre-prompt regardless of outcome
+    setShowPrePrompt(false);
+    
+    // Don't auto-navigate away - let the UI state machine handle showing post-denial screen
+    // User can choose to go back via "Not now" button
+  };
+
+  // Permission state machine - single source of truth
   if (!permission) {
+    // Loading permission status
     return (
       <View style={{ flex: 1, backgroundColor: "#000000", alignItems: "center", justifyContent: "center" }}>
         <Text
@@ -505,7 +599,10 @@ export default function ScanScreen() {
     );
   }
 
-  if (!permission.granted) {
+  if (permission.granted) {
+    // Permission granted - show camera (handled below)
+  } else if (permission.status === 'undetermined' || showPrePrompt) {
+    // Show pre-prompt before system dialog
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg.primary, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xl }}>
         <View style={{ 
@@ -540,13 +637,65 @@ export default function ScanScreen() {
           Scan & Match needs camera access to{"\n"}scan items while you shop
         </Text>
         <ButtonPrimary
-          label="Allow Camera"
-          onPress={requestPermission}
-          style={{ marginBottom: spacing.md }}
+          label="Continue"
+          onPress={handleRequestPermission}
         />
-        <View style={{ marginTop: spacing.md }}>
+      </View>
+    );
+  } else {
+    // Permission denied or restricted - show post-denial screen
+    const isRestricted = permission.status === 'restricted';
+    
+    const handleOpenSettings = () => {
+      openedSettingsRef.current = true;
+      Linking.openSettings();
+    };
+    
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg.primary, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xl }}>
+        <View style={{ 
+          width: 96, 
+          height: 96, 
+          borderRadius: 48, 
+          backgroundColor: colors.accent.terracottaLight,
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: spacing.lg,
+        }}>
+          <Camera size={40} color={colors.accent.terracotta} strokeWidth={1.5} />
+        </View>
+        <Text
+          style={{
+            ...typography.display.screenTitle,
+            color: colors.text.primary,
+            textAlign: "center",
+            marginBottom: spacing.xs,
+          }}
+        >
+          Scan & Match can't access your camera
+        </Text>
+        <Text
+          style={{
+            ...typography.ui.body,
+            color: colors.text.secondary,
+            textAlign: "center",
+            marginBottom: spacing.xl,
+          }}
+        >
+          {isRestricted 
+            ? "Camera access is restricted on this device. You may not be able to change this in Settings."
+            : "To scan items, allow Camera access in Settings."}
+        </Text>
+        {!isRestricted && (
+          <ButtonPrimary
+            label="Open Settings"
+            onPress={handleOpenSettings}
+            style={{ marginBottom: spacing.md }}
+          />
+        )}
+        <View style={{ marginTop: isRestricted ? 0 : spacing.md }}>
           <ButtonTertiary
-            label="Maybe Later"
+            label="Not now"
             onPress={handleClose}
           />
         </View>

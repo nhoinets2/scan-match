@@ -1,5 +1,15 @@
 # Changelog
 
+## January 21, 2026
+
+### Improved
+- **Camera permission UX**: Added pre-prompt screen before iOS system permission dialog to improve grant rates and comply with App Store Review Guidelines. Users now see a custom explanation screen before the native dialog, with clear messaging about why camera access is needed.
+- **Camera permission handling**: Implemented robust permission state machine with explicit refresh logic when returning from Settings. Permission status is now the single source of truth, with UI-driven screen states and retry backoff (150ms → 300ms → 500ms) for reliable detection of permission changes.
+- **Restricted camera access handling**: Added proper support for iOS "restricted" status (parental controls/MDM) with appropriate messaging that doesn't mislead users to open Settings when it won't help.
+
+### Fixed
+- **Post-denial Settings navigation**: Fixed issue where post-denial screen appeared when user returned from Settings after granting camera permission. Now only refreshes permission state when user explicitly taps "Open Settings", preventing unnecessary retries during random app backgrounding (Control Center, multitasking).
+
 ## January 20, 2026
 
 ### Fixed
