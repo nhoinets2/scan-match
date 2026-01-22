@@ -437,18 +437,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("[Auth] React Query cache clear error (non-fatal):", cacheError);
     }
     
-    // Logout from RevenueCat (non-fatal if fails)
-    try {
-      console.log("[Auth] Logging out from RevenueCat...");
-      const rcResult = await logoutUser();
-      if (!rcResult.ok) {
-        console.log("[Auth] RevenueCat logout failed:", rcResult.reason, "- continuing");
-      } else {
-        console.log("[Auth] ✅ RevenueCat logout successful");
-      }
-    } catch (rcError) {
-      console.error("[Auth] RevenueCat logout error (non-fatal):", rcError);
-    }
+    // Skip RevenueCat logout - let setUserId handle user switching on next sign-in
+    // RevenueCat is designed to switch users without logging out (avoids anonymous IDs)
+    console.log("[Auth] Skipping RevenueCat logout (will switch user on next sign-in)");
     
     // Always sign out from Supabase - this is the critical part
     console.log("[Auth] Signing out from Supabase...");

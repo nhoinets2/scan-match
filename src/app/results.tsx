@@ -135,6 +135,7 @@ import {
   useTailorCardSeen,
   useMarkTailorCardSeen,
 } from "@/lib/store-preferences";
+import { useProStatus } from "@/lib/useProStatus";
 import {
   trackFirstWardrobeMatchVisible,
   trackEmptyMatchesSectionExpanded,
@@ -547,6 +548,7 @@ function ResultsFailed({
   onRetry,
   insets,
   fromScan,
+  refetchProStatus,
 }: {
   imageUri: string;
   error: AnalyzeError;
@@ -554,10 +556,12 @@ function ResultsFailed({
   onRetry: () => void;
   insets: { top: number; bottom: number };
   fromScan?: boolean;
+  refetchProStatus: () => Promise<unknown>;
 }) {
   const isMaxRetries = attempt >= MAX_RETRIES;
   const isQuotaExceeded = error.kind === "quota_exceeded";
   const [showPaywall, setShowPaywall] = useState(false);
+  const [isActivatingPro, setIsActivatingPro] = useState(false);
 
   // Get error-specific hint
   const getErrorHint = () => {
@@ -741,14 +745,78 @@ function ResultsFailed({
       <Paywall
         visible={showPaywall}
         onClose={() => setShowPaywall(false)}
-        onPurchaseComplete={() => {
+        onPurchaseComplete={async () => {
           setShowPaywall(false);
-          // After upgrade, user can retry
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          onRetry();
+          setIsActivatingPro(true);
+          
+          try {
+            // Wait for Pro status to refresh from RevenueCat/database
+            await refetchProStatus();
+            // Small delay to ensure backend sees updated status
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            // Retry with the same photo - now as Pro user
+            onRetry();
+          } catch (error) {
+            console.log("[ResultsFailed] Error refreshing Pro status:", error);
+            // Still try to retry even if refresh had issues
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            onRetry();
+          } finally {
+            setIsActivatingPro(false);
+          }
         }}
         reason="in_store_limit"
       />
+
+      {/* Activating Pro overlay */}
+      {isActivatingPro && (
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: colors.overlay.dark,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            style={{
+              backgroundColor: colors.bg.elevated,
+              borderRadius: borderRadius.card,
+              padding: spacing.xl,
+              alignItems: "center",
+              ...shadows.card,
+            }}
+          >
+            <Sparkles size={32} color={colors.accent.terracotta} style={{ marginBottom: spacing.md }} />
+            <Text
+              style={{
+                ...typography.ui.sectionTitle,
+                color: colors.text.primary,
+                textAlign: "center",
+                marginBottom: spacing.xs,
+              }}
+            >
+              Activating Pro
+            </Text>
+            <Text
+              style={{
+                ...typography.ui.caption,
+                color: colors.text.secondary,
+                textAlign: "center",
+              }}
+            >
+              Just a moment...
+            </Text>
+          </Animated.View>
+        </View>
+      )}
     </View>
   );
 }
@@ -1396,6 +1464,7 @@ export default function ResultsScreen() {
   const queryClient = useQueryClient();
   const addRecentCheckMutation = useAddRecentCheck();
   const updateRecentCheckOutcomeMutation = useUpdateRecentCheckOutcome();
+  const { refetch: refetchProStatus } = useProStatus();
 
   // Refresh wardrobe data when screen regains focus
   // This ensures wardrobe updates from add-item are reflected immediately
@@ -1690,6 +1759,7 @@ export default function ResultsScreen() {
           onRetry={handleRetry}
           insets={insets}
           fromScan={params.fromScan === "true"}
+          refetchProStatus={refetchProStatus}
         />
       );
     }

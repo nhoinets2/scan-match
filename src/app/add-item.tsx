@@ -46,6 +46,7 @@ import {
   HelpCircle,
   Pencil,
   WifiOff,
+  Sparkles,
 } from "lucide-react-native";
 
 import { cn } from "@/lib/cn";
@@ -868,6 +869,7 @@ export default function AddItemScreen() {
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [isActivatingPro, setIsActivatingPro] = useState(false);
   const [isSaving, setIsSaving] = useState(false); // Loading state for Add to Wardrobe button
   const [showPrePrompt, setShowPrePrompt] = useState(false);
   const isRefreshingPermission = useRef(false);
@@ -1098,11 +1100,24 @@ export default function AddItemScreen() {
     router.back();
   };
 
-  const handlePaywallSuccess = () => {
+  const handlePaywallSuccess = async () => {
     setShowPaywall(false);
-    // Refetch pro status to update state
-    refetchProStatus();
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setIsActivatingPro(true);
+    
+    try {
+      // Wait for Pro status to refresh from RevenueCat/database
+      await refetchProStatus();
+      // Small delay to ensure state is updated
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      console.log("[AddItem] Error refreshing Pro status:", error);
+      // Still proceed even if refresh had issues
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } finally {
+      setIsActivatingPro(false);
+    }
   };
 
   const processImage = async (uri: string, retryKey?: string) => {
@@ -1767,6 +1782,54 @@ export default function AddItemScreen() {
           onPurchaseComplete={handlePaywallSuccess}
           reason="wardrobe_limit"
         />
+
+        {/* Activating Pro overlay */}
+        {isActivatingPro && (
+          <View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: colors.overlay.dark,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              style={{
+                backgroundColor: colors.bg.elevated,
+                borderRadius: borderRadius.card,
+                padding: spacing.xl,
+                alignItems: "center",
+                ...shadows.card,
+              }}
+            >
+              <Sparkles size={32} color={colors.accent.terracotta} style={{ marginBottom: spacing.md }} />
+              <Text
+                style={{
+                  ...typography.ui.sectionTitle,
+                  color: colors.text.primary,
+                  textAlign: "center",
+                  marginBottom: spacing.xs,
+                }}
+              >
+                Activating Pro
+              </Text>
+              <Text
+                style={{
+                  ...typography.ui.caption,
+                  color: colors.text.secondary,
+                  textAlign: "center",
+                }}
+              >
+                Just a moment...
+              </Text>
+            </Animated.View>
+          </View>
+        )}
 
         {/* Help bottom sheet */}
         <HelpBottomSheet

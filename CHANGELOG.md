@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Moved REFUND_POLICY.md** to `docs/`
 
 ### Fixed
+- **Post-upgrade scan retry stuck on limit screen** - After purchasing Pro subscription from "Scan limit reached" screen, users were stuck on the same screen instead of retrying the scan. Now properly refreshes Pro status after purchase and automatically retries the scan with the same photo. Shows "Activating Pro..." overlay during status refresh.
+- **Post-upgrade wardrobe add not reflecting Pro status** - After purchasing Pro subscription from wardrobe limit paywall, users could still see the paywall again if they tried to capture immediately (Pro status wasn't refreshed yet). Now properly awaits Pro status refresh with "Activating Pro..." overlay before allowing capture.
 - **Subscription status leaking between users** - When user logs out and another user logs in, the new user no longer sees the previous user's Pro subscription status
 - **RevenueCat user ID not updated after logout** - RevenueCat now properly tracks the correct user when logging in after logout
 - **Misleading quota message for free users** - Fixed bug where free users hitting their quota saw "Monthly limit reached - resets next month" instead of "Scan limit reached - Upgrade to Pro". The monthly reset message was misleading because free users have a lifetime limit that never resets.
