@@ -16,6 +16,7 @@ import {
   ActivityIndicator,
   Linking,
   ScrollView,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -34,6 +35,7 @@ import {
   Zap,
   Star,
   Infinity,
+  RefreshCw,
 } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 
@@ -250,7 +252,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
   const [isRestoring, setIsRestoring] = useState(false);
 
   // Fetch offerings from RevenueCat
-  const { data: offerings, isLoading: isLoadingOfferings } = useQuery({
+  const { data: offerings, isLoading: isLoadingOfferings, refetch: refetchOfferings } = useQuery({
     queryKey: ["revenuecat-offerings"],
     queryFn: async () => {
       const result = await getOfferings();
@@ -261,6 +263,8 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
     },
     enabled: visible && isRevenueCatEnabled(),
     staleTime: 5 * 60 * 1000,
+    retry: 2, // Auto-retry twice on failure
+    retryDelay: 1000, // 1 second between retries
   });
 
   // Get packages
@@ -271,17 +275,52 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
     (pkg) => pkg.identifier === "$rc_annual"
   );
 
-  // Format prices
-  const monthlyPrice = monthlyPackage?.product.priceString || "$5.99";
-  const annualPrice = annualPackage?.product.priceString || "$39.99";
-  const annualMonthlyEquivalent = "$3.33";
-  const annualSavings = "Save 44%";
+  // Determine purchase availability
+  const packageToPurchase = selectedPlan === "annual" ? annualPackage : monthlyPackage;
+  const canPurchase = !!packageToPurchase && !isPurchasing && !isLoadingOfferings;
+  
+  // Check if offerings are ready but packages are missing
+  const isOfferingsReady = !!offerings?.current;
+  const showUnavailableBanner = isOfferingsReady && (!monthlyPackage || !annualPackage);
+
+  // Format prices - only show real prices when packages exist
+  const monthlyPrice = isLoadingOfferings ? "Loading..." : 
+                       monthlyPackage ? monthlyPackage.product.priceString : "Unavailable";
+  const annualPrice = isLoadingOfferings ? "Loading..." : 
+                      annualPackage ? annualPackage.product.priceString : "Unavailable";
+  
+  // Calculate annual savings only if both packages exist
+  const annualMonthlyEquivalent = annualPackage && monthlyPackage
+    ? `$${(annualPackage.product.price / 12).toFixed(2)}`
+    : "--";
+  const annualSavings = annualPackage && monthlyPackage
+    ? `Save ${Math.round((1 - annualPackage.product.price / (monthlyPackage.product.price * 12)) * 100)}%`
+    : "Save 44%";
 
   const handlePurchase = async () => {
-    const packageToPurchase = selectedPlan === "annual" ? annualPackage : monthlyPackage;
-
     if (!packageToPurchase) {
-      console.log("[Paywall] No package available for purchase");
+      console.log("[Paywall] No package available for purchase", {
+        selectedPlan,
+        monthlyAvailable: !!monthlyPackage,
+        annualAvailable: !!annualPackage,
+        currentOffering: offerings?.current?.identifier,
+        availablePackages: offerings?.current?.availablePackages?.map(p => p.identifier) || [],
+      });
+
+      Alert.alert(
+        "Subscriptions unavailable",
+        "We couldn't load subscription products. Please try again.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { 
+            text: "Retry", 
+            onPress: () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              refetchOfferings();
+            }
+          }
+        ]
+      );
       return;
     }
 
@@ -292,15 +331,61 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
       const result = await purchasePackage(packageToPurchase);
 
       if (result.ok) {
-        const hasProResult = await hasEntitlement("pro");
+        // Check entitlement immediately
+        let hasProResult = await hasEntitlement("pro");
+        
         if (hasProResult.ok && hasProResult.data) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           onPurchaseComplete?.();
+          return;
         }
+
+        // If not immediately active, poll for entitlement (up to 10 seconds)
+        console.log("[Paywall] Entitlement not immediately active, polling...");
+        for (let i = 0; i < 5; i++) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          hasProResult = await hasEntitlement("pro");
+          
+          if (hasProResult.ok && hasProResult.data) {
+            console.log("[Paywall] Entitlement activated after polling");
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            onPurchaseComplete?.();
+            return;
+          }
+        }
+
+        // Still not synced after 10 seconds
+        console.log("[Paywall] Entitlement not synced after 10 seconds");
+        Alert.alert(
+          "Almost done", 
+          "Purchase completed! Your subscription is being activated. Please wait a moment and try again.",
+          [{ text: "OK" }]
+        );
+      } else {
+        // Purchase failed
+        console.log("[Paywall] Purchase failed:", result.reason, result.error);
+        Alert.alert(
+          "Purchase failed",
+          "Unable to complete your purchase. Please try again.",
+          [{ text: "OK" }]
+        );
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Check if user cancelled
+      if (error?.userCancelled || error?.code === "1") {
+        console.log("[Paywall] User cancelled purchase");
+        return; // Don't show error for cancellation
+      }
+
       console.log("[Paywall] Purchase error:", error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      
+      Alert.alert(
+        "Purchase failed",
+        error?.message || "An error occurred. Please try again.",
+        [{ text: "OK" }]
+      );
     } finally {
       setIsPurchasing(false);
     }
@@ -440,6 +525,66 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
             </Text>
           </Animated.View>
 
+          {/* Unavailable banner */}
+          {showUnavailableBanner && (
+            <Animated.View
+              entering={FadeInDown.delay(150).springify()}
+              style={{
+                backgroundColor: "rgba(255, 200, 100, 0.95)",
+                borderRadius: borderRadius.card,
+                padding: spacing.md,
+                marginBottom: spacing.md,
+                flexDirection: "row",
+                alignItems: "center",
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    ...typography.ui.bodyMedium,
+                    color: colors.text.primary,
+                    marginBottom: spacing.xs,
+                  }}
+                >
+                  Subscriptions temporarily unavailable
+                </Text>
+                <Text
+                  style={{
+                    ...typography.ui.caption,
+                    color: colors.text.secondary,
+                  }}
+                >
+                  Please try again in a moment.
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  refetchOfferings();
+                }}
+                style={{
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.sm,
+                  backgroundColor: colors.accent.terracotta,
+                  borderRadius: borderRadius.pill,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+              >
+                <RefreshCw size={14} color={colors.text.inverse} strokeWidth={2} />
+                <Text
+                  style={{
+                    ...typography.ui.label,
+                    color: colors.text.inverse,
+                    marginLeft: spacing.xs,
+                  }}
+                >
+                  Retry
+                </Text>
+              </Pressable>
+            </Animated.View>
+          )}
+
           {/* Benefits Card - Glass effect */}
           <Animated.View
             entering={FadeInDown.delay(200).springify()}
@@ -534,21 +679,39 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
                 alignItems: "center",
                 justifyContent: "center",
                 overflow: "hidden",
+                opacity: canPurchase ? 1 : 0.5,
               }}
             >
               <Pressable
                 onPress={handlePurchase}
-                disabled={isPurchasing || isLoadingOfferings}
+                disabled={!canPurchase}
                 style={{
                   width: "100%",
                   height: "100%",
                   alignItems: "center",
                   justifyContent: "center",
-                  opacity: isPurchasing || isLoadingOfferings ? 0.7 : 1,
                 }}
               >
                 {isPurchasing ? (
                   <ActivityIndicator color={button.primaryInverse.textColor} />
+                ) : isLoadingOfferings ? (
+                  <Text
+                    style={{
+                      ...typography.button.primary,
+                      color: button.primaryInverse.textColor,
+                    }}
+                  >
+                    Loading...
+                  </Text>
+                ) : !packageToPurchase ? (
+                  <Text
+                    style={{
+                      ...typography.button.primary,
+                      color: button.primaryInverse.textColor,
+                    }}
+                  >
+                    Unavailable
+                  </Text>
                 ) : (
                   <Text
                     style={{

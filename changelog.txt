@@ -9,6 +9,8 @@
 
 ### Fixed
 - **Post-denial Settings navigation**: Fixed issue where post-denial screen appeared when user returned from Settings after granting camera permission. Now only refreshes permission state when user explicitly taps "Open Settings", preventing unnecessary retries during random app backgrounding (Control Center, multitasking).
+- **Paywall purchase button reliability**: Fixed critical issue where purchase button remained tappable even when RevenueCat packages failed to load, causing silent failures. Button now properly disables when packages unavailable, shows "Unavailable" or "Loading..." states, and displays user-friendly error alerts with retry option. Removes misleading fallback prices that could trigger App Review rejection.
+- **Subscription purchase error handling**: Enhanced purchase flow with proper error handling for user cancellations (no error shown), entitlement polling (waits up to 10 seconds for activation), and detailed error messages. Added unavailable banner with retry button when offerings fail to load.
 
 ## January 20, 2026
 
