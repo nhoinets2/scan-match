@@ -96,6 +96,7 @@ Root documentation:
 | [Tailor Suggestions Roadmap](tailor-suggestions-roadmap.md) | Store preferences feature phases |
 | [Scan Retention](scan-retention.md) | Recent scans persistence |
 | [Winback Retention System](winback-retention-system.md) | User re-engagement strategy |
+| [Paywall App Review Compliance](paywall-app-review-compliance.md) | RevenueCat paywall states and App Store submission guide |
 
 ### UI & UX
 
