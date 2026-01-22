@@ -252,14 +252,25 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
   const [isRestoring, setIsRestoring] = useState(false);
 
   // Fetch offerings from RevenueCat
-  const { data: offerings, isLoading: isLoadingOfferings, refetch: refetchOfferings } = useQuery({
+  const { 
+    data: offerings, 
+    isLoading: isLoadingOfferings, 
+    isError: isOfferingsError,
+    refetch: refetchOfferings 
+  } = useQuery({
     queryKey: ["revenuecat-offerings"],
     queryFn: async () => {
+      console.log("[Paywall] Fetching offerings from RevenueCat...");
       const result = await getOfferings();
+      
       if (result.ok) {
+        console.log("[Paywall] Offerings loaded successfully");
         return result.data;
       }
-      return null;
+      
+      // Throw error so React Query retry mechanism works
+      console.log("[Paywall] Offerings fetch failed:", result.reason);
+      throw new Error(`Failed to load offerings: ${result.reason}`);
     },
     enabled: visible && isRevenueCatEnabled(),
     staleTime: 5 * 60 * 1000,
@@ -279,14 +290,17 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
   const packageToPurchase = selectedPlan === "annual" ? annualPackage : monthlyPackage;
   const canPurchase = !!packageToPurchase && !isPurchasing && !isLoadingOfferings;
   
-  // Check if offerings are ready but packages are missing
+  // Check if offerings are ready but packages are missing, OR if there was an error fetching
   const isOfferingsReady = !!offerings?.current;
-  const showUnavailableBanner = isOfferingsReady && (!monthlyPackage || !annualPackage);
+  const showUnavailableBanner = (isOfferingsReady && (!monthlyPackage || !annualPackage)) || isOfferingsError;
 
   // Format prices - only show real prices when packages exist
+  // Show "Loading..." during initial load, "Unavailable" after error or when packages missing
   const monthlyPrice = isLoadingOfferings ? "Loading..." : 
+                       isOfferingsError ? "Unavailable" :
                        monthlyPackage ? monthlyPackage.product.priceString : "Unavailable";
   const annualPrice = isLoadingOfferings ? "Loading..." : 
+                      isOfferingsError ? "Unavailable" :
                       annualPackage ? annualPackage.product.priceString : "Unavailable";
   
   // Calculate annual savings only if both packages exist
@@ -546,7 +560,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
                     marginBottom: spacing.xs,
                   }}
                 >
-                  Subscriptions temporarily unavailable
+                  {isOfferingsError ? "Can't load subscriptions" : "Subscriptions temporarily unavailable"}
                 </Text>
                 <Text
                   style={{
@@ -554,7 +568,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
                     color: colors.text.secondary,
                   }}
                 >
-                  Please try again in a moment.
+                  {isOfferingsError ? "Check your connection and try again." : "Please try again in a moment."}
                 </Text>
               </View>
               <Pressable
