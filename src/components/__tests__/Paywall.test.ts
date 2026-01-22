@@ -35,7 +35,7 @@ interface PriceInfo {
 
 function getPaywallTitle(reason: PaywallReason): string | null {
   const titleConfig: Record<PaywallReason, string | null> = {
-    in_store_limit: "You've used your 5 free scans",
+    in_store_limit: "You've used your 10 free scans",
     wardrobe_limit: "You've hit your wardrobe limit",
     upgrade: null,
   };
@@ -48,7 +48,7 @@ function getPaywallSubtitle(): string {
 
 function getLegalLinkText(reason: PaywallReason): { terms: string; privacy: string } {
   if (reason === "upgrade") {
-    return { terms: "Terms of Service", privacy: "Privacy Policy" };
+    return { terms: "Terms of Use (EULA)", privacy: "Privacy Policy" };
   }
   return { terms: "Terms", privacy: "Privacy" };
 }
@@ -88,8 +88,8 @@ function getPlanCardConfig(
   if (isAnnual) {
     return {
       title: "Annual",
-      trialInfo: "7-day free trial included",
-      billingInfo: `${prices.annualPrice}/year billed annually`,
+      trialInfo: `7-day free trial, then ${prices.annualPrice} per year (billed annually)`,
+      billingInfo: "",
       displayPrice: prices.annualMonthlyEquivalent,
       showBestValueBadge: true,
     };
@@ -121,7 +121,7 @@ const BENEFITS = [
 describe("Paywall content", () => {
   describe("getPaywallTitle", () => {
     it("returns scan limit title for in_store_limit", () => {
-      expect(getPaywallTitle("in_store_limit")).toBe("You've used your 5 free scans");
+      expect(getPaywallTitle("in_store_limit")).toBe("You've used your 10 free scans");
     });
 
     it("returns wardrobe limit title for wardrobe_limit", () => {
@@ -155,7 +155,7 @@ describe("Paywall content", () => {
 
     it("returns full text for upgrade flow", () => {
       expect(getLegalLinkText("upgrade")).toEqual({
-        terms: "Terms of Service",
+        terms: "Terms of Use (EULA)",
         privacy: "Privacy Policy",
       });
     });
@@ -251,8 +251,8 @@ describe("Plan card configuration", () => {
       const config = getPlanCardConfig(true, mockPrices);
 
       expect(config.title).toBe("Annual");
-      expect(config.trialInfo).toBe("7-day free trial included");
-      expect(config.billingInfo).toBe("$39.99/year billed annually");
+      expect(config.trialInfo).toBe("7-day free trial, then $39.99 per year (billed annually)");
+      expect(config.billingInfo).toBe("");
       expect(config.displayPrice).toBe("$3.33");
       expect(config.showBestValueBadge).toBe(true);
     });
@@ -293,39 +293,36 @@ describe("Benefits list", () => {
   });
 });
 
-describe("Trial terms display", () => {
-  function getTrialTermsText(
+describe("Plan terms display", () => {
+  function getPlanTermsText(
     selectedPlan: SelectedPlan,
-    annualPrice: string
-  ): string | null {
+    annualPrice: string,
+    monthlyPrice: string
+  ): string {
     if (selectedPlan === "annual") {
       return `7 days free, then ${annualPrice}/year. Cancel anytime before trial ends.`;
     }
-    return null;
+    return `${monthlyPrice}/month, cancel anytime.`;
   }
 
   it("shows trial terms for annual plan", () => {
-    const terms = getTrialTermsText("annual", "$39.99");
+    const terms = getPlanTermsText("annual", "$39.99", "$5.99");
     expect(terms).toBe("7 days free, then $39.99/year. Cancel anytime before trial ends.");
   });
 
-  it("returns null for monthly plan", () => {
-    const terms = getTrialTermsText("monthly", "$39.99");
-    expect(terms).toBe(null);
+  it("shows monthly terms for monthly plan", () => {
+    const terms = getPlanTermsText("monthly", "$39.99", "$5.99");
+    expect(terms).toBe("$5.99/month, cancel anytime.");
   });
 });
 
-describe("Restore margin adjustment", () => {
-  function getRestoreMarginTop(selectedPlan: SelectedPlan): "md" | "lg" {
-    return selectedPlan === "annual" ? "md" : "lg";
+describe("Restore margin", () => {
+  function getRestoreMarginTop(): "md" {
+    return "md";
   }
 
-  it("smaller margin when annual (trial terms shown above)", () => {
-    expect(getRestoreMarginTop("annual")).toBe("md");
-  });
-
-  it("larger margin when monthly (no trial terms)", () => {
-    expect(getRestoreMarginTop("monthly")).toBe("lg");
+  it("consistent margin since both plans show terms", () => {
+    expect(getRestoreMarginTop()).toBe("md");
   });
 });
 
@@ -344,14 +341,14 @@ describe("Paywall integration scenarios", () => {
       const ctaLabel = getCtaButtonLabel(state.selectedPlan);
       const disabled = isCtaDisabled(state);
 
-      expect(title).toBe("You've used your 5 free scans");
+      expect(title).toBe("You've used your 10 free scans");
       expect(ctaLabel).toBe("Start free trial");
       expect(disabled).toBe(false);
     });
   });
 
   describe("user selects monthly", () => {
-    it("updates CTA label and hides trial terms", () => {
+    it("updates CTA label and shows monthly terms", () => {
       const state: PaywallState = {
         selectedPlan: "monthly",
         isPurchasing: false,

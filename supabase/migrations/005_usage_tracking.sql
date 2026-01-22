@@ -25,7 +25,7 @@ ADD COLUMN IF NOT EXISTS total_wardrobe_adds_used INTEGER NOT NULL DEFAULT 0;
 
 -- Free tier limits (adjust as needed)
 -- These are defined here so they can be enforced server-side
-CREATE OR REPLACE FUNCTION get_scan_limit() RETURNS INTEGER AS $$ SELECT 5; $$ LANGUAGE sql IMMUTABLE;
+CREATE OR REPLACE FUNCTION get_scan_limit() RETURNS INTEGER AS $$ SELECT 10; $$ LANGUAGE sql IMMUTABLE;
 CREATE OR REPLACE FUNCTION get_wardrobe_add_limit() RETURNS INTEGER AS $$ SELECT 15; $$ LANGUAGE sql IMMUTABLE;
 
 -- ─────────────────────────────────────────────

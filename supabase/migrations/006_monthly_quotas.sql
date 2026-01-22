@@ -2,7 +2,7 @@
 -- Adds monthly limits for ALL users (including Pro) to prevent runaway costs
 -- 
 -- Monthly limits:
--- - Free users: 5 scans/month, 15 wardrobe adds/month
+-- - Free users: 10 scans/month, 15 wardrobe adds/month
 -- - Pro users: 200 scans/month, 500 wardrobe adds/month
 --
 -- This protects against:
@@ -32,7 +32,7 @@ ADD COLUMN IF NOT EXISTS month_started_at TIMESTAMPTZ NOT NULL DEFAULT date_trun
 -- ─────────────────────────────────────────────
 
 -- Free tier monthly limits
-CREATE OR REPLACE FUNCTION get_free_scan_monthly_limit() RETURNS INTEGER AS $$ SELECT 5; $$ LANGUAGE sql IMMUTABLE;
+CREATE OR REPLACE FUNCTION get_free_scan_monthly_limit() RETURNS INTEGER AS $$ SELECT 10; $$ LANGUAGE sql IMMUTABLE;
 CREATE OR REPLACE FUNCTION get_free_wardrobe_add_monthly_limit() RETURNS INTEGER AS $$ SELECT 15; $$ LANGUAGE sql IMMUTABLE;
 
 -- Pro tier monthly limits (safety cap)

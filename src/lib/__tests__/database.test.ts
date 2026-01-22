@@ -23,7 +23,7 @@ const SCAN_RETENTION = {
 } as const;
 
 const USAGE_LIMITS = {
-  FREE_SCANS: 5,
+  FREE_SCANS: 10,
   FREE_WARDROBE_ADDS: 15,
 } as const;
 
@@ -249,7 +249,7 @@ describe('SCAN_RETENTION constants', () => {
 
 describe('USAGE_LIMITS constants', () => {
   it('has correct FREE_SCANS value', () => {
-    expect(USAGE_LIMITS.FREE_SCANS).toBe(5);
+    expect(USAGE_LIMITS.FREE_SCANS).toBe(10);
   });
 
   it('has correct FREE_WARDROBE_ADDS value', () => {
@@ -899,14 +899,14 @@ describe('Usage quota calculations', () => {
 
     it('returns false when at limit', () => {
       const isPro = false;
-      const scansUsed = 5;
+      const scansUsed = 10;
       const hasScansRemaining = isPro || scansUsed < USAGE_LIMITS.FREE_SCANS;
       expect(hasScansRemaining).toBe(false);
     });
 
     it('returns false when over limit', () => {
       const isPro = false;
-      const scansUsed = 10;
+      const scansUsed = 15;
       const hasScansRemaining = isPro || scansUsed < USAGE_LIMITS.FREE_SCANS;
       expect(hasScansRemaining).toBe(false);
     });
@@ -939,11 +939,11 @@ describe('Usage quota calculations', () => {
     it('calculates remaining correctly', () => {
       const scansUsed = 3;
       const remaining = Math.max(0, USAGE_LIMITS.FREE_SCANS - scansUsed);
-      expect(remaining).toBe(2);
+      expect(remaining).toBe(7);
     });
 
     it('returns 0 when at or over limit', () => {
-      const scansUsed = 7;
+      const scansUsed = 12;
       const remaining = Math.max(0, USAGE_LIMITS.FREE_SCANS - scansUsed);
       expect(remaining).toBe(0);
     });
@@ -951,7 +951,7 @@ describe('Usage quota calculations', () => {
     it('returns full limit when nothing used', () => {
       const scansUsed = 0;
       const remaining = Math.max(0, USAGE_LIMITS.FREE_SCANS - scansUsed);
-      expect(remaining).toBe(5);
+      expect(remaining).toBe(10);
     });
   });
 
@@ -1159,7 +1159,7 @@ describe('Integration tests', () => {
   describe('Usage quota enforcement flow', () => {
     it('simulates full consume credit flow', () => {
       // Initial state
-      const initialCounts: UsageCounts = { scansUsed: 4, wardrobeAddsUsed: 10, isPro: false };
+      const initialCounts: UsageCounts = { scansUsed: 9, wardrobeAddsUsed: 10, isPro: false };
       
       // Check if allowed
       const hasScansRemaining = initialCounts.isPro || initialCounts.scansUsed < USAGE_LIMITS.FREE_SCANS;
@@ -1168,8 +1168,8 @@ describe('Integration tests', () => {
       // Simulate consume
       const consumeResult: ConsumeResult = {
         allowed: true,
-        used: 5,
-        limit: 5,
+        used: 10,
+        limit: 10,
         remaining: 0,
         alreadyConsumed: false,
         reason: 'consumed',

@@ -1,5 +1,10 @@
 # Changelog
 
+## January 22, 2026
+
+### Changed
+- **Free scan limit**: Increased free in-store scan limit from 5 to 10 scans to provide more value to free users and improve trial experience before upgrade
+
 ## January 21, 2026
 
 ### Improved
@@ -34,7 +39,7 @@
 
 ### Added
 - **Monthly quota limits** for all users (including Pro) to prevent runaway API costs
-  - Free: 5 scans/month, 15 wardrobe adds/month
+  - Free: 10 scans/month, 15 wardrobe adds/month
   - Pro: 500 scans/month, 1000 wardrobe adds/month
 - Server-side quota enforcement via Supabase Edge Function
 - Idempotency keys to prevent double-charging on retries
@@ -53,7 +58,7 @@
 - **Saved scans loading states**: Added loading spinner to saved scan images (ImageWithFallback and ThumbnailWithFallback components) during URI transitions and network loads. Consistent loading experience across all image types.
 - Paywall no longer interrupts users who used their last credit successfully (was showing paywall after analysis completed)
 - **Scan flow now shows paywall BEFORE capture** when quota exceeded (previously let users scan then blocked them after)
-- Scan paywall now shows correct title "You've used your 5 free scans" (was showing wrong paywall type)
+- Scan paywall now shows correct title "You've used your 10 free scans" (was showing wrong paywall type)
 
 ### Improved
 - **Add wardrobe item performance**: Removed redundant client-side quota check (~100-200ms faster)

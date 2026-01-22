@@ -639,7 +639,7 @@ export const useUpdateRecentCheckOutcome = () => {
  * NOTE: These are also enforced server-side in SQL functions.
  */
 export const USAGE_LIMITS = {
-  FREE_SCANS: 5,
+  FREE_SCANS: 10,
   FREE_WARDROBE_ADDS: 15,
 } as const;
 

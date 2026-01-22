@@ -2,7 +2,7 @@
  * Quota Store - Tracks free usage limits for scanning features
  *
  * Free quotas:
- * - 5 free in-store scans (Scan Item flow)
+ * - 10 free in-store scans (Scan Item flow)
  * - 15 free add-to-wardrobe scans (Add to Wardrobe flow)
  *
  * Once exceeded, user must subscribe to Pro to continue.
@@ -14,7 +14,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Quota limits
 export const QUOTA_LIMITS = {
-  IN_STORE_SCANS: 5,
+  IN_STORE_SCANS: 10,
   WARDROBE_ADDS: 15,
 } as const;
 

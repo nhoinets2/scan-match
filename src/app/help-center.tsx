@@ -233,19 +233,19 @@ const HELP_SECTIONS: HelpSection[] = [
         id: "plans",
         question: "What subscription plans are available?",
         answer:
-          "Scan & Match offers two Pro plans: Monthly ($5.99/month) and Annual ($39.99/year, save 44%). The free plan includes 15 wardrobe adds and 5 in-store scans. Pro members get unlimited access to all features with no restrictions.",
+          "Scan & Match offers two Pro plans: Monthly ($5.99/month) and Annual ($39.99/year, save 44%). The free plan includes 15 wardrobe adds and 10 in-store scans. Pro members get unlimited access to all features with no restrictions.",
       },
       {
         id: "how-credits-work",
         question: "How do scan and wardrobe add credits work?",
         answer:
-          "On the free plan, you have 5 scan credits and 15 wardrobe add credits. Credits are consumed the moment you capture or select a photo – when our AI starts analyzing the image.\n\nImportant: Once analysis begins, the credit is used regardless of what happens next. This includes:\n• Navigating away or closing the app mid-analysis\n• Network issues interrupting the process\n• Choosing not to save the result\n\nThis is because the AI analysis runs immediately when you take the photo, and that's what costs us to provide. Think of it like taking a professional photo – even if you don't keep the photo, the photographer still took the shot.\n\nPro members have unlimited scans and adds with no credit limits.",
+          "On the free plan, you have 10 scan credits and 15 wardrobe add credits. Credits are consumed the moment you capture or select a photo – when our AI starts analyzing the image.\n\nImportant: Once analysis begins, the credit is used regardless of what happens next. This includes:\n• Navigating away or closing the app mid-analysis\n• Network issues interrupting the process\n• Choosing not to save the result\n\nThis is because the AI analysis runs immediately when you take the photo, and that's what costs us to provide. Think of it like taking a professional photo – even if you don't keep the photo, the photographer still took the shot.\n\nPro members have unlimited scans and adds with no credit limits.",
       },
       {
         id: "see-remaining-credits",
         question: "Where can I see my remaining credits?",
         answer:
-          "You can see your remaining credits on your Profile page, right below your email. It shows how many wardrobe adds and scans you have left (e.g., \"12/15 wardrobe adds • 3/5 scans\"). Tap the ℹ️ icon next to the credits for more information about how they work.",
+          "You can see your remaining credits on your Profile page, right below your email. It shows how many wardrobe adds and scans you have left (e.g., \"12/15 wardrobe adds • 7/10 scans\"). Tap the ℹ️ icon next to the credits for more information about how they work.",
       },
       {
         id: "credits-across-devices",

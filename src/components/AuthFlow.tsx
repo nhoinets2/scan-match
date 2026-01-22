@@ -451,7 +451,7 @@ function AuthContent({
       >
         By continuing, you agree to our{" "}
         <Text
-          onPress={() => Linking.openURL("https://scantomatch.com/terms-and-conditions.html")}
+          onPress={() => Linking.openURL("https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")}
           style={{ textDecorationLine: "underline" }}
         >
           Terms

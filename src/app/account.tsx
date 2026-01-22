@@ -417,8 +417,13 @@ export default function AccountScreen() {
             />
             <SettingsRow
               icon={<FileText size={18} color={colors.text.secondary} />}
-              title="Terms of Service"
+              title="Terms and Conditions"
               onPress={() => openLink("https://scantomatch.com/terms-and-conditions.html")}
+            />
+            <SettingsRow
+              icon={<FileText size={18} color={colors.text.secondary} />}
+              title="Terms of Use (EULA)"
+              onPress={() => openLink("https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")}
               showSeparator={false}
             />
           </Animated.View>

@@ -58,7 +58,7 @@ import {
 
 // Legal URLs
 const LEGAL_URLS = {
-  terms: "https://scantomatch.com/terms-and-conditions.html",
+  terms: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/",
   privacy: "https://scantomatch.com/privacy-policy.html",
 } as const;
 
@@ -144,7 +144,7 @@ function PlanCard({
                   letterSpacing: 1,
                 }}
               >
-                Best value — {savings}
+                BEST VALUE
               </Text>
             </View>
           )}
@@ -187,25 +187,18 @@ function PlanCard({
               </Text>
               
               {isAnnual ? (
-                <>
-                  <Text
-                    style={{
-                      ...typography.ui.label,
-                      color: colors.status.success,
-                      marginBottom: 2,
-                    }}
-                  >
-                    7-day free trial included
+                <Text
+                  style={{
+                    ...typography.ui.label,
+                  }}
+                >
+                  <Text style={{ fontFamily: typography.fontFamily.semibold, color: colors.text.primary }}>
+                    7-day free trial
                   </Text>
-                  <Text
-                    style={{
-                      ...typography.ui.caption,
-                      color: colors.text.secondary,
-                    }}
-                  >
-                    {price}/year billed annually
+                  <Text style={{ fontFamily: typography.fontFamily.regular, color: colors.text.secondary }}>
+                    , then {price} per year (billed annually)
                   </Text>
-                </>
+                </Text>
               ) : (
                 <Text
                   style={{
@@ -235,7 +228,7 @@ function PlanCard({
                   color: colors.text.secondary,
                 }}
               >
-                / month
+                {isAnnual ? "avg / month" : "/ month"}
               </Text>
             </View>
           </View>
@@ -432,7 +425,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
 
   // Dynamic header based on reason
   const titleConfig: Record<PaywallReason, string | null> = {
-    in_store_limit: "You've used your 5 free scans",
+    in_store_limit: "You've used your 10 free scans",
     wardrobe_limit: "You've hit your wardrobe limit",
     upgrade: null, // No title for upgrade flow, just show subtitle
   };
@@ -740,8 +733,8 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
             </View>
           </Animated.View>
 
-          {/* Trial terms - only show for annual plan */}
-          {selectedPlan === "annual" && (
+          {/* Terms below button - show for both plans */}
+          {selectedPlan === "annual" ? (
             <Text
               style={{
                 ...typography.ui.micro,
@@ -752,6 +745,17 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
             >
               7 days free, then {annualPrice}/year. Cancel anytime before trial ends.
             </Text>
+          ) : (
+            <Text
+              style={{
+                ...typography.ui.micro,
+                color: "rgba(255, 255, 255, 0.6)",
+                textAlign: "center",
+                marginTop: spacing.sm,
+              }}
+            >
+              {monthlyPrice}/month, cancel anytime.
+            </Text>
           )}
 
           {/* Restore purchases */}
@@ -760,7 +764,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
             disabled={isRestoring}
             style={{
               alignItems: "center",
-              marginTop: selectedPlan === "annual" ? spacing.md : spacing.lg,
+              marginTop: spacing.md,
               paddingVertical: spacing.sm,
             }}
           >
@@ -787,7 +791,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
                 textAlign: "center",
               }}
             >
-              Subscription auto-renews. Cancel anytime in Settings.
+              Auto-renews until cancelled. Cancel anytime in Settings.
             </Text>
             <View
               style={{
@@ -803,7 +807,7 @@ export function Paywall({ visible, onClose, onPurchaseComplete, reason }: Paywal
                     textDecorationLine: "underline",
                   }}
                 >
-                  {reason === "upgrade" ? "Terms of Service" : "Terms"}
+                  {reason === "upgrade" ? "Terms of Use (EULA)" : "Terms"}
                 </Text>
               </Pressable>
               <Text
