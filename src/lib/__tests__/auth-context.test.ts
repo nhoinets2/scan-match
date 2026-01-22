@@ -62,6 +62,12 @@ const mockSupabase = {
 const mockRevenueCat = {
   initializeRevenueCat: jest.fn(),
   logoutUser: jest.fn(),
+  setUserId: jest.fn(),
+};
+
+// Mock QueryClient
+const mockQueryClient = {
+  clear: jest.fn(),
 };
 
 // Mock Platform
@@ -648,6 +654,11 @@ describe("signOut", () => {
       mockQuotaStore.resetQuotas();
     } catch {}
 
+    // Clear React Query cache (non-fatal if fails)
+    try {
+      mockQueryClient.clear();
+    } catch {}
+
     // Logout from RevenueCat (non-fatal if fails)
     try {
       await mockRevenueCat.logoutUser();
@@ -711,6 +722,24 @@ describe("signOut", () => {
   it("continues even if cache clear fails", async () => {
     mockSnapToMatchStore.clearCache.mockImplementation(() => {
       throw new Error("Cache error");
+    });
+    mockSupabaseAuth.signOut.mockResolvedValue({ error: null });
+
+    // Should not throw
+    await expect(signOut()).resolves.not.toThrow();
+  });
+
+  it("clears React Query cache on sign out", async () => {
+    mockSupabaseAuth.signOut.mockResolvedValue({ error: null });
+
+    await signOut();
+
+    expect(mockQueryClient.clear).toHaveBeenCalled();
+  });
+
+  it("continues even if React Query cache clear fails", async () => {
+    mockQueryClient.clear.mockImplementationOnce(() => {
+      throw new Error("Cache clear error");
     });
     mockSupabaseAuth.signOut.mockResolvedValue({ error: null });
 
@@ -947,6 +976,11 @@ describe("Auth State Change Handling", () => {
   ): Promise<void> => {
     if (event === "SIGNED_IN" && session?.user?.id) {
       await mockRevenueCat.initializeRevenueCat(session.user.id);
+      await mockRevenueCat.setUserId(session.user.id);
+    }
+    
+    if (event === "SIGNED_OUT") {
+      mockQueryClient.clear();
     }
   };
 
@@ -960,10 +994,22 @@ describe("Auth State Change Handling", () => {
     expect(mockRevenueCat.initializeRevenueCat).toHaveBeenCalledWith("user-123");
   });
 
-  it("does not initialize RevenueCat on sign out", async () => {
+  it("sets RevenueCat user ID on sign in", async () => {
+    mockRevenueCat.setUserId.mockResolvedValue({ ok: true });
+    
+    await handleAuthStateChange("SIGNED_IN", {
+      access_token: "token",
+      refresh_token: "refresh",
+      user: { id: "user-456" },
+    });
+
+    expect(mockRevenueCat.setUserId).toHaveBeenCalledWith("user-456");
+  });
+
+  it("clears React Query cache on sign out", async () => {
     await handleAuthStateChange("SIGNED_OUT", null);
 
-    expect(mockRevenueCat.initializeRevenueCat).not.toHaveBeenCalled();
+    expect(mockQueryClient.clear).toHaveBeenCalled();
   });
 
   it("does not initialize RevenueCat on token refresh", async () => {
@@ -974,6 +1020,51 @@ describe("Auth State Change Handling", () => {
     });
 
     expect(mockRevenueCat.initializeRevenueCat).not.toHaveBeenCalled();
+  });
+
+  /**
+   * CRITICAL TEST: Prevents subscription data leakage between users
+   * 
+   * This test simulates the bug where:
+   * 1. User A logs in and has a Pro subscription
+   * 2. User A logs out
+   * 3. User B logs in
+   * 4. User B incorrectly sees "Pro Member" status from User A
+   * 
+   * The fix ensures React Query cache is cleared on logout.
+   */
+  it("prevents subscription data leakage when switching accounts", async () => {
+    // User A signs in with Pro subscription
+    mockRevenueCat.setUserId.mockResolvedValue({ ok: true });
+    await handleAuthStateChange("SIGNED_IN", {
+      access_token: "token-a",
+      refresh_token: "refresh-a",
+      user: { id: "user-a", email: "usera@example.com" },
+    });
+
+    expect(mockRevenueCat.initializeRevenueCat).toHaveBeenCalledWith("user-a");
+    expect(mockRevenueCat.setUserId).toHaveBeenCalledWith("user-a");
+
+    // User A logs out
+    await handleAuthStateChange("SIGNED_OUT", null);
+    
+    // CRITICAL: Verify cache was cleared to prevent data leakage
+    expect(mockQueryClient.clear).toHaveBeenCalled();
+    
+    // Clear mocks to simulate fresh state
+    jest.clearAllMocks();
+    mockRevenueCat.setUserId.mockResolvedValue({ ok: true });
+
+    // User B signs in (different account)
+    await handleAuthStateChange("SIGNED_IN", {
+      access_token: "token-b",
+      refresh_token: "refresh-b",
+      user: { id: "user-b", email: "userb@example.com" },
+    });
+
+    // Verify User B gets properly initialized with their own ID
+    expect(mockRevenueCat.setUserId).toHaveBeenCalledWith("user-b");
+    expect(mockRevenueCat.setUserId).not.toHaveBeenCalledWith("user-a");
   });
 });
 

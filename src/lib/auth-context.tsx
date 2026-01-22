@@ -7,7 +7,8 @@ import * as Linking from "expo-linking";
 import { supabase, clearInvalidTokens } from "./supabase";
 import { useSnapToMatchStore } from "./store";
 import { useQuotaStore } from "./quota-store";
-import { initializeRevenueCat, logoutUser } from "./revenuecatClient";
+import { initializeRevenueCat, logoutUser, setUserId } from "./revenuecatClient";
+import { queryClient } from "./queryClient";
 
 // Required for expo-auth-session to close the browser on completion
 WebBrowser.maybeCompleteAuthSession();
@@ -152,12 +153,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(newSession);
       setUser(newSession?.user ?? null);
 
-      // Initialize RevenueCat when user signs in
-      // Since we don't initialize for anonymous users, this is the first initialization
+      // Initialize/login RevenueCat when user signs in
       if (event === "SIGNED_IN" && newSession?.user?.id) {
-        console.log("[Auth] User signed in, initializing RevenueCat with ID:", newSession.user.id);
+        console.log("[Auth] User signed in, setting up RevenueCat with ID:", newSession.user.id);
+        
+        // First, try to initialize (will work on first app launch)
         await initializeRevenueCat(newSession.user.id);
-        console.log("[Auth] ✅ RevenueCat initialized with user ID from the start");
+        
+        // Then, set the user ID (will work after logout when SDK is already initialized)
+        // This handles the case where user logs out and logs into a different account
+        const setUserResult = await setUserId(newSession.user.id);
+        if (setUserResult.ok) {
+          console.log("[Auth] ✅ RevenueCat user ID set successfully");
+        } else {
+          console.log("[Auth] ⚠️ RevenueCat setUserId:", setUserResult.reason);
+        }
+      }
+      
+      // CRITICAL: Clear React Query cache on sign out to prevent data leakage between users
+      if (event === "SIGNED_OUT") {
+        console.log("[Auth] 🧹 Clearing React Query cache on sign out...");
+        queryClient.clear();
+        console.log("[Auth] ✅ React Query cache cleared");
       }
       
       // Clear Google loading state on auth change
@@ -409,6 +426,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       useQuotaStore.getState().resetQuotas();
     } catch (quotaError) {
       console.error("[Auth] Error resetting quotas (non-fatal):", quotaError);
+    }
+    
+    // CRITICAL: Clear React Query cache to prevent data leakage between users
+    try {
+      console.log("[Auth] Clearing React Query cache...");
+      queryClient.clear();
+      console.log("[Auth] ✅ React Query cache cleared");
+    } catch (cacheError) {
+      console.error("[Auth] React Query cache clear error (non-fatal):", cacheError);
     }
     
     // Logout from RevenueCat (non-fatal if fails)

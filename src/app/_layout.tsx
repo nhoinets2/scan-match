@@ -16,7 +16,7 @@ import {
   BodoniModa_700Bold,
 } from "@expo-google-fonts/bodoni-moda";
 import { useColorScheme } from "@/lib/useColorScheme";
-import { QueryClient, QueryClientProvider, focusManager } from "@tanstack/react-query";
+import { QueryClientProvider, focusManager } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
@@ -25,6 +25,7 @@ import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { supabase } from "@/lib/supabase";
 import { colors } from "@/lib/design-tokens";
 import { initializeBackgroundUploads } from "@/lib/storage";
+import { queryClient } from "@/lib/queryClient";
 
 export const unstable_settings = {
   initialRouteName: "login",
@@ -32,21 +33,6 @@ export const unstable_settings = {
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
-
-// Configure QueryClient with React Native optimizations
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // Prevent immediate refetch on mount if data is fresh (within staleTime)
-      // Individual queries can override this
-      refetchOnMount: true,
-      // Retry failed queries once before showing error
-      retry: 1,
-      // Keep queries in cache for 5 minutes after last usage
-      gcTime: 5 * 60 * 1000,
-    },
-  },
-});
 
 /**
  * Initializes background uploads only after auth is ready.

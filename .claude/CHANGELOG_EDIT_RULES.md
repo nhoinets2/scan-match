@@ -1,13 +1,15 @@
 # Changelog Editing Rules
 
-**IMPORTANT**: These rules apply ONLY when editing `/home/user/workspace/changelog.txt`
+**IMPORTANT**: These rules apply when editing `/home/user/workspace/CHANGELOG.md`
+
+**NOTE**: This project follows [Keep a Changelog](https://keepachangelog.com/) format with semantic versioning.
 
 ## HARD RULES (MUST FOLLOW)
 
-1. **NEVER modify existing entries**: Do NOT modify, delete, reorder, or rewrap any existing text under any dated section
-2. **Date format**: Use "## Month Day, Year" format (e.g., "## January 21, 2026")
-3. **Chronological order**: New date sections MUST be inserted at the TOP (above all existing dates)
-4. **Update existing date**: If today's date section already exists, ADD to it (don't create duplicate)
+1. **NEVER modify existing entries**: Do NOT modify, delete, reorder, or rewrap any existing text under any version section
+2. **Version format**: Changes go in `## [Unreleased]` section until a release is made
+3. **Category order**: Keep categories in standard order (Security, Added, Changed, Deprecated, Removed, Fixed, Improved, Technical)
+4. **Update existing section**: Add new entries to appropriate category in `[Unreleased]`, don't duplicate categories
 5. **Preserve formatting**: Keep exact Markdown style (##, ###, -, blank lines)
 
 ## File Structure
@@ -29,14 +31,16 @@
 ...
 ```
 
-## Categories (in this order)
+## Categories (in this order per Keep a Changelog)
 
-1. **Added** - New features, capabilities, or UI elements
-2. **Fixed** - Bug fixes, error corrections
-3. **Improved** - Performance improvements, UX enhancements
-4. **Changed** - Behavior changes, breaking changes
-5. **Security** - Security improvements, vulnerability fixes
-6. **Technical** - Infrastructure, migrations, refactoring
+1. **Security** - Security improvements, vulnerability fixes (always first!)
+2. **Added** - New features, capabilities, or UI elements
+3. **Changed** - Behavior changes, breaking changes
+4. **Deprecated** - Features that will be removed in future versions
+5. **Removed** - Removed features or files
+6. **Fixed** - Bug fixes, error corrections
+7. **Improved** - Performance improvements, UX enhancements (custom category for our project)
+8. **Technical** - Infrastructure, migrations, refactoring (custom category for our project)
 
 ## Writing Guidelines
 
@@ -72,7 +76,7 @@ When asked to update the changelog:
 
 1. **Read current file**
    ```bash
-   Read /home/user/workspace/changelog.txt
+   Read /home/user/workspace/CHANGELOG.md
    ```
 
 2. **Determine today's date** (from system context)
@@ -182,7 +186,9 @@ When asked to update the changelog:
 
 ## Technical Notes
 
-- File location: `/home/user/workspace/changelog.txt`
+- File location: `/home/user/workspace/CHANGELOG.md`
+- Format: [Keep a Changelog](https://keepachangelog.com/)
+- Versioning: [Semantic Versioning](https://semver.org/)
 - Backup exists: `/home/user/workspace/CHANGELOG.md` (markdown version, may have different format)
 - Use StrReplace tool for edits
 - Include 3-5 lines of context before and after to ensure unique match
