@@ -17,13 +17,23 @@ const STORAGE_KEYS = {
 // CONFIGURATION
 // ============================================
 
+/**
+ * Force analytics DB insertion in dev (for testing).
+ * Set EXPO_PUBLIC_FORCE_ANALYTICS_DB=true in .env to enable.
+ */
+const FORCE_ANALYTICS_DB = process.env.EXPO_PUBLIC_FORCE_ANALYTICS_DB === 'true';
+
 const ANALYTICS_CONFIG = {
   /** Maximum events to queue before auto-flush */
   BATCH_SIZE: 10,
   /** Flush interval in milliseconds (15 seconds) */
   FLUSH_INTERVAL_MS: 15000,
-  /** Enable production sink (Supabase) */
-  ENABLE_PRODUCTION_SINK: !__DEV__,
+  /** 
+   * Enable production sink (Supabase)
+   * - Enabled in production (!__DEV__)
+   * - Can be forced in dev via EXPO_PUBLIC_FORCE_ANALYTICS_DB=true
+   */
+  ENABLE_PRODUCTION_SINK: !__DEV__ || FORCE_ANALYTICS_DB,
   /** Sampling rates for high-volume events (0-1, where 1 = 100%) */
   SAMPLING_RATES: {
     // Always send (100%)
@@ -69,9 +79,23 @@ function getSessionId(): string {
 
 /**
  * Set the current user ID (call after auth)
+ * Triggers a flush to send any queued events that were waiting for login.
  */
 export function setAnalyticsUserId(userId: string | null): void {
+  const previousUserId = currentUserId;
   currentUserId = userId;
+
+  // If user just logged in, update queued events and flush
+  if (userId && !previousUserId && eventQueue.length > 0) {
+    // Backfill user_id on queued events from this session
+    for (const event of eventQueue) {
+      if (!event.user_id) {
+        event.user_id = userId;
+      }
+    }
+    // Trigger flush now that we have a user
+    flushEvents();
+  }
 }
 
 /**
@@ -400,18 +424,43 @@ function enqueueEvent(event: QueuedEvent): void {
 /**
  * Flush queued events to Supabase
  * Safe: never throws, never blocks UX
+ * 
+ * IMPORTANT: Only flushes events that have a user_id.
+ * Events without user_id (before login) stay queued until login,
+ * or are dropped if the queue overflows.
+ * This ensures RLS policy (auth.uid() = user_id) is satisfied.
  */
 async function flushEvents(): Promise<void> {
   if (eventQueue.length === 0) return;
   if (!ANALYTICS_CONFIG.ENABLE_PRODUCTION_SINK) return;
 
-  // Take current queue and reset
-  const eventsToSend = [...eventQueue];
-  eventQueue = [];
+  // Split events: those with user_id can be sent, others stay queued
+  const eventsWithUser: QueuedEvent[] = [];
+  const eventsWithoutUser: QueuedEvent[] = [];
+
+  for (const event of eventQueue) {
+    if (event.user_id) {
+      eventsWithUser.push(event);
+    } else {
+      eventsWithoutUser.push(event);
+    }
+  }
+
+  // Nothing to send (all events are pre-login)
+  if (eventsWithUser.length === 0) {
+    if (__DEV__ && eventsWithoutUser.length > 0) {
+      console.log(`[Analytics] Skipping flush: ${eventsWithoutUser.length} events waiting for login`);
+    }
+    return;
+  }
+
+  // Keep events without user in queue (up to a limit to prevent memory leak)
+  const MAX_QUEUED_WITHOUT_USER = 50;
+  eventQueue = eventsWithoutUser.slice(-MAX_QUEUED_WITHOUT_USER);
 
   try {
     // Batch insert to Supabase
-    const rows = eventsToSend.map(event => ({
+    const rows = eventsWithUser.map(event => ({
       user_id: event.user_id,
       session_id: event.session_id,
       name: event.name,
