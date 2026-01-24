@@ -16,7 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Configurable confidence thresholds and decision priorities
   - Full trace support for debugging decisions
   - Remote config override with validated safe subset of keys
-- **Style Signals v1 types (Epic 1 foundation)**: Added comprehensive TypeScript types for the style signals schema including `StyleSignalsV1` interface, aesthetic archetypes, formality bands, statement levels, season heaviness, pattern levels, and material families
+- **Style Signals v1 (Epic 1)**: Full implementation of style signal generation and storage:
+  - Database schema with 8 new columns on `wardrobe_items` and `recent_checks`
+  - Edge Function (`style-signals`) for GPT-4 Vision analysis with 12 aesthetic archetypes
+  - Client service with caching, batch fetching, and lazy enrichment support
+  - Feature flags for controlled rollout (`trust_filter_enabled`, `style_signals_enabled`)
+  - Integration layer for applying Trust Filter to Confidence Engine results
 
 ### Security
 - **[CRITICAL FIX] Subscription data leakage between accounts** - Fixed critical security vulnerability where subscription status would leak from one user to another when switching accounts on the same device. React Query cache is now properly cleared on logout, and RevenueCat user ID is correctly set on login. When User A with Pro subscription logged out and User B logged in, User B would incorrectly see "Pro Member" status from User A. See `docs/historical/subscription-leak-fix.md` for full details.
@@ -101,6 +106,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `evaluate.ts` - Main `evaluateTrustFilterPair` and `evaluateTrustFilterBatch` functions
   - `index.ts` - Public API exports
   - `__tests__/evaluate.test.ts` - 23 unit tests covering all 12 canonical scenarios plus edge cases
+- **supabase/migrations/007_style_signals_v1.sql** - Database migration adding style signals columns to `wardrobe_items` and `recent_checks` tables:
+  - `style_signals_v1` (JSONB) - The actual style signals data
+  - `style_signals_version` - Schema version for future migrations
+  - `style_signals_status` - Processing status (none/processing/ready/failed)
+  - `style_signals_updated_at`, `source`, `error`, `prompt_version`, `input_hash`
+  - Includes indexes for efficient queries and GIN index for JSONB
+- **supabase/functions/style-signals/** - New Edge Function for generating StyleSignalsV1:
+  - Accepts `{ type: 'scan' | 'wardrobe', scanId?, itemId? }`
+  - Uses GPT-4 Vision with structured prompt for 12 aesthetic archetypes
+  - Validates and normalizes AI response to strict schema
+  - Caching by input hash + prompt version (no redundant AI calls)
+  - Graceful fallback to unknown-filled signals on failure
+- **src/lib/style-signals-service.ts** - Client service for style signals:
+  - `generateScanStyleSignals(scanId)` - Generate signals for scan
+  - `generateWardrobeStyleSignals(itemId)` - Generate signals for wardrobe item
+  - `enqueueWardrobeEnrichmentBatch(itemIds)` - Fire-and-forget lazy enrichment
+  - `fetchWardrobeStyleSignalsBatch(itemIds)` - Batch fetch cached signals
+  - `getItemsNeedingEnrichment(itemIds)` - Check which items need enrichment
+- **src/lib/feature-flags.ts** - Centralized feature flag management:
+  - `trust_filter_enabled` - Enable/disable Trust Filter
+  - `trust_filter_trace_enabled` - Enable detailed trace logging
+  - `style_signals_enabled` - Enable style signal generation
+  - `lazy_enrichment_enabled` - Enable background wardrobe enrichment
+- **src/lib/trust-filter-integration.ts** - Integration layer between Trust Filter and CE:
+  - `applyTrustFilter(scanSignals, category, matches, wardrobe)` - Async version with signal fetching
+  - `applyTrustFilterSync(scanSignals, category, matches, signalsMap)` - Sync version with pre-fetched signals
+  - Returns `{ highFinal, demoted, hidden, stats }` for results screen
 - **src/lib/auth-context.tsx** - Clear React Query cache on logout (both in signOut function and SIGNED_OUT event), set RevenueCat user ID on login
 - **src/app/_layout.tsx** - Import queryClient from shared module
 - **New Edge Function: analyze-image** - Handles auth, quota, rate limits, and OpenAI calls
