@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Supabase Analytics Sink**: Added production analytics system using Supabase as the backend:
+  - New `analytics_events` table with RLS (insert-only for clients)
+  - Batched event sending (10 events or 15 seconds)
+  - Sampling for high-volume events (e.g., `trust_filter_pair_decision` at 5%)
+  - Session ID per app launch for session-level analysis
+  - Trust Filter and Style Signals event types
+  - Query examples for demote rates, reason breakdowns, success rates
 - **Trust Filter v1 Integration (Epic 2)**: Integrated Trust Filter into results screen via `useTrustFilter` hook. When enabled, HIGH matches are post-processed to filter trust-breaking combinations:
   - `highFinal` matches stay in "Wear now" tab
   - `demoted` matches move to "Worth trying" tab  
@@ -111,6 +118,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `evaluate.ts` - Main `evaluateTrustFilterPair` and `evaluateTrustFilterBatch` functions
   - `index.ts` - Public API exports
   - `__tests__/evaluate.test.ts` - 23 unit tests covering all 12 canonical scenarios plus edge cases
+- **supabase/migrations/008_analytics_events.sql** - Database migration for analytics:
+  - `analytics_events` table with `user_id`, `session_id`, `name`, `properties` (JSONB)
+  - Indexes for time, event name, and user queries
+  - RLS: insert-only for authenticated users, no client reads
+  - Example queries for Trust Filter demote rates, style signals success rates
 - **supabase/migrations/007_style_signals_v1.sql** - Database migration adding style signals columns to `wardrobe_items` and `recent_checks` tables:
   - `style_signals_v1` (JSONB) - The actual style signals data
   - `style_signals_version` - Schema version for future migrations

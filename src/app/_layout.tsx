@@ -26,6 +26,7 @@ import { supabase } from "@/lib/supabase";
 import { colors } from "@/lib/design-tokens";
 import { initializeBackgroundUploads } from "@/lib/storage";
 import { queryClient } from "@/lib/queryClient";
+import { initializeAnalytics, setAnalyticsUserId, resetAnalyticsSession } from "@/lib/analytics";
 
 export const unstable_settings = {
   initialRouteName: "login",
@@ -54,6 +55,49 @@ function BackgroundUploadInitializer() {
       void initializeBackgroundUploads();
     }
   }, [isLoading, user]);
+
+  return null; // This component renders nothing
+}
+
+/**
+ * Initializes analytics and tracks user ID changes.
+ * - Initializes session on first render
+ * - Sets user ID when auth changes
+ * - Resets session on logout
+ */
+function AnalyticsInitializer() {
+  const { user, isLoading } = useAuth();
+  const previousUserId = useRef<string | null>(null);
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    // Initialize analytics once (generates session ID, starts flush timer)
+    if (!initialized.current) {
+      initialized.current = true;
+      initializeAnalytics();
+    }
+  }, []);
+
+  useEffect(() => {
+    // Wait for auth to finish loading
+    if (isLoading) return;
+
+    const currentUserId = user?.id ?? null;
+
+    // Detect user change (login/logout/switch)
+    if (currentUserId !== previousUserId.current) {
+      if (currentUserId) {
+        // User logged in
+        setAnalyticsUserId(currentUserId);
+        console.log("[Analytics] User ID set:", currentUserId.slice(0, 8) + "...");
+      } else if (previousUserId.current) {
+        // User logged out
+        resetAnalyticsSession();
+        console.log("[Analytics] Session reset (user logged out)");
+      }
+      previousUserId.current = currentUserId;
+    }
+  }, [isLoading, user?.id]);
 
   return null; // This component renders nothing
 }
@@ -452,6 +496,7 @@ export default function RootLayout() {
       <AuthProvider>
         <SplashHider fontsLoaded={fontsLoaded} fontError={fontError} />
         <BackgroundUploadInitializer />
+        <AnalyticsInitializer />
         <FocusManagerInitializer />
         <DeepLinkHandler />
         <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg.primary }}>

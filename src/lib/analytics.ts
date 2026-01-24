@@ -1,7 +1,10 @@
 // Analytics utility for tracking user events
-// Events are logged to console in development and can be sent to analytics service in production
+// Events are logged to console in development and sent to Supabase in production
+// Uses batching (10 events or 15s) and sampling for high-volume events
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AppState, AppStateStatus } from "react-native";
+import { supabase } from "./supabase";
 
 // Storage keys for persistent tracking
 const STORAGE_KEYS = {
@@ -9,6 +12,75 @@ const STORAGE_KEYS = {
   SCAN_COUNT: "analytics_scan_count",
   SIGNUP_DATE: "analytics_signup_date",
 } as const;
+
+// ============================================
+// CONFIGURATION
+// ============================================
+
+const ANALYTICS_CONFIG = {
+  /** Maximum events to queue before auto-flush */
+  BATCH_SIZE: 10,
+  /** Flush interval in milliseconds (15 seconds) */
+  FLUSH_INTERVAL_MS: 15000,
+  /** Enable production sink (Supabase) */
+  ENABLE_PRODUCTION_SINK: !__DEV__,
+  /** Sampling rates for high-volume events (0-1, where 1 = 100%) */
+  SAMPLING_RATES: {
+    // Always send (100%)
+    trust_filter_started: 1,
+    trust_filter_completed: 1,
+    trust_filter_error: 1,
+    trust_filter_remote_config_invalid: 1,
+    style_signals_completed: 1,
+    style_signals_failed: 1,
+    style_signals_started: 1,
+    // Sample at 5% (high volume)
+    trust_filter_pair_decision: 0.05,
+    // Default for unlisted events
+    default: 1,
+  } as Record<string, number>,
+};
+
+// ============================================
+// SESSION MANAGEMENT
+// ============================================
+
+let sessionId: string | null = null;
+let currentUserId: string | null = null;
+
+/**
+ * Generate a unique session ID (called once per app launch)
+ */
+function generateSessionId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 10);
+  return `${timestamp}-${random}`;
+}
+
+/**
+ * Get or create the current session ID
+ */
+function getSessionId(): string {
+  if (!sessionId) {
+    sessionId = generateSessionId();
+  }
+  return sessionId;
+}
+
+/**
+ * Set the current user ID (call after auth)
+ */
+export function setAnalyticsUserId(userId: string | null): void {
+  currentUserId = userId;
+}
+
+/**
+ * Reset session (call on logout or app restart)
+ */
+export function resetAnalyticsSession(): void {
+  sessionId = null;
+  currentUserId = null;
+}
 
 // ============================================
 // EVENT TYPES
@@ -31,7 +103,110 @@ export type AnalyticsEvent =
   | StorePrefStoreSelected
   | StorePrefStoreRemoved
   | StorePrefSaved
-  | StorePrefDismissed;
+  | StorePrefDismissed
+  // Trust Filter events
+  | TrustFilterStarted
+  | TrustFilterCompleted
+  | TrustFilterPairDecision
+  | TrustFilterError
+  | TrustFilterRemoteConfigInvalid
+  // Style Signals events
+  | StyleSignalsStarted
+  | StyleSignalsCompleted
+  | StyleSignalsFailed;
+
+// ============================================
+// TRUST FILTER EVENT TYPES
+// ============================================
+
+interface TrustFilterStarted {
+  name: "trust_filter_started";
+  properties: {
+    scan_id: string;
+    scan_category: string;
+    high_match_count: number;
+    has_scan_signals: boolean;
+  };
+}
+
+interface TrustFilterCompleted {
+  name: "trust_filter_completed";
+  properties: {
+    scan_id: string;
+    scan_category: string;
+    original_high_count: number;
+    final_high_count: number;
+    demoted_count: number;
+    hidden_count: number;
+    skipped_count: number;
+    duration_ms: number;
+  };
+}
+
+interface TrustFilterPairDecision {
+  name: "trust_filter_pair_decision";
+  properties: {
+    scan_id: string;
+    match_id: string;
+    action: "keep" | "demote" | "hide";
+    reason: string;
+    archetype_distance?: string;
+    formality_gap?: number;
+    season_diff?: number;
+    prompt_version?: number;
+  };
+}
+
+interface TrustFilterError {
+  name: "trust_filter_error";
+  properties: {
+    scan_id: string;
+    error_type: string;
+    error_message: string;
+  };
+}
+
+interface TrustFilterRemoteConfigInvalid {
+  name: "trust_filter_remote_config_invalid";
+  properties: {
+    errors: string[];
+  };
+}
+
+// ============================================
+// STYLE SIGNALS EVENT TYPES
+// ============================================
+
+interface StyleSignalsStarted {
+  name: "style_signals_started";
+  properties: {
+    type: "scan" | "wardrobe";
+    item_id: string;
+  };
+}
+
+interface StyleSignalsCompleted {
+  name: "style_signals_completed";
+  properties: {
+    type: "scan" | "wardrobe";
+    item_id: string;
+    cached: boolean;
+    duration_ms: number;
+    primary_archetype: string;
+    formality_band: string;
+    prompt_version: number;
+  };
+}
+
+interface StyleSignalsFailed {
+  name: "style_signals_failed";
+  properties: {
+    type: "scan" | "wardrobe";
+    item_id: string;
+    error_type: string;
+    error_message: string;
+  };
+}
 
 interface WardrobeMatchSectionFirstVisible {
   name: "wardrobe_match_section_first_visible";
@@ -186,29 +361,162 @@ interface StorePrefDismissed {
 }
 
 // ============================================
+// EVENT QUEUE & BATCHING
+// ============================================
+
+interface QueuedEvent {
+  name: string;
+  properties: Record<string, unknown>;
+  timestamp: string;
+  session_id: string;
+  user_id: string | null;
+}
+
+let eventQueue: QueuedEvent[] = [];
+let flushTimer: ReturnType<typeof setInterval> | null = null;
+let isInitialized = false;
+
+/**
+ * Check if event should be sampled (sent to production)
+ */
+function shouldSampleEvent(eventName: string): boolean {
+  const rate = ANALYTICS_CONFIG.SAMPLING_RATES[eventName] 
+    ?? ANALYTICS_CONFIG.SAMPLING_RATES.default;
+  return Math.random() < rate;
+}
+
+/**
+ * Enqueue an event for batched sending
+ */
+function enqueueEvent(event: QueuedEvent): void {
+  eventQueue.push(event);
+
+  // Auto-flush when batch size reached
+  if (eventQueue.length >= ANALYTICS_CONFIG.BATCH_SIZE) {
+    flushEvents();
+  }
+}
+
+/**
+ * Flush queued events to Supabase
+ * Safe: never throws, never blocks UX
+ */
+async function flushEvents(): Promise<void> {
+  if (eventQueue.length === 0) return;
+  if (!ANALYTICS_CONFIG.ENABLE_PRODUCTION_SINK) return;
+
+  // Take current queue and reset
+  const eventsToSend = [...eventQueue];
+  eventQueue = [];
+
+  try {
+    // Batch insert to Supabase
+    const rows = eventsToSend.map(event => ({
+      user_id: event.user_id,
+      session_id: event.session_id,
+      name: event.name,
+      properties: event.properties,
+      created_at: event.timestamp,
+    }));
+
+    const { error } = await supabase
+      .from('analytics_events')
+      .insert(rows);
+
+    if (error) {
+      // Log but don't throw - analytics should never break UX
+      console.warn('[Analytics] Flush failed:', error.message);
+      // Don't re-queue to avoid infinite loop on persistent errors
+    } else if (__DEV__) {
+      console.log(`[Analytics] Flushed ${rows.length} events to Supabase`);
+    }
+  } catch (error) {
+    // Silently fail - analytics should never break UX
+    console.warn('[Analytics] Flush error:', error);
+  }
+}
+
+/**
+ * Initialize analytics (call once at app start)
+ */
+export function initializeAnalytics(): void {
+  if (isInitialized) return;
+  isInitialized = true;
+
+  // Generate session ID
+  getSessionId();
+
+  // Start flush timer
+  if (ANALYTICS_CONFIG.ENABLE_PRODUCTION_SINK) {
+    flushTimer = setInterval(flushEvents, ANALYTICS_CONFIG.FLUSH_INTERVAL_MS);
+  }
+
+  // Flush on app background/close
+  const handleAppStateChange = (nextState: AppStateStatus) => {
+    if (nextState === 'background' || nextState === 'inactive') {
+      flushEvents();
+    }
+  };
+
+  AppState.addEventListener('change', handleAppStateChange);
+
+  if (__DEV__) {
+    console.log('[Analytics] Initialized', {
+      sessionId: getSessionId(),
+      productionSink: ANALYTICS_CONFIG.ENABLE_PRODUCTION_SINK,
+    });
+  }
+}
+
+/**
+ * Cleanup analytics (call on app unmount if needed)
+ */
+export function cleanupAnalytics(): void {
+  if (flushTimer) {
+    clearInterval(flushTimer);
+    flushTimer = null;
+  }
+  flushEvents(); // Final flush
+  isInitialized = false;
+}
+
+// ============================================
 // TRACKING FUNCTIONS
 // ============================================
 
 /**
- * Main tracking function - logs events in development
- * Can be extended to send to analytics services (Mixpanel, Amplitude, etc.)
+ * Main tracking function
+ * - Logs to console in development
+ * - Sends to Supabase in production (batched + sampled)
  */
 export function trackEvent<T extends AnalyticsEvent>(
   name: T["name"],
   properties: T["properties"]
 ): void {
-  const event = {
-    name,
-    properties,
-    timestamp: new Date().toISOString(),
-  };
+  const timestamp = new Date().toISOString();
 
-  // Log in development
-  console.log(`[Analytics] ${name}`, properties);
+  // Always log in development
+  if (__DEV__) {
+    console.log(`[Analytics] ${name}`, properties);
+  }
 
-  // TODO: Send to analytics service in production
-  // Example: mixpanel.track(name, properties);
-  // Example: amplitude.logEvent(name, properties);
+  // Production sink: enqueue for batched sending
+  if (ANALYTICS_CONFIG.ENABLE_PRODUCTION_SINK && shouldSampleEvent(name)) {
+    enqueueEvent({
+      name,
+      properties: properties as Record<string, unknown>,
+      timestamp,
+      session_id: getSessionId(),
+      user_id: currentUserId,
+    });
+  }
+}
+
+/**
+ * Force flush events (call before critical operations)
+ */
+export function forceFlushAnalytics(): void {
+  flushEvents();
 }
 
 // ============================================
@@ -564,3 +872,163 @@ export function trackStorePrefDismissed(params: {
     method: params.method,
   });
 }
+
+// ============================================
+// TRUST FILTER ANALYTICS
+// ============================================
+
+/**
+ * Track when Trust Filter evaluation starts
+ */
+export function trackTrustFilterStarted(params: {
+  scanId: string;
+  scanCategory: string;
+  highMatchCount: number;
+  hasScanSignals: boolean;
+}): void {
+  trackEvent("trust_filter_started", {
+    scan_id: params.scanId,
+    scan_category: params.scanCategory,
+    high_match_count: params.highMatchCount,
+    has_scan_signals: params.hasScanSignals,
+  });
+}
+
+/**
+ * Track when Trust Filter evaluation completes
+ */
+export function trackTrustFilterCompleted(params: {
+  scanId: string;
+  scanCategory: string;
+  originalHighCount: number;
+  finalHighCount: number;
+  demotedCount: number;
+  hiddenCount: number;
+  skippedCount: number;
+  durationMs: number;
+}): void {
+  trackEvent("trust_filter_completed", {
+    scan_id: params.scanId,
+    scan_category: params.scanCategory,
+    original_high_count: params.originalHighCount,
+    final_high_count: params.finalHighCount,
+    demoted_count: params.demotedCount,
+    hidden_count: params.hiddenCount,
+    skipped_count: params.skippedCount,
+    duration_ms: params.durationMs,
+  });
+}
+
+/**
+ * Track individual Trust Filter pair decision (sampled at 5%)
+ */
+export function trackTrustFilterPairDecision(params: {
+  scanId: string;
+  matchId: string;
+  action: "keep" | "demote" | "hide";
+  reason: string;
+  archetypeDistance?: string;
+  formalityGap?: number;
+  seasonDiff?: number;
+  promptVersion?: number;
+}): void {
+  trackEvent("trust_filter_pair_decision", {
+    scan_id: params.scanId,
+    match_id: params.matchId,
+    action: params.action,
+    reason: params.reason,
+    archetype_distance: params.archetypeDistance,
+    formality_gap: params.formalityGap,
+    season_diff: params.seasonDiff,
+    prompt_version: params.promptVersion,
+  });
+}
+
+/**
+ * Track Trust Filter error
+ */
+export function trackTrustFilterError(params: {
+  scanId: string;
+  errorType: string;
+  errorMessage: string;
+}): void {
+  trackEvent("trust_filter_error", {
+    scan_id: params.scanId,
+    error_type: params.errorType,
+    error_message: params.errorMessage,
+  });
+}
+
+/**
+ * Track when remote config validation fails
+ */
+export function trackTrustFilterRemoteConfigInvalid(params: {
+  errors: string[];
+}): void {
+  trackEvent("trust_filter_remote_config_invalid", {
+    errors: params.errors,
+  });
+}
+
+// ============================================
+// STYLE SIGNALS ANALYTICS
+// ============================================
+
+/**
+ * Track when style signals generation starts
+ */
+export function trackStyleSignalsStarted(params: {
+  type: "scan" | "wardrobe";
+  itemId: string;
+}): void {
+  trackEvent("style_signals_started", {
+    type: params.type,
+    item_id: params.itemId,
+  });
+}
+
+/**
+ * Track when style signals generation completes
+ */
+export function trackStyleSignalsCompleted(params: {
+  type: "scan" | "wardrobe";
+  itemId: string;
+  cached: boolean;
+  durationMs: number;
+  primaryArchetype: string;
+  formalityBand: string;
+  promptVersion: number;
+}): void {
+  trackEvent("style_signals_completed", {
+    type: params.type,
+    item_id: params.itemId,
+    cached: params.cached,
+    duration_ms: params.durationMs,
+    primary_archetype: params.primaryArchetype,
+    formality_band: params.formalityBand,
+    prompt_version: params.promptVersion,
+  });
+}
+
+/**
+ * Track when style signals generation fails
+ */
+export function trackStyleSignalsFailed(params: {
+  type: "scan" | "wardrobe";
+  itemId: string;
+  errorType: string;
+  errorMessage: string;
+}): void {
+  trackEvent("style_signals_failed", {
+    type: params.type,
+    item_id: params.itemId,
+    error_type: params.errorType,
+    error_message: params.errorMessage,
+  });
+}
+
+// ============================================
+// __DEV__ DECLARATION
+// ============================================
+
+declare const __DEV__: boolean;
