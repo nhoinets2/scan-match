@@ -8,7 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Trust Filter v1 (Epic 2)**: Implemented deterministic post-CE guardrail that prevents trust-breaking HIGH matches. Evaluates pairs using style signals (aesthetic archetypes, formality, statement level, season, pattern) and outputs keep/demote/hide decisions with reason codes. Features include:
+- **Trust Filter v1 Integration (Epic 2)**: Integrated Trust Filter into results screen via `useTrustFilter` hook. When enabled, HIGH matches are post-processed to filter trust-breaking combinations:
+  - `highFinal` matches stay in "Wear now" tab
+  - `demoted` matches move to "Worth trying" tab  
+  - `hidden` matches are removed completely
+  - Async style signal fetching with lazy enrichment for wardrobe items
+- **Trust Filter v1 Core (Epic 2)**: Implemented deterministic post-CE guardrail that prevents trust-breaking HIGH matches. Evaluates pairs using style signals (aesthetic archetypes, formality, statement level, season, pattern) and outputs keep/demote/hide decisions with reason codes. Features include:
   - 12 aesthetic archetypes with cluster-based distance calculation
   - Secondary aesthetic softening to prevent over-penalizing blended styles
   - Category-specific policies (bags/accessories never hidden for archetype-only, skirts can't escalate to hide)
@@ -129,6 +134,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `trust_filter_trace_enabled` - Enable detailed trace logging
   - `style_signals_enabled` - Enable style signal generation
   - `lazy_enrichment_enabled` - Enable background wardrobe enrichment
+- **src/lib/useTrustFilter.ts** - React hook for applying Trust Filter to CE results:
+  - Fetches style signals for scan and matched wardrobe items
+  - Applies Trust Filter batch evaluation
+  - Returns filtered matches (highFinal, demoted, hidden)
+  - Handles async loading states and lazy enrichment
 - **src/lib/trust-filter-integration.ts** - Integration layer between Trust Filter and CE:
   - `applyTrustFilter(scanSignals, category, matches, wardrobe)` - Async version with signal fetching
   - `applyTrustFilterSync(scanSignals, category, matches, signalsMap)` - Sync version with pre-fetched signals

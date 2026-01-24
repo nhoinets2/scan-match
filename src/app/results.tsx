@@ -100,7 +100,8 @@ import { logAnalysisLifecycleEvent } from "@/lib/analysis-telemetry";
 import { capitalizeFirst, capitalizeItems, capitalizeSentences } from "@/lib/text-utils";
 import { generateIdempotencyKey } from "@/lib/database";
 import { recordPositiveAction, requestReviewIfAppropriate } from "@/lib/useStoreReview";
-import { useConfidenceEngine, tierToVerdictState, tierToLabel } from "@/lib/useConfidenceEngine";
+import { useConfidenceEngine, tierToVerdictState, tierToLabel, type EnrichedMatch } from "@/lib/useConfidenceEngine";
+import { useTrustFilter } from "@/lib/useTrustFilter";
 import { prepareScanForSave, completeScanSave, isLocalUri, cancelUpload, cleanupScanStorage, queueScanUpload } from "@/lib/storage";
 import { useAuth } from "@/lib/auth-context";
 import { useComboAssembler, runShadowModeComparison } from "@/lib/useComboAssembler";
@@ -1936,7 +1937,47 @@ function ResultsSuccess({
   }, [resolvedImageUri]);
 
   // Confidence Engine evaluation - primary matching system
-  const confidenceResult = useConfidenceEngine(scannedItem, wardrobe);
+  const rawConfidenceResult = useConfidenceEngine(scannedItem, wardrobe);
+
+  // Trust Filter - post-CE filtering of HIGH matches
+  // Applies style-based guardrails to prevent trust-breaking matches
+  const trustFilterResult = useTrustFilter(
+    rawConfidenceResult,
+    scannedItem,
+    wardrobe,
+    currentCheckId // Use scan ID for fetching cached signals
+  );
+
+  // Merge Trust Filter results into confidence result
+  // - matches: Trust Filter's highFinal (or original if TF disabled)
+  // - nearMatches: original NEAR + Trust Filter's demoted matches
+  const confidenceResult = useMemo(() => {
+    if (!trustFilterResult.wasApplied) {
+      return rawConfidenceResult;
+    }
+
+    // Create modified result with Trust Filter applied
+    const originalNearMatches = rawConfidenceResult.rawEvaluation?.near_matches ?? [];
+    
+    // Convert demoted EnrichedMatches to PairEvaluations for near_matches
+    // The demoted items go into the NEAR tab
+    const demotedPairEvals = trustFilterResult.demotedMatches.map(m => m.evaluation);
+
+    return {
+      ...rawConfidenceResult,
+      matches: trustFilterResult.matches,
+      highMatchCount: trustFilterResult.matches.length,
+      bestMatch: trustFilterResult.matches.length > 0 ? trustFilterResult.matches[0] : null,
+      // Update showMatchesSection based on Trust Filter results
+      showMatchesSection: trustFilterResult.matches.length > 0,
+      // Merge demoted matches into near matches
+      rawEvaluation: rawConfidenceResult.rawEvaluation ? {
+        ...rawConfidenceResult.rawEvaluation,
+        near_matches: [...demotedPairEvals, ...originalNearMatches],
+      } : null,
+      nearMatchCount: demotedPairEvals.length + originalNearMatches.length,
+    };
+  }, [rawConfidenceResult, trustFilterResult]);
 
   // Log confidence engine results for debugging (dev only)
   useEffect(() => {
@@ -1947,9 +1988,12 @@ function ResultsSuccess({
         matchCount: confidenceResult.matches.length,
         nearMatchCount: confidenceResult.nearMatchCount,
         suggestionsMode: confidenceResult.suggestionsMode,
+        trustFilterApplied: trustFilterResult.wasApplied,
+        trustFilterHidden: trustFilterResult.hiddenCount,
+        trustFilterDemoted: trustFilterResult.demotedMatches.length,
       });
     }
-  }, [confidenceResult]);
+  }, [confidenceResult, trustFilterResult]);
 
   // ComboAssembler: Generate outfit combos from CE-ranked items
   const comboAssemblerResult = useComboAssembler(scannedItem, wardrobe, confidenceResult);
