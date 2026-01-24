@@ -64,15 +64,24 @@ Deno.serve(async (req) => {
 
   try {
     // Verify webhook authorization
+    // RevenueCat sends the Authorization header value exactly as configured
+    // It does NOT add "Bearer " prefix automatically
     const authHeader = req.headers.get("Authorization");
     const webhookSecret = Deno.env.get("REVENUECAT_WEBHOOK_SECRET");
 
-    if (webhookSecret && authHeader !== `Bearer ${webhookSecret}`) {
-      console.error("Unauthorized webhook request");
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (webhookSecret) {
+      // Check both formats: raw value or with Bearer prefix
+      const isValidAuth =
+        authHeader === webhookSecret ||
+        authHeader === `Bearer ${webhookSecret}`;
+
+      if (!isValidAuth) {
+        console.error("Unauthorized webhook request - invalid auth header");
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     // Parse the webhook payload
