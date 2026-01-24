@@ -12,7 +12,7 @@
  *   // Use tfResult.demotedMatches to add to NEAR tab
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { ConfidenceEngineResult, EnrichedMatch } from './useConfidenceEngine';
 import type { ScannedItem, WardrobeItem, Category } from './types';
 import type { StyleSignalsV1 } from './trust-filter/types';
@@ -34,6 +34,12 @@ import {
   enqueueWardrobeEnrichmentBatch,
   generateScanStyleSignals,
 } from './style-signals-service';
+import {
+  trackTrustFilterStarted,
+  trackTrustFilterCompleted,
+  trackTrustFilterPairDecision,
+  trackTrustFilterError,
+} from './analytics';
 
 // ============================================
 // TYPES
@@ -189,9 +195,13 @@ export function useTrustFilter(
     setSignalsFetched(false);
   }, [scanId]);
 
+  // Track if we've already sent telemetry for this evaluation
+  const telemetrySentRef = useRef<string | null>(null);
+
   // Apply Trust Filter
   const result = useMemo((): TrustFilterResult => {
     const matches = confidenceResult.matches;
+    const startTime = Date.now();
 
     // If Trust Filter is disabled, return original matches
     if (!isTrustFilterEnabled()) {
@@ -232,6 +242,17 @@ export function useTrustFilter(
     const enableTrace = isTrustFilterTraceEnabled();
     const scanCategory = scannedItem?.category ?? 'tops';
 
+    // Telemetry: Track start (only once per scan)
+    const telemetryKey = `${scanId}-${matches.length}-${wardrobeSignals.size}`;
+    if (scanId && telemetrySentRef.current !== telemetryKey) {
+      trackTrustFilterStarted({
+        scanId,
+        scanCategory,
+        highMatchCount: matches.length,
+        hasScanSignals: !!scanSignals,
+      });
+    }
+
     // Prepare batch input for Trust Filter
     const batchMatches = matches.map(m => ({
       id: m.wardrobeItem.id,
@@ -240,13 +261,34 @@ export function useTrustFilter(
       ceScore: m.evaluation.raw_score,
     }));
 
-    // Run Trust Filter batch evaluation
-    const batchResult = evaluateTrustFilterBatch({
-      scanSignals,
-      scanCategory: mapCategory(scanCategory),
-      matches: batchMatches,
-      enableTrace,
-    });
+    let batchResult: TrustFilterBatchResult;
+    try {
+      // Run Trust Filter batch evaluation
+      batchResult = evaluateTrustFilterBatch({
+        scanSignals,
+        scanCategory: mapCategory(scanCategory),
+        matches: batchMatches,
+        enableTrace,
+      });
+    } catch (error) {
+      // Telemetry: Track error
+      if (scanId) {
+        trackTrustFilterError({
+          scanId,
+          errorType: 'evaluation_error',
+          errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+      // On error, return original matches
+      return {
+        matches,
+        demotedMatches: [],
+        hiddenCount: 0,
+        wasApplied: false,
+        isLoading: false,
+        scanSignals,
+      };
+    }
 
     // Create lookup from match ID to EnrichedMatch
     const matchMap = new Map<string, EnrichedMatch>();
@@ -270,6 +312,39 @@ export function useTrustFilter(
     }
 
     hiddenCount = batchResult.hidden.length;
+
+    // Telemetry: Track completion and pair decisions (only once per scan)
+    if (scanId && telemetrySentRef.current !== telemetryKey) {
+      const durationMs = Date.now() - startTime;
+
+      // Track completion
+      trackTrustFilterCompleted({
+        scanId,
+        scanCategory,
+        originalHighCount: matches.length,
+        finalHighCount: highFinal.length,
+        demotedCount: demoted.length,
+        hiddenCount,
+        skippedCount: batchResult.stats.skippedCount,
+        durationMs,
+      });
+
+      // Track individual pair decisions (sampled at 5% in analytics.ts)
+      for (const [matchId, decision] of batchResult.decisions) {
+        trackTrustFilterPairDecision({
+          scanId,
+          matchId,
+          action: decision.action,
+          reason: decision.reason,
+          archetypeDistance: decision.archetype_distance ?? undefined,
+          formalityGap: decision.formality_gap ?? undefined,
+          seasonDiff: decision.season_diff ?? undefined,
+          promptVersion: 1, // Current prompt version
+        });
+      }
+
+      telemetrySentRef.current = telemetryKey;
+    }
 
     // Log in development
     if (__DEV__) {
@@ -301,7 +376,7 @@ export function useTrustFilter(
         skippedCount: batchResult.stats.skippedCount,
       } : undefined,
     };
-  }, [confidenceResult.matches, scanSignals, wardrobeSignals, scannedItem?.category, isLoading]);
+  }, [confidenceResult.matches, scanSignals, wardrobeSignals, scannedItem?.category, isLoading, scanId]);
 
   return result;
 }

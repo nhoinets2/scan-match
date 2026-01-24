@@ -27,6 +27,7 @@ import { colors } from "@/lib/design-tokens";
 import { initializeBackgroundUploads } from "@/lib/storage";
 import { queryClient } from "@/lib/queryClient";
 import { initializeAnalytics, setAnalyticsUserId, resetAnalyticsSession } from "@/lib/analytics";
+import { preloadRemoteConfig } from "@/lib/trust-filter-remote-config";
 
 export const unstable_settings = {
   initialRouteName: "login",
@@ -64,6 +65,7 @@ function BackgroundUploadInitializer() {
  * - Initializes session on first render
  * - Sets user ID when auth changes
  * - Resets session on logout
+ * - Preloads remote config
  */
 function AnalyticsInitializer() {
   const { user, isLoading } = useAuth();
@@ -75,6 +77,8 @@ function AnalyticsInitializer() {
     if (!initialized.current) {
       initialized.current = true;
       initializeAnalytics();
+      // Preload Trust Filter remote config (non-blocking)
+      preloadRemoteConfig();
     }
   }, []);
 

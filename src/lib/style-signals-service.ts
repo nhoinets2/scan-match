@@ -257,6 +257,9 @@ export async function fetchWardrobeStyleSignalsBatch(
   }
 }
 
+/** Current prompt version - must match Edge Function */
+export const CURRENT_PROMPT_VERSION = 1;
+
 /**
  * Check which wardrobe items need enrichment.
  *
@@ -280,7 +283,6 @@ export async function getItemsNeedingEnrichment(
       return itemIds; // Assume all need enrichment on error
     }
 
-    const CURRENT_PROMPT_VERSION = 1;
     const needsEnrichment: string[] = [];
 
     const statusMap = new Map<string, { status: string; version: number }>();
@@ -309,3 +311,186 @@ export async function getItemsNeedingEnrichment(
     return itemIds;
   }
 }
+
+// ============================================
+// RE-ENRICHMENT TRIGGERS
+// ============================================
+
+/**
+ * Check if a wardrobe item's signals are outdated (prompt version mismatch).
+ *
+ * @param itemId - The wardrobe item ID
+ * @returns True if signals need re-generation
+ */
+export async function isSignalsOutdated(itemId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('wardrobe_items')
+      .select('style_signals_status, style_signals_prompt_version')
+      .eq('id', itemId)
+      .single();
+
+    if (error || !data) {
+      return true; // Assume outdated if we can't check
+    }
+
+    // Outdated if: not ready, or prompt version is old
+    if (data.style_signals_status !== 'ready') {
+      return true;
+    }
+
+    const version = data.style_signals_prompt_version ?? 0;
+    return version < CURRENT_PROMPT_VERSION;
+  } catch (error) {
+    console.error('[StyleSignalsService] Error checking outdated status:', error);
+    return true;
+  }
+}
+
+/**
+ * Force re-enrichment of a wardrobe item's style signals.
+ * Resets the status to 'none' and triggers generation.
+ *
+ * @param itemId - The wardrobe item ID to re-enrich
+ * @returns Result of the regeneration
+ */
+export async function forceReEnrichWardrobe(
+  itemId: string
+): Promise<StyleSignalsResponse> {
+  try {
+    // Reset status to 'none' to force regeneration
+    const { error: resetError } = await supabase
+      .from('wardrobe_items')
+      .update({
+        style_signals_status: 'none',
+        style_signals_v1: null,
+        style_signals_error: null,
+      })
+      .eq('id', itemId);
+
+    if (resetError) {
+      console.error('[StyleSignalsService] Error resetting signals:', resetError);
+      return {
+        ok: false,
+        error: { kind: 'reset_error', message: resetError.message },
+      };
+    }
+
+    // Trigger regeneration
+    return await generateWardrobeStyleSignals(itemId);
+  } catch (error) {
+    console.error('[StyleSignalsService] Error forcing re-enrichment:', error);
+    return {
+      ok: false,
+      error: { kind: 'unknown', message: 'Re-enrichment failed' },
+    };
+  }
+}
+
+/**
+ * Force re-enrichment of a scan's style signals.
+ *
+ * @param scanId - The scan ID to re-enrich
+ * @returns Result of the regeneration
+ */
+export async function forceReEnrichScan(
+  scanId: string
+): Promise<StyleSignalsResponse> {
+  try {
+    // Reset status to 'none' to force regeneration
+    const { error: resetError } = await supabase
+      .from('recent_checks')
+      .update({
+        style_signals_status: 'none',
+        style_signals_v1: null,
+        style_signals_error: null,
+      })
+      .eq('id', scanId);
+
+    if (resetError) {
+      console.error('[StyleSignalsService] Error resetting scan signals:', resetError);
+      return {
+        ok: false,
+        error: { kind: 'reset_error', message: resetError.message },
+      };
+    }
+
+    // Trigger regeneration
+    return await generateScanStyleSignals(scanId);
+  } catch (error) {
+    console.error('[StyleSignalsService] Error forcing scan re-enrichment:', error);
+    return {
+      ok: false,
+      error: { kind: 'unknown', message: 'Scan re-enrichment failed' },
+    };
+  }
+}
+
+/**
+ * Get all wardrobe items with outdated signals (for bulk re-enrichment).
+ *
+ * @returns Array of item IDs with outdated signals
+ */
+export async function getOutdatedWardrobeItems(): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from('wardrobe_items')
+      .select('id')
+      .or(`style_signals_status.neq.ready,style_signals_prompt_version.lt.${CURRENT_PROMPT_VERSION}`);
+
+    if (error || !data) {
+      console.error('[StyleSignalsService] Error fetching outdated items:', error);
+      return [];
+    }
+
+    return data.map(item => item.id);
+  } catch (error) {
+    console.error('[StyleSignalsService] Error fetching outdated items:', error);
+    return [];
+  }
+}
+
+/**
+ * Trigger bulk re-enrichment for all outdated wardrobe items.
+ * Fire-and-forget - runs in background.
+ *
+ * @param batchSize - Number of items to enrich at once (default 5)
+ * @param delayMs - Delay between batches in ms (default 1000)
+ */
+export async function triggerBulkReEnrichment(
+  batchSize: number = 5,
+  delayMs: number = 1000
+): Promise<{ total: number; started: boolean }> {
+  const outdatedIds = await getOutdatedWardrobeItems();
+
+  if (outdatedIds.length === 0) {
+    return { total: 0, started: false };
+  }
+
+  // Process in background (fire and forget)
+  (async () => {
+    for (let i = 0; i < outdatedIds.length; i += batchSize) {
+      const batch = outdatedIds.slice(i, i + batchSize);
+      enqueueWardrobeEnrichmentBatch(batch);
+
+      // Delay between batches to avoid overwhelming the server
+      if (i + batchSize < outdatedIds.length) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+
+    if (__DEV__) {
+      console.log(`[StyleSignalsService] Bulk re-enrichment completed: ${outdatedIds.length} items`);
+    }
+  })().catch(error => {
+    console.error('[StyleSignalsService] Bulk re-enrichment error:', error);
+  });
+
+  return { total: outdatedIds.length, started: true };
+}
+
+// ============================================
+// __DEV__ DECLARATION
+// ============================================
+
+declare const __DEV__: boolean;

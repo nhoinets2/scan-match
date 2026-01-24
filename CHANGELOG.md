@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Trust Filter Telemetry**: Wired analytics tracking into `useTrustFilter` hook:
+  - `trust_filter_started` - When evaluation begins
+  - `trust_filter_completed` - Summary with demote/hide/skip counts and duration
+  - `trust_filter_pair_decision` - Per-pair decision (sampled at 5%)
+  - `trust_filter_error` - When evaluation fails
+- **Trust Filter Remote Config**: Added remote config system for dynamic rule updates:
+  - New `trust_filter_config` table in Supabase
+  - Single active config with automatic deactivation of others
+  - Client fetches config on app start (5 min cache)
+  - Validates overrides against allowed keys before applying
+- **Style Signals Re-enrichment Triggers**: Added functions for outdated signal management:
+  - `isSignalsOutdated(itemId)` - Check if signals need refresh
+  - `forceReEnrichWardrobe(itemId)` - Force regeneration for wardrobe item
+  - `forceReEnrichScan(scanId)` - Force regeneration for scan
+  - `getOutdatedWardrobeItems()` - Get all items needing refresh
+  - `triggerBulkReEnrichment()` - Batch re-enrich with rate limiting
 - **Supabase Analytics Sink**: Added production analytics system using Supabase as the backend:
   - New `analytics_events` table with RLS (insert-only for clients)
   - Batched event sending (10 events or 15 seconds)
@@ -118,6 +134,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `evaluate.ts` - Main `evaluateTrustFilterPair` and `evaluateTrustFilterBatch` functions
   - `index.ts` - Public API exports
   - `__tests__/evaluate.test.ts` - 23 unit tests covering all 12 canonical scenarios plus edge cases
+- **supabase/migrations/009_trust_filter_remote_config.sql** - Remote config table:
+  - `trust_filter_config` table with version, is_active, config_overrides
+  - Trigger to ensure only one active config at a time
+  - RLS: authenticated users can read active config only
+  - Example template config included (inactive)
+- **src/lib/trust-filter-remote-config.ts** - Remote config fetch service:
+  - `fetchTrustFilterConfig()` - Fetch and merge remote overrides
+  - `getTrustFilterConfigSync()` - Get cached config (sync)
+  - `preloadRemoteConfig()` - Start fetch at app launch
+  - 5-minute cache to avoid excessive fetches
 - **supabase/migrations/008_analytics_events.sql** - Database migration for analytics:
   - `analytics_events` table with `user_id`, `session_id`, `name`, `properties` (JSONB)
   - Indexes for time, event name, and user queries
