@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Trust Filter v1 (Epic 2)**: Implemented deterministic post-CE guardrail that prevents trust-breaking HIGH matches. Evaluates pairs using style signals (aesthetic archetypes, formality, statement level, season, pattern) and outputs keep/demote/hide decisions with reason codes. Features include:
+  - 12 aesthetic archetypes with cluster-based distance calculation
+  - Secondary aesthetic softening to prevent over-penalizing blended styles
+  - Category-specific policies (bags/accessories never hidden for archetype-only, skirts can't escalate to hide)
+  - Anchor rule for context-dependent pairs (shoes+tops, outerwear+shoes)
+  - Configurable confidence thresholds and decision priorities
+  - Full trace support for debugging decisions
+  - Remote config override with validated safe subset of keys
+- **Style Signals v1 types (Epic 1 foundation)**: Added comprehensive TypeScript types for the style signals schema including `StyleSignalsV1` interface, aesthetic archetypes, formality bands, statement levels, season heaviness, pattern levels, and material families
+
 ### Security
 - **[CRITICAL FIX] Subscription data leakage between accounts** - Fixed critical security vulnerability where subscription status would leak from one user to another when switching accounts on the same device. React Query cache is now properly cleared on logout, and RevenueCat user ID is correctly set on login. When User A with Pro subscription logged out and User B logged in, User B would incorrectly see "Pro Member" status from User A. See `docs/historical/subscription-leak-fix.md` for full details.
 - **OpenAI API key moved to server-side** - Moved OpenAI API key to server-side Edge Function (no longer exposed in client bundle)
@@ -83,6 +94,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **changelog.txt** - Migrated to proper CHANGELOG.md following Keep a Changelog format
 
 ### Technical
+- **src/lib/trust-filter/** - New module for Trust Filter v1 with 6 files:
+  - `types.ts` - Type definitions for StyleSignalsV1, reason codes, categories
+  - `config.ts` - TRUST_FILTER_CONFIG_V1 with cluster distances, rules, policies
+  - `helpers.ts` - Pure functions for distance calculation, formality gaps, category checks
+  - `evaluate.ts` - Main `evaluateTrustFilterPair` and `evaluateTrustFilterBatch` functions
+  - `index.ts` - Public API exports
+  - `__tests__/evaluate.test.ts` - 23 unit tests covering all 12 canonical scenarios plus edge cases
 - **src/lib/auth-context.tsx** - Clear React Query cache on logout (both in signOut function and SIGNED_OUT event), set RevenueCat user ID on login
 - **src/app/_layout.tsx** - Import queryClient from shared module
 - **New Edge Function: analyze-image** - Handles auth, quota, rate limits, and OpenAI calls
