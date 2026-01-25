@@ -144,16 +144,30 @@ export function useTrustFilter(
 
         if (scanId) {
           // Try to fetch from DB first
+          if (__DEV__) {
+            console.log('[useTrustFilter] Fetching scan signals for:', scanId);
+          }
           fetchedScanSignals = await fetchScanStyleSignals(scanId);
+
+          if (__DEV__) {
+            console.log('[useTrustFilter] DB cache result:', fetchedScanSignals ? 'found' : 'not found');
+          }
 
           // If not cached and style signals are enabled, generate
           if (!fetchedScanSignals && isStyleSignalsEnabled()) {
             if (__DEV__) {
-              console.log('[useTrustFilter] Generating scan style signals...');
+              console.log('[useTrustFilter] Generating scan style signals via Edge Function...');
             }
             const response = await generateScanStyleSignals(scanId);
+            if (__DEV__) {
+              console.log('[useTrustFilter] Edge Function response:', response.ok ? 'success' : response.error);
+            }
             if (response.ok && response.data) {
               fetchedScanSignals = response.data;
+            }
+          } else if (!fetchedScanSignals && !isStyleSignalsEnabled()) {
+            if (__DEV__) {
+              console.log('[useTrustFilter] Style signals disabled, skipping generation');
             }
           }
         }
@@ -162,7 +176,13 @@ export function useTrustFilter(
 
         // Fetch wardrobe signals for matched items
         if (matchedItemIds.length > 0) {
+          if (__DEV__) {
+            console.log('[useTrustFilter] Fetching wardrobe signals for', matchedItemIds.length, 'items');
+          }
           const fetchedWardrobeSignals = await fetchWardrobeStyleSignalsBatch(matchedItemIds);
+          if (__DEV__) {
+            console.log('[useTrustFilter] Wardrobe signals found:', fetchedWardrobeSignals.size, '/', matchedItemIds.length);
+          }
           setWardrobeSignals(fetchedWardrobeSignals);
 
           // Enqueue enrichment for items without signals
