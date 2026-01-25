@@ -117,6 +117,7 @@ import {
 } from "@/lib/results-ui-policy";
 // Debug feature flags
 import { shouldSaveDebugData } from "@/lib/debug-config";
+import { isTrustFilterTraceEnabled } from "@/lib/feature-flags";
 import { buildEngineSnapshot } from "@/lib/debug-snapshot";
 import { ButtonPrimary } from "@/components/ButtonPrimary";
 import { ButtonTertiary } from "@/components/ButtonTertiary";
@@ -1107,6 +1108,8 @@ function MatchesBottomSheet({
   scannedItemImageUri,
   scannedItemLabel,
   onItemPress,
+  demotedItemIds,
+  trustFilterApplied,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -1116,6 +1119,10 @@ function MatchesBottomSheet({
   scannedItemImageUri?: string;
   scannedItemLabel?: string;
   onItemPress: (item: WardrobeItem, index: number) => void;
+  /** IDs of items demoted by Trust Filter (for debug UI) */
+  demotedItemIds?: Set<string>;
+  /** Whether Trust Filter was applied (for debug UI) */
+  trustFilterApplied?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   // Internal state for viewing images - no external modal needed
@@ -1399,6 +1406,23 @@ function MatchesBottomSheet({
                               }}
                             >
                               {match.explanation}
+                            </Text>
+                          )}
+                          {/* Trust Filter Debug UI (dev only) */}
+                          {__DEV__ && isTrustFilterTraceEnabled() && trustFilterApplied && (
+                            <Text
+                              style={{
+                                fontFamily: "Inter_500Medium",
+                                fontSize: 10,
+                                color: matchType === "high" 
+                                  ? "#22c55e" // green for keep
+                                  : demotedItemIds?.has(item.id) 
+                                    ? "#f59e0b" // amber for demote
+                                    : "#94a3b8", // gray for original near
+                                marginTop: 2,
+                              }}
+                            >
+                              TF: {matchType === "high" ? "keep" : demotedItemIds?.has(item.id) ? "demote" : "near_original"}
                             </Text>
                           )}
                         </View>
@@ -1994,6 +2018,11 @@ function ResultsSuccess({
       });
     }
   }, [confidenceResult, trustFilterResult]);
+
+  // Create Set of demoted item IDs for debug UI (efficient lookup)
+  const demotedItemIds = useMemo(() => {
+    return new Set(trustFilterResult.demotedMatches.map(m => m.wardrobeItem.id));
+  }, [trustFilterResult.demotedMatches]);
 
   // ComboAssembler: Generate outfit combos from CE-ranked items
   const comboAssemblerResult = useComboAssembler(scannedItem, wardrobe, confidenceResult);
@@ -5076,6 +5105,8 @@ function ResultsSuccess({
           const itemId = item.id;
           router.push(`/wardrobe-item?itemId=${encodeURIComponent(String(itemId))}&viewOnly=true`);
         }}
+        demotedItemIds={demotedItemIds}
+        trustFilterApplied={trustFilterResult.wasApplied}
       />
       )}
     </View>
