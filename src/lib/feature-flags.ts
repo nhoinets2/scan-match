@@ -2,7 +2,13 @@
  * Feature Flags
  *
  * Centralized feature flag management.
- * In production, these could be fetched from a remote config service.
+ * Reads from EXPO_PUBLIC_* environment variables with fallback defaults.
+ *
+ * Environment variables:
+ *   EXPO_PUBLIC_TRUST_FILTER_ENABLED=true
+ *   EXPO_PUBLIC_TRUST_FILTER_TRACE_ENABLED=true
+ *   EXPO_PUBLIC_STYLE_SIGNALS_ENABLED=true
+ *   EXPO_PUBLIC_LAZY_ENRICHMENT_ENABLED=true
  */
 
 // ============================================
@@ -40,24 +46,39 @@ export interface FeatureFlags {
 }
 
 // ============================================
-// DEFAULT VALUES
+// ENVIRONMENT VARIABLE HELPERS
+// ============================================
+
+function getEnvBoolean(key: string, defaultValue: boolean): boolean {
+  const value = process.env[key];
+  if (value === undefined || value === '') {
+    return defaultValue;
+  }
+  return value === 'true' || value === '1';
+}
+
+// ============================================
+// DEFAULT VALUES (from env vars or hardcoded defaults)
 // ============================================
 
 // Check if we're in development mode
 declare const __DEV__: boolean;
 
 const DEFAULT_FLAGS: FeatureFlags = {
-  // Trust Filter enabled for testing
-  trust_filter_enabled: true,
+  // Trust Filter: EXPO_PUBLIC_TRUST_FILTER_ENABLED or default false
+  trust_filter_enabled: getEnvBoolean('EXPO_PUBLIC_TRUST_FILTER_ENABLED', false),
 
-  // Trace logging enabled in development
-  trust_filter_trace_enabled: typeof __DEV__ !== 'undefined' ? __DEV__ : false,
+  // Trace logging: EXPO_PUBLIC_TRUST_FILTER_TRACE_ENABLED or default to __DEV__
+  trust_filter_trace_enabled: getEnvBoolean(
+    'EXPO_PUBLIC_TRUST_FILTER_TRACE_ENABLED',
+    typeof __DEV__ !== 'undefined' ? __DEV__ : false
+  ),
 
-  // Style signals enabled (required for Trust Filter)
-  style_signals_enabled: true,
+  // Style signals: EXPO_PUBLIC_STYLE_SIGNALS_ENABLED or default false
+  style_signals_enabled: getEnvBoolean('EXPO_PUBLIC_STYLE_SIGNALS_ENABLED', false),
 
-  // Lazy enrichment enabled for background wardrobe enrichment
-  lazy_enrichment_enabled: true,
+  // Lazy enrichment: EXPO_PUBLIC_LAZY_ENRICHMENT_ENABLED or default false
+  lazy_enrichment_enabled: getEnvBoolean('EXPO_PUBLIC_LAZY_ENRICHMENT_ENABLED', false),
 };
 
 // ============================================
