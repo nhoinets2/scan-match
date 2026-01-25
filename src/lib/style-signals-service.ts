@@ -83,10 +83,47 @@ export async function generateScanStyleSignals(
   }
 }
 
+// ============================================
+// DIRECT SCAN SIGNALS (for unsaved local images)
+// ============================================
+
+// In-memory cache for direct signals (avoids repeated base64 + API calls)
+const directSignalsCache = new Map<string, StyleSignalsV1>();
+
+// Max payload size for base64 image (6MB base64 ≈ 4.5MB raw image)
+const MAX_BASE64_LENGTH = 6 * 1024 * 1024;
+
+// Target dimensions for resizing (keeps quality good enough for style analysis)
+const RESIZE_MAX_DIMENSION = 1280;
+const JPEG_QUALITY = 0.75;
+
+/**
+ * Resize and compress an image to reduce payload size.
+ * Returns a base64 data URL ready for the Edge Function.
+ */
+async function resizeAndCompressImage(localImageUri: string): Promise<string> {
+  const ImageManipulator = await import('expo-image-manipulator');
+  
+  // Resize to max 1280px on longest side, compress to JPEG 0.75
+  const result = await ImageManipulator.manipulateAsync(
+    localImageUri,
+    [{ resize: { width: RESIZE_MAX_DIMENSION, height: RESIZE_MAX_DIMENSION } }],
+    { compress: JPEG_QUALITY, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+  );
+
+  if (!result.base64) {
+    throw new Error('Failed to compress image to base64');
+  }
+
+  return `data:image/jpeg;base64,${result.base64}`;
+}
+
 /**
  * Generate style signals directly from a local image.
- * Converts the local image to base64 and sends to the Edge Function.
+ * Resizes/compresses the image, converts to base64, and sends to the Edge Function.
  * Used for unsaved scans where the image hasn't been uploaded yet.
+ * 
+ * Results are cached in-memory by image URI to avoid repeated API calls.
  *
  * @param localImageUri - Local file:// URI of the image
  * @returns StyleSignalsResponse with the generated signals
@@ -95,6 +132,15 @@ export async function generateScanStyleSignalsDirect(
   localImageUri: string
 ): Promise<StyleSignalsResponse> {
   try {
+    // Check in-memory cache first (avoid repeated base64 + API calls on re-renders)
+    const cached = directSignalsCache.get(localImageUri);
+    if (cached) {
+      if (__DEV__) {
+        console.log('[StyleSignalsService] Returning cached direct signals');
+      }
+      return { ok: true, data: cached };
+    }
+
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData?.session?.access_token;
 
@@ -105,19 +151,25 @@ export async function generateScanStyleSignalsDirect(
       };
     }
 
-    // Convert local image to base64 data URL
-    const { readAsStringAsync, EncodingType } = await import('expo-file-system');
-    const base64Data = await readAsStringAsync(localImageUri, {
-      encoding: EncodingType.Base64,
-    });
+    // Resize and compress image before converting to base64
+    if (__DEV__) {
+      console.log('[StyleSignalsService] Resizing and compressing local image...');
+    }
+    const imageDataUrl = await resizeAndCompressImage(localImageUri);
 
-    // Determine MIME type from extension
-    const extension = localImageUri.split('.').pop()?.toLowerCase() || 'jpg';
-    const mimeType = extension === 'png' ? 'image/png' : 'image/jpeg';
-    const imageDataUrl = `data:${mimeType};base64,${base64Data}`;
+    // Client-side payload size check
+    if (imageDataUrl.length > MAX_BASE64_LENGTH) {
+      console.warn('[StyleSignalsService] Image too large even after compression');
+      return {
+        ok: false,
+        error: { kind: 'payload_too_large', message: 'Image too large for analysis' },
+      };
+    }
 
     if (__DEV__) {
-      console.log('[StyleSignalsService] Generating direct signals for local image');
+      // Log size info but NEVER log the actual base64 data
+      const sizeKB = Math.round(imageDataUrl.length / 1024);
+      console.log(`[StyleSignalsService] Sending ${sizeKB}KB compressed image for direct analysis`);
     }
 
     const response = await fetch(getStyleSignalsUrl(), {
@@ -133,6 +185,18 @@ export async function generateScanStyleSignalsDirect(
     });
 
     const result = await response.json();
+    
+    // Cache successful results
+    if (result.ok && result.data) {
+      directSignalsCache.set(localImageUri, result.data);
+      
+      // Limit cache size (keep last 10 scans)
+      if (directSignalsCache.size > 10) {
+        const firstKey = directSignalsCache.keys().next().value;
+        if (firstKey) directSignalsCache.delete(firstKey);
+      }
+    }
+
     return result as StyleSignalsResponse;
   } catch (error) {
     console.error('[StyleSignalsService] Error generating direct scan signals:', error);
@@ -141,6 +205,14 @@ export async function generateScanStyleSignalsDirect(
       error: { kind: 'network_error', message: 'Failed to generate signals from local image' },
     };
   }
+}
+
+/**
+ * Clear the direct signals cache.
+ * Call this when user logs out or starts a new session.
+ */
+export function clearDirectSignalsCache(): void {
+  directSignalsCache.clear();
 }
 
 // Declare __DEV__ for TypeScript

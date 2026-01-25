@@ -21,6 +21,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Rate limiting: in-memory store (resets on function cold start)
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
 // Current prompt version - increment when prompt changes significantly
 const CURRENT_PROMPT_VERSION = 1;
 
@@ -434,7 +437,7 @@ Deno.serve(async (req) => {
     // ============================================
     
     if (type === 'scan_direct') {
-      // Auth required
+      // Auth required - verify JWT token
       const authHeader = req.headers.get("Authorization");
       if (!authHeader?.startsWith("Bearer ")) {
         return new Response(
@@ -443,10 +446,54 @@ Deno.serve(async (req) => {
         );
       }
 
+      // Verify the JWT and get user ID for rate limiting
+      const token = authHeader.replace("Bearer ", "");
+      const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      });
+
+      const { data: userData, error: authError } = await supabaseUser.auth.getUser();
+      if (authError || !userData?.user) {
+        return new Response(
+          JSON.stringify({ ok: false, error: { kind: "unauthorized", message: "Invalid auth token" } }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const userId = userData.user.id;
+
+      // Rate limiting for scan_direct (prevent abuse)
+      const directRateLimit = rateLimitStore.get(`direct:${userId}`);
+      const now = Date.now();
+      const DIRECT_LIMIT_PER_HOUR = 30; // Max 30 direct scans per hour
+      
+      if (directRateLimit && directRateLimit.resetAt > now) {
+        if (directRateLimit.count >= DIRECT_LIMIT_PER_HOUR) {
+          const retryAfter = Math.ceil((directRateLimit.resetAt - now) / 1000);
+          return new Response(
+            JSON.stringify({ ok: false, error: { kind: "rate_limited", message: `Rate limit exceeded. Try again in ${retryAfter}s` } }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": String(retryAfter) } }
+          );
+        }
+        directRateLimit.count++;
+      } else {
+        rateLimitStore.set(`direct:${userId}`, { count: 1, resetAt: now + 3600000 }); // 1 hour
+      }
+
       if (!imageDataUrl) {
         return new Response(
           JSON.stringify({ ok: false, error: { kind: "bad_request", message: "Missing imageDataUrl" } }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Server-side payload size limit (8MB base64 string max)
+      const MAX_PAYLOAD_SIZE = 8 * 1024 * 1024;
+      if (imageDataUrl.length > MAX_PAYLOAD_SIZE) {
+        console.warn(`[style-signals] scan_direct: payload too large (${Math.round(imageDataUrl.length / 1024)}KB)`);
+        return new Response(
+          JSON.stringify({ ok: false, error: { kind: "payload_too_large", message: "Image too large. Max 8MB." } }),
+          { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
@@ -458,7 +505,9 @@ Deno.serve(async (req) => {
         );
       }
 
-      console.log(`[style-signals] scan_direct: analyzing base64 image`);
+      // NOTE: Never log imageDataUrl - it's huge and potentially sensitive
+      const payloadSizeKB = Math.round(imageDataUrl.length / 1024);
+      console.log(`[style-signals] scan_direct: user=${userId.slice(0, 8)}..., payload=${payloadSizeKB}KB`);
 
       const openaiKey = Deno.env.get("OPENAI_API_KEY");
       if (!openaiKey) {
