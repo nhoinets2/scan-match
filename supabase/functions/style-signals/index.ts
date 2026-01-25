@@ -304,41 +304,7 @@ Deno.serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    // Get auth token from header
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(
-        JSON.stringify({ ok: false, error: { kind: "unauthorized", message: "Missing auth token" } }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-
-    // Initialize Supabase clients
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    });
-
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Verify user is authenticated
-    const { data: { user }, error: authError } = await supabaseUser.auth.getUser(token);
-    if (authError || !user) {
-      console.error("[style-signals] Auth error:", authError);
-      return new Response(
-        JSON.stringify({ ok: false, error: { kind: "unauthorized", message: "Invalid auth token" } }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const userId = user.id;
-
-    // Parse request body
+    // Parse request body first to check type
     const body: StyleSignalsRequest = await req.json();
     const { type, scanId, itemId, imageName } = body;
 
@@ -349,11 +315,19 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Initialize Supabase config
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
     // ============================================
-    // GOLDEN SET MODE (for testing)
+    // GOLDEN SET MODE (for testing - no auth required)
     // ============================================
     
     if (type === 'golden_set') {
+      // Golden set mode skips user authentication - it's for internal testing only
+      const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+      
       if (!imageName) {
         return new Response(
           JSON.stringify({ ok: false, error: { kind: "bad_request", message: "Missing imageName" } }),
@@ -452,6 +426,39 @@ Deno.serve(async (req) => {
         );
       }
     }
+
+    // ============================================
+    // AUTHENTICATED MODES (scan, wardrobe)
+    // ============================================
+
+    // Get auth token from header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ ok: false, error: { kind: "unauthorized", message: "Missing auth token" } }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+
+    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabaseUser.auth.getUser(token);
+    if (authError || !user) {
+      console.error("[style-signals] Auth error:", authError);
+      return new Response(
+        JSON.stringify({ ok: false, error: { kind: "unauthorized", message: "Invalid auth token" } }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const userId = user.id;
 
     let imageUri: string;
     let recordId: string;

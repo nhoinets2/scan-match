@@ -1,0 +1,1715 @@
+{
+  "version": 1,
+  "generatedAt": "2026-01-25T02:18:16.321Z",
+  "promptVersion": 1,
+  "entries": [
+    {
+      "filename": "v1/MIN-01_black_leather_ankle_boots.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/MIN-01_black_leather_ankle_boots.webp",
+      "generatedAt": "2026-01-25T02:12:39.574Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "classic",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "office",
+          "confidence": 0.85
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.7
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.75
+        },
+        "palette": {
+          "colors": [
+            "black",
+            "brown"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.95
+        },
+        "material": {
+          "family": "leather",
+          "confidence": 0.95
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/MIN-02_white_crewneck_tee.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/MIN-02_white_crewneck_tee.webp",
+      "generatedAt": "2026-01-25T02:12:50.201Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "minimalist",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.9
+        },
+        "statement": {
+          "level": "low",
+          "confidence": 0.9
+        },
+        "season": {
+          "heaviness": "light",
+          "confidence": 0.9
+        },
+        "palette": {
+          "colors": [
+            "white"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "cotton",
+          "confidence": 0.9
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/MIN-03_black_straight_leg_trousers.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/MIN-03_black_straight_leg_trousers.webp",
+      "generatedAt": "2026-01-25T02:13:00.020Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "classic",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "office",
+          "confidence": 0.9
+        },
+        "statement": {
+          "level": "low",
+          "confidence": 0.8
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.7
+        },
+        "palette": {
+          "colors": [
+            "black"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "synthetic_tech",
+          "confidence": 0.7
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/CLA-01_beige_trench_coat.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/CLA-01_beige_trench_coat.webp",
+      "generatedAt": "2026-01-25T02:13:10.655Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "classic",
+          "primary_confidence": 0.95,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "smart_casual",
+          "confidence": 0.85
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.75
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.8
+        },
+        "palette": {
+          "colors": [
+            "beige",
+            "brown"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.95
+        },
+        "material": {
+          "family": "cotton",
+          "confidence": 0.8
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/CLA-02_navy_blazer.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/CLA-02_navy_blazer.webp",
+      "generatedAt": "2026-01-25T02:13:19.261Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "classic",
+          "primary_confidence": 0.95,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "office",
+          "confidence": 0.9
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.7
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.8
+        },
+        "palette": {
+          "colors": [
+            "navy",
+            "cream"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.95
+        },
+        "material": {
+          "family": "wool",
+          "confidence": 0.85
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/CLA-03_structured_leather_tote.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/CLA-03_structured_leather_tote.webp",
+      "generatedAt": "2026-01-25T02:13:29.277Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "classic",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "office",
+          "confidence": 0.9
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.7
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.8
+        },
+        "palette": {
+          "colors": [
+            "brown",
+            "tan"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 1
+        },
+        "material": {
+          "family": "leather",
+          "confidence": 0.9
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/AMB-01_simple_black_slip_dress.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/AMB-01_simple_black_slip_dress.webp",
+      "generatedAt": "2026-01-25T02:13:36.347Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "minimalist",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "evening",
+          "confidence": 0.9
+        },
+        "statement": {
+          "level": "high",
+          "confidence": 0.8
+        },
+        "season": {
+          "heaviness": "light",
+          "confidence": 0.8
+        },
+        "palette": {
+          "colors": [
+            "black"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "silk_satin",
+          "confidence": 0.9
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/AMB-02_tailored_black_blazer.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/AMB-02_tailored_black_blazer.webp",
+      "generatedAt": "2026-01-25T02:13:44.620Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "classic",
+          "primary_confidence": 0.9,
+          "secondary": "minimalist",
+          "secondary_confidence": 0.7
+        },
+        "formality": {
+          "band": "office",
+          "confidence": 0.9
+        },
+        "statement": {
+          "level": "low",
+          "confidence": 0.8
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.7
+        },
+        "palette": {
+          "colors": [
+            "black",
+            "cream"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "cotton",
+          "confidence": 0.7
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/AMB-03_dark_skinny_jeans.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/AMB-03_dark_skinny_jeans.webp",
+      "generatedAt": "2026-01-25T02:13:54.379Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "classic",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.9
+        },
+        "statement": {
+          "level": "low",
+          "confidence": 0.9
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.8
+        },
+        "palette": {
+          "colors": [
+            "denim_blue",
+            "tan"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "denim",
+          "confidence": 0.9
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/AMB-04_white_sneakers.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/AMB-04_white_sneakers.webp",
+      "generatedAt": "2026-01-25T02:14:02.525Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "minimalist",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.9
+        },
+        "statement": {
+          "level": "low",
+          "confidence": 0.9
+        },
+        "season": {
+          "heaviness": "light",
+          "confidence": 0.8
+        },
+        "palette": {
+          "colors": [
+            "white",
+            "beige"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "leather",
+          "confidence": 0.8
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/WRK-01_blue_denim_jacket.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/WRK-01_blue_denim_jacket.webp",
+      "generatedAt": "2026-01-25T02:14:11.519Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "classic",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.9
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.7
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.8
+        },
+        "palette": {
+          "colors": [
+            "denim_blue",
+            "blue"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "denim",
+          "confidence": 0.9
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/WRK-02_olive_utility_jacket.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/WRK-02_olive_utility_jacket.webp",
+      "generatedAt": "2026-01-25T02:14:20.225Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "workwear",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.8
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.7
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.8
+        },
+        "palette": {
+          "colors": [
+            "olive",
+            "beige"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "cotton",
+          "confidence": 0.8
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/WRK-03_straight_dark_denim_jeans.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/WRK-03_straight_dark_denim_jeans.webp",
+      "generatedAt": "2026-01-25T02:14:30.048Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "classic",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.9
+        },
+        "statement": {
+          "level": "low",
+          "confidence": 0.9
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.8
+        },
+        "palette": {
+          "colors": [
+            "denim_blue",
+            "tan"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "denim",
+          "confidence": 0.9
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/GLM-01_sequin_camisole.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/GLM-01_sequin_camisole.webp",
+      "generatedAt": "2026-01-25T02:14:38.891Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "glam",
+          "primary_confidence": 0.95,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "evening",
+          "confidence": 0.9
+        },
+        "statement": {
+          "level": "high",
+          "confidence": 0.9
+        },
+        "season": {
+          "heaviness": "light",
+          "confidence": 0.8
+        },
+        "palette": {
+          "colors": [
+            "black",
+            "metallic"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.8
+        },
+        "material": {
+          "family": "synthetic_tech",
+          "confidence": 0.85
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/GLM-02_metalic_clutch.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/GLM-02_metalic_clutch.webp",
+      "generatedAt": "2026-01-25T02:14:48.141Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "glam",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "evening",
+          "confidence": 0.9
+        },
+        "statement": {
+          "level": "high",
+          "confidence": 0.9
+        },
+        "season": {
+          "heaviness": "light",
+          "confidence": 0.8
+        },
+        "palette": {
+          "colors": [
+            "metallic"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "other",
+          "confidence": 0.8
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/GLM-03_stiletto_heels.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/GLM-03_stiletto_heels.webp",
+      "generatedAt": "2026-01-25T02:14:56.455Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "glam",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "evening",
+          "confidence": 0.9
+        },
+        "statement": {
+          "level": "high",
+          "confidence": 0.9
+        },
+        "season": {
+          "heaviness": "light",
+          "confidence": 0.7
+        },
+        "palette": {
+          "colors": [
+            "black",
+            "metallic"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "leather",
+          "confidence": 0.8
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/ROM-01_puff_sleeve_blouse.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/ROM-01_puff_sleeve_blouse.webp",
+      "generatedAt": "2026-01-25T02:15:05.856Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "romantic",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "smart_casual",
+          "confidence": 0.8
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.7
+        },
+        "season": {
+          "heaviness": "light",
+          "confidence": 0.9
+        },
+        "palette": {
+          "colors": [
+            "cream",
+            "beige"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "cotton",
+          "confidence": 0.7
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/ROM-02_satin_midi_slip_skirt.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/ROM-02_satin_midi_slip_skirt.webp",
+      "generatedAt": "2026-01-25T02:15:13.150Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "romantic",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "formal",
+          "confidence": 0.9
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.8
+        },
+        "season": {
+          "heaviness": "light",
+          "confidence": 0.9
+        },
+        "palette": {
+          "colors": [
+            "cream",
+            "beige"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "silk_satin",
+          "confidence": 0.9
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/ROM-03_pearl_necklace.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/ROM-03_pearl_necklace.webp",
+      "generatedAt": "2026-01-25T02:15:21.230Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "romantic",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "evening",
+          "confidence": 0.85
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.75
+        },
+        "season": {
+          "heaviness": "light",
+          "confidence": 0.8
+        },
+        "palette": {
+          "colors": [
+            "cream",
+            "metallic"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "other",
+          "confidence": 0.7
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/EDG-01_leather_moto_jacket.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/EDG-01_leather_moto_jacket.webp",
+      "generatedAt": "2026-01-25T02:15:28.908Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "edgy",
+          "primary_confidence": 0.95,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.8
+        },
+        "statement": {
+          "level": "high",
+          "confidence": 0.9
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.7
+        },
+        "palette": {
+          "colors": [
+            "black"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.95
+        },
+        "material": {
+          "family": "leather",
+          "confidence": 0.95
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/EDG-02_combat_boots.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/EDG-02_combat_boots.webp",
+      "generatedAt": "2026-01-25T02:15:37.482Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "edgy",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.8
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.7
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.7
+        },
+        "palette": {
+          "colors": [
+            "black"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "leather",
+          "confidence": 0.9
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/EDG-03_silver_chain_necklace.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/EDG-03_silver_chain_necklace.webp",
+      "generatedAt": "2026-01-25T02:15:45.236Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "edgy",
+          "primary_confidence": 0.8,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "smart_casual",
+          "confidence": 0.7
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.7
+        },
+        "season": {
+          "heaviness": "light",
+          "confidence": 0.9
+        },
+        "palette": {
+          "colors": [
+            "metallic"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "other",
+          "confidence": 0.8
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/BOH-01_flora_maxi_dress.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/BOH-01_flora_maxi_dress.webp",
+      "generatedAt": "2026-01-25T02:15:53.169Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "romantic",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "smart_casual",
+          "confidence": 0.8
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.7
+        },
+        "season": {
+          "heaviness": "light",
+          "confidence": 0.9
+        },
+        "palette": {
+          "colors": [
+            "cream",
+            "brown"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "bold",
+          "confidence": 0.8
+        },
+        "material": {
+          "family": "cotton",
+          "confidence": 0.7
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/BOH-02_fringe_suede_bag.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/BOH-02_fringe_suede_bag.webp",
+      "generatedAt": "2026-01-25T02:16:02.258Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "western",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.8
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.7
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.6
+        },
+        "palette": {
+          "colors": [
+            "brown",
+            "tan"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "leather",
+          "confidence": 0.9
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/BOH-03_wide_brim_felt_hat.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/BOH-03_wide_brim_felt_hat.webp",
+      "generatedAt": "2026-01-25T02:16:09.818Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "western",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.8
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.7
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.6
+        },
+        "palette": {
+          "colors": [
+            "brown",
+            "tan"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "wool",
+          "confidence": 0.8
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/STR-01_oversized_graphic_tee.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/STR-01_oversized_graphic_tee.webp",
+      "generatedAt": "2026-01-25T02:16:18.229Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "boho",
+          "primary_confidence": 0.8,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.9
+        },
+        "statement": {
+          "level": "high",
+          "confidence": 0.9
+        },
+        "season": {
+          "heaviness": "light",
+          "confidence": 0.8
+        },
+        "palette": {
+          "colors": [
+            "multicolor",
+            "beige"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "bold",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "cotton",
+          "confidence": 0.7
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/STR-02_baggy_cargo_pants.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/STR-02_baggy_cargo_pants.webp",
+      "generatedAt": "2026-01-25T02:16:25.892Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "workwear",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.8
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.7
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.7
+        },
+        "palette": {
+          "colors": [
+            "black"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "cotton",
+          "confidence": 0.8
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/STR-03_chunky_sneakers.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/STR-03_chunky_sneakers.webp",
+      "generatedAt": "2026-01-25T02:16:33.757Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "sporty",
+          "primary_confidence": 0.9,
+          "secondary": "street",
+          "secondary_confidence": 0.7
+        },
+        "formality": {
+          "band": "athleisure",
+          "confidence": 0.9
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.8
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.7
+        },
+        "palette": {
+          "colors": [
+            "white",
+            "gray"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "subtle",
+          "confidence": 0.6
+        },
+        "material": {
+          "family": "synthetic_tech",
+          "confidence": 0.8
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/PRP-01_cable_knit_sweater.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/PRP-01_cable_knit_sweater.webp",
+      "generatedAt": "2026-01-25T02:16:41.713Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "classic",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "smart_casual",
+          "confidence": 0.8
+        },
+        "statement": {
+          "level": "low",
+          "confidence": 0.9
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.8
+        },
+        "palette": {
+          "colors": [
+            "cream",
+            "beige"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "subtle",
+          "confidence": 0.8
+        },
+        "material": {
+          "family": "wool",
+          "confidence": 0.9
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/PRP-02_pleated_mini_skirt.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/PRP-02_pleated_mini_skirt.webp",
+      "generatedAt": "2026-01-25T02:16:50.001Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "preppy",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "smart_casual",
+          "confidence": 0.8
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.7
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.7
+        },
+        "palette": {
+          "colors": [
+            "navy"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "cotton",
+          "confidence": 0.7
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/PRP-03_loafers.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/PRP-03_loafers.webp",
+      "generatedAt": "2026-01-25T02:17:01.639Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "classic",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "smart_casual",
+          "confidence": 0.8
+        },
+        "statement": {
+          "level": "low",
+          "confidence": 0.9
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.7
+        },
+        "palette": {
+          "colors": [
+            "brown",
+            "tan"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "leather",
+          "confidence": 0.9
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/SPT-01_gray_cropped_sweatshirt.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/SPT-01_gray_cropped_sweatshirt.webp",
+      "generatedAt": "2026-01-25T02:17:08.885Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "minimalist",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.8
+        },
+        "statement": {
+          "level": "low",
+          "confidence": 0.9
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.7
+        },
+        "palette": {
+          "colors": [
+            "gray"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "knit",
+          "confidence": 0.8
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/SPT-02_black_leggins.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/SPT-02_black_leggins.webp",
+      "generatedAt": "2026-01-25T02:17:17.740Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "sporty",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "athleisure",
+          "confidence": 0.9
+        },
+        "statement": {
+          "level": "low",
+          "confidence": 0.9
+        },
+        "season": {
+          "heaviness": "light",
+          "confidence": 0.9
+        },
+        "palette": {
+          "colors": [
+            "black"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "synthetic_tech",
+          "confidence": 0.9
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/SPT-03_running_shoes.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/SPT-03_running_shoes.webp",
+      "generatedAt": "2026-01-25T02:17:26.054Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "street",
+          "primary_confidence": 0.9,
+          "secondary": "sporty",
+          "secondary_confidence": 0.7
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.9
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.8
+        },
+        "season": {
+          "heaviness": "light",
+          "confidence": 0.8
+        },
+        "palette": {
+          "colors": [
+            "white",
+            "cream"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "knit",
+          "confidence": 0.8
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/WES-01_white_cowboy_boots.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/WES-01_white_cowboy_boots.webp",
+      "generatedAt": "2026-01-25T02:17:33.591Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "western",
+          "primary_confidence": 0.95,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.8
+        },
+        "statement": {
+          "level": "high",
+          "confidence": 0.9
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.7
+        },
+        "palette": {
+          "colors": [
+            "white",
+            "blue"
+          ],
+          "confidence": 0.85
+        },
+        "pattern": {
+          "level": "bold",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "leather",
+          "confidence": 0.9
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/WES-02_western_belt_buckle.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/WES-02_western_belt_buckle.webp",
+      "generatedAt": "2026-01-25T02:17:41.682Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "western",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.8
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.7
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.6
+        },
+        "palette": {
+          "colors": [
+            "brown",
+            "metallic"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "subtle",
+          "confidence": 0.6
+        },
+        "material": {
+          "family": "leather",
+          "confidence": 0.9
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/WES-03_denim_shirt_with_yoke.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/WES-03_denim_shirt_with_yoke.webp",
+      "generatedAt": "2026-01-25T02:17:49.369Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "western",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.8
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.7
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.7
+        },
+        "palette": {
+          "colors": [
+            "denim_blue",
+            "white"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "subtle",
+          "confidence": 0.6
+        },
+        "material": {
+          "family": "denim",
+          "confidence": 0.9
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/OUT-01_technical_shell_jacket.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/OUT-01_technical_shell_jacket.webp",
+      "generatedAt": "2026-01-25T02:17:58.242Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "outdoor_utility",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.8
+        },
+        "statement": {
+          "level": "low",
+          "confidence": 0.9
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.8
+        },
+        "palette": {
+          "colors": [
+            "gray"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "synthetic_tech",
+          "confidence": 0.9
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/OUT-02_trail_sneakers.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/OUT-02_trail_sneakers.webp",
+      "generatedAt": "2026-01-25T02:18:08.667Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "outdoor_utility",
+          "primary_confidence": 0.95,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.85
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.75
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.8
+        },
+        "palette": {
+          "colors": [
+            "tan",
+            "black"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "subtle",
+          "confidence": 0.7
+        },
+        "material": {
+          "family": "synthetic_tech",
+          "confidence": 0.9
+        }
+      },
+      "approved": false,
+      "notes": ""
+    },
+    {
+      "filename": "v1/OUT-03_nylon_crossbody.webp",
+      "imageUrl": "https://btmxvxwifgbxqqkigifm.supabase.co/storage/v1/object/public/golden_set/v1/OUT-03_nylon_crossbody.webp",
+      "generatedAt": "2026-01-25T02:18:16.321Z",
+      "signals": {
+        "version": 1,
+        "aesthetic": {
+          "primary": "outdoor_utility",
+          "primary_confidence": 0.9,
+          "secondary": "none",
+          "secondary_confidence": 0
+        },
+        "formality": {
+          "band": "casual",
+          "confidence": 0.8
+        },
+        "statement": {
+          "level": "medium",
+          "confidence": 0.7
+        },
+        "season": {
+          "heaviness": "mid",
+          "confidence": 0.7
+        },
+        "palette": {
+          "colors": [
+            "black",
+            "gray"
+          ],
+          "confidence": 0.9
+        },
+        "pattern": {
+          "level": "solid",
+          "confidence": 0.9
+        },
+        "material": {
+          "family": "synthetic_tech",
+          "confidence": 0.9
+        }
+      },
+      "approved": false,
+      "notes": ""
+    }
+  ]
+}

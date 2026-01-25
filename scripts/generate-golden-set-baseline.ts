@@ -27,6 +27,50 @@ const BUCKET_NAME = 'golden_set';
 const SUBFOLDER = 'v1'; // Images are in the v1 subfolder
 const OUTPUT_FILE = 'test-assets/golden-set-baseline.json';
 
+// Hardcoded list of golden set images (bucket listing is restricted)
+const GOLDEN_SET_FILES = [
+  'MIN-01_black_leather_ankle_boots.webp',
+  'MIN-02_white_crewneck_tee.webp',
+  'MIN-03_black_straight_leg_trousers.webp',
+  'CLA-01_beige_trench_coat.webp',
+  'CLA-02_navy_blazer.webp',
+  'CLA-03_structured_leather_tote.webp',
+  'AMB-01_simple_black_slip_dress.webp',
+  'AMB-02_tailored_black_blazer.webp',
+  'AMB-03_dark_skinny_jeans.webp',
+  'AMB-04_white_sneakers.webp',
+  'WRK-01_blue_denim_jacket.webp',
+  'WRK-02_olive_utility_jacket.webp',
+  'WRK-03_straight_dark_denim_jeans.webp',
+  'GLM-01_sequin_camisole.webp',
+  'GLM-02_metalic_clutch.webp',
+  'GLM-03_stiletto_heels.webp',
+  'ROM-01_puff_sleeve_blouse.webp',
+  'ROM-02_satin_midi_slip_skirt.webp',
+  'ROM-03_pearl_necklace.webp',
+  'EDG-01_leather_moto_jacket.webp',
+  'EDG-02_combat_boots.webp',
+  'EDG-03_silver_chain_necklace.webp',
+  'BOH-01_flora_maxi_dress.webp',
+  'BOH-02_fringe_suede_bag.webp',
+  'BOH-03_wide_brim_felt_hat.webp',
+  'STR-01_oversized_graphic_tee.webp',
+  'STR-02_baggy_cargo_pants.webp',
+  'STR-03_chunky_sneakers.webp',
+  'PRP-01_cable_knit_sweater.webp',
+  'PRP-02_pleated_mini_skirt.webp',
+  'PRP-03_loafers.webp',
+  'SPT-01_gray_cropped_sweatshirt.webp',
+  'SPT-02_black_leggins.webp',
+  'SPT-03_running_shoes.webp',
+  'WES-01_white_cowboy_boots.webp',
+  'WES-02_western_belt_buckle.webp',
+  'WES-03_denim_shirt_with_yoke.webp',
+  'OUT-01_technical_shell_jacket.webp',
+  'OUT-02_trail_sneakers.webp',
+  'OUT-03_nylon_crossbody.webp',
+];
+
 // ============================================
 // SETUP
 // ============================================
@@ -135,45 +179,23 @@ async function main() {
   console.log('🎯 Golden Set Baseline Generator\n');
   console.log(`📡 Using Edge Function at: ${supabaseUrl}/functions/v1/style-signals\n`);
 
-  // 1. List images in bucket subfolder
-  console.log(`📁 Listing images in "${BUCKET_NAME}/${SUBFOLDER}" ...`);
-  
-  const { data: files, error: listError } = await supabase.storage
-    .from(BUCKET_NAME)
-    .list(SUBFOLDER, { limit: 100 });
-
-  if (listError) {
-    console.error('❌ Error listing files:', listError.message);
-    process.exit(1);
-  }
-
-  // Filter to image files only (exclude folders)
-  const imageFiles = files?.filter(f => 
-    f.id !== null && /\.(jpg|jpeg|png|webp|gif)$/i.test(f.name)
-  ) ?? [];
-
-  if (imageFiles.length === 0) {
-    console.log('⚠️  No images found in bucket');
-    console.log('   Files found:', files?.map(f => f.name));
-    process.exit(0);
-  }
-
-  console.log(`✅ Found ${imageFiles.length} images\n`);
+  // Use hardcoded file list (bucket listing is restricted)
+  console.log(`📁 Processing ${GOLDEN_SET_FILES.length} images from ${BUCKET_NAME}/${SUBFOLDER}/\n`);
 
   // 2. Process each image
   const entries: GoldenSetEntry[] = [];
 
-  for (let i = 0; i < imageFiles.length; i++) {
-    const file = imageFiles[i];
-    const fullPath = `${SUBFOLDER}/${file.name}`;
-    console.log(`[${i + 1}/${imageFiles.length}] Processing: ${fullPath}`);
+  for (let i = 0; i < GOLDEN_SET_FILES.length; i++) {
+    const filename = GOLDEN_SET_FILES[i];
+    const fullPath = `${SUBFOLDER}/${filename}`;
+    console.log(`[${i + 1}/${GOLDEN_SET_FILES.length}] Processing: ${filename}`);
 
-    // Get signed URL for display (bucket is private)
-    const { data: signedData } = await supabase.storage
+    // Get public URL for display
+    const { data: urlData } = supabase.storage
       .from(BUCKET_NAME)
-      .createSignedUrl(fullPath, 3600 * 24 * 7); // 7 days for review
+      .getPublicUrl(fullPath);
 
-    const imageUrl = signedData?.signedUrl || '';
+    const imageUrl = urlData.publicUrl;
 
     // Analyze via Edge Function (pass full path including subfolder)
     const signals = await analyzeImageViaEdgeFunction(fullPath);
@@ -193,7 +215,7 @@ async function main() {
     }
 
     // Small delay to avoid rate limits
-    if (i < imageFiles.length - 1) {
+    if (i < GOLDEN_SET_FILES.length - 1) {
       await new Promise(r => setTimeout(r, 1000));
     }
   }
@@ -214,7 +236,7 @@ async function main() {
 
   fs.writeFileSync(OUTPUT_FILE, JSON.stringify(baseline, null, 2));
   console.log(`\n📄 Results saved to: ${OUTPUT_FILE}`);
-  console.log(`\n✅ Done! Processed ${entries.length}/${imageFiles.length} images`);
+  console.log(`\n✅ Done! Processed ${entries.length}/${GOLDEN_SET_FILES.length} images`);
   console.log('\n📝 Next steps:');
   console.log('   1. Review the generated signals in the JSON file');
   console.log('   2. Correct any incorrect values');
