@@ -18,7 +18,9 @@
     "compare-models": "npx tsx scripts/compare-models.ts",
     "golden:baseline": "bun run scripts/generate-golden-set-baseline.ts",
     "golden:run": "bun run scripts/golden-set-run.ts",
-    "golden:diff": "bun run scripts/golden-set-diff.ts"
+    "golden:diff": "bun run scripts/golden-set-diff.ts",
+    "test:rate-limits": "npx ts-node scripts/test-rate-limits.ts",
+    "test:smoke": "npx ts-node scripts/smoke-test-image-manipulation.ts"
   },
   "dependencies": {
     "@babel/plugin-proposal-export-namespace-from": "^7.18.9",

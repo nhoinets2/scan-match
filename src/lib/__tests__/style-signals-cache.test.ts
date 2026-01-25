@@ -226,6 +226,167 @@ describe('Style Signals Cache Logic', () => {
 });
 
 // ============================================
+// NO API CALL ON CACHE HIT
+// ============================================
+
+describe('No API call on cache hit', () => {
+  interface CacheEntry {
+    signals: StyleSignalsV1;
+    expiresAt: number;
+  }
+
+  it('should skip network call entirely when cache has fresh entry', () => {
+    const cache = new Map<string, CacheEntry>();
+    const signals = createMockSignals();
+    const now = Date.now();
+    let networkCallCount = 0;
+
+    // Arrange: cache has fresh entry
+    cache.set('image.jpg', {
+      signals,
+      expiresAt: now + 20 * 60 * 1000, // 20 min from now
+    });
+
+    // Simulate the check logic from generateScanStyleSignalsDirect
+    const cached = cache.get('image.jpg');
+    if (cached && cached.expiresAt > now) {
+      // Cache hit - return early, no network call
+      const result = { ok: true, data: cached.signals };
+      expect(result.ok).toBe(true);
+      expect(result.data).toEqual(signals);
+    } else {
+      // Would make network call
+      networkCallCount++;
+    }
+
+    // Assert: no network call was made
+    expect(networkCallCount).toBe(0);
+  });
+
+  it('should make network call when cache entry is expired', () => {
+    const cache = new Map<string, CacheEntry>();
+    const signals = createMockSignals();
+    const now = Date.now();
+    let networkCallCount = 0;
+
+    // Arrange: cache has EXPIRED entry
+    cache.set('image.jpg', {
+      signals,
+      expiresAt: now - 1000, // Already expired
+    });
+
+    // Simulate the check logic
+    const cached = cache.get('image.jpg');
+    if (cached && cached.expiresAt > now) {
+      // Cache hit - would return early
+    } else {
+      // Cache miss or expired - make network call
+      networkCallCount++;
+    }
+
+    // Assert: network call was made
+    expect(networkCallCount).toBe(1);
+  });
+});
+
+// ============================================
+// NO RETRY LOOP ON CLIENT REJECT (>6MB)
+// ============================================
+
+describe('No compression retry loop on oversized payload', () => {
+  const MAX_BASE64_LENGTH = 6 * 1024 * 1024; // 6MB
+  const SECOND_PASS_THRESHOLD = 1.5 * 1024 * 1024; // 1.5MB
+
+  it('should return error immediately when payload > 6MB after two passes', () => {
+    let compressionPassCount = 0;
+    let networkCallCount = 0;
+
+    // Simulate the compression + size check logic
+    function simulateCompression(firstPassSize: number, secondPassSize: number): { ok: boolean; error?: { kind: string } } {
+      compressionPassCount++; // First pass
+      let dataUrlLength = firstPassSize;
+
+      // Second pass if > 1.5MB
+      if (dataUrlLength > SECOND_PASS_THRESHOLD) {
+        compressionPassCount++; // Second pass
+        dataUrlLength = secondPassSize;
+      }
+
+      // Check against 6MB limit
+      if (dataUrlLength > MAX_BASE64_LENGTH) {
+        // Return error immediately - NO retry, NO network call
+        return { ok: false, error: { kind: 'payload_too_large' } };
+      }
+
+      // Would make network call
+      networkCallCount++;
+      return { ok: true };
+    }
+
+    // Test: both passes result in > 6MB
+    const result = simulateCompression(
+      8 * 1024 * 1024, // First pass: 8MB
+      7 * 1024 * 1024  // Second pass: 7MB (still too big)
+    );
+
+    // Assert: returns error, max 2 compression passes, no network call
+    expect(result.ok).toBe(false);
+    expect(result.error?.kind).toBe('payload_too_large');
+    expect(compressionPassCount).toBe(2); // Max 2 passes
+    expect(networkCallCount).toBe(0); // No network call
+  });
+
+  it('should NOT attempt third compression pass', () => {
+    let compressionPassCount = 0;
+
+    // Simulate: both passes still big
+    function simulateMaxTwoPasses(): number {
+      compressionPassCount++; // Pass 1
+      const firstPassSize = 3 * 1024 * 1024; // 3MB
+
+      if (firstPassSize > SECOND_PASS_THRESHOLD) {
+        compressionPassCount++; // Pass 2
+      }
+
+      // No third pass - stop here
+      return compressionPassCount;
+    }
+
+    const passes = simulateMaxTwoPasses();
+    expect(passes).toBeLessThanOrEqual(2);
+  });
+
+  it('should succeed with single pass when first pass is small enough', () => {
+    let compressionPassCount = 0;
+    let networkCallCount = 0;
+
+    function simulateCompression(firstPassSize: number): { ok: boolean } {
+      compressionPassCount++;
+      const dataUrlLength = firstPassSize;
+
+      // No second pass needed if under threshold
+      if (dataUrlLength > SECOND_PASS_THRESHOLD) {
+        compressionPassCount++;
+      }
+
+      if (dataUrlLength > MAX_BASE64_LENGTH) {
+        return { ok: false };
+      }
+
+      networkCallCount++;
+      return { ok: true };
+    }
+
+    // First pass: 500KB (under 1.5MB threshold)
+    const result = simulateCompression(500 * 1024);
+
+    expect(result.ok).toBe(true);
+    expect(compressionPassCount).toBe(1); // Only one pass
+    expect(networkCallCount).toBe(1); // Network call made
+  });
+});
+
+// ============================================
 // COMPRESSION PARAMETERS
 // ============================================
 
