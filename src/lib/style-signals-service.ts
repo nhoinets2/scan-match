@@ -84,6 +84,69 @@ export async function generateScanStyleSignals(
 }
 
 /**
+ * Generate style signals directly from a local image.
+ * Converts the local image to base64 and sends to the Edge Function.
+ * Used for unsaved scans where the image hasn't been uploaded yet.
+ *
+ * @param localImageUri - Local file:// URI of the image
+ * @returns StyleSignalsResponse with the generated signals
+ */
+export async function generateScanStyleSignalsDirect(
+  localImageUri: string
+): Promise<StyleSignalsResponse> {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+
+    if (!token) {
+      return {
+        ok: false,
+        error: { kind: 'unauthorized', message: 'Not authenticated' },
+      };
+    }
+
+    // Convert local image to base64 data URL
+    const { readAsStringAsync, EncodingType } = await import('expo-file-system');
+    const base64Data = await readAsStringAsync(localImageUri, {
+      encoding: EncodingType.Base64,
+    });
+
+    // Determine MIME type from extension
+    const extension = localImageUri.split('.').pop()?.toLowerCase() || 'jpg';
+    const mimeType = extension === 'png' ? 'image/png' : 'image/jpeg';
+    const imageDataUrl = `data:${mimeType};base64,${base64Data}`;
+
+    if (__DEV__) {
+      console.log('[StyleSignalsService] Generating direct signals for local image');
+    }
+
+    const response = await fetch(getStyleSignalsUrl(), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type: 'scan_direct',
+        imageDataUrl,
+      }),
+    });
+
+    const result = await response.json();
+    return result as StyleSignalsResponse;
+  } catch (error) {
+    console.error('[StyleSignalsService] Error generating direct scan signals:', error);
+    return {
+      ok: false,
+      error: { kind: 'network_error', message: 'Failed to generate signals from local image' },
+    };
+  }
+}
+
+// Declare __DEV__ for TypeScript
+declare const __DEV__: boolean;
+
+/**
  * Generate style signals for a wardrobe item.
  * Calls the style-signals Edge Function.
  *

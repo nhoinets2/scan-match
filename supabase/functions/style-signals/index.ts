@@ -134,10 +134,11 @@ Respond with ONLY the JSON object, no explanation.`;
 // ============================================
 
 interface StyleSignalsRequest {
-  type: 'scan' | 'wardrobe' | 'golden_set';
+  type: 'scan' | 'wardrobe' | 'golden_set' | 'scan_direct';
   scanId?: string;
   itemId?: string;
   imageName?: string; // For golden_set type: filename in golden_set bucket
+  imageDataUrl?: string; // For scan_direct type: base64 data URL (for unsaved scans with local images)
 }
 
 interface StyleSignalsV1 {
@@ -306,11 +307,11 @@ Deno.serve(async (req) => {
   try {
     // Parse request body first to check type
     const body: StyleSignalsRequest = await req.json();
-    const { type, scanId, itemId, imageName } = body;
+    const { type, scanId, itemId, imageName, imageDataUrl } = body;
 
-    if (!type || (type !== 'scan' && type !== 'wardrobe' && type !== 'golden_set')) {
+    if (!type || (type !== 'scan' && type !== 'wardrobe' && type !== 'golden_set' && type !== 'scan_direct')) {
       return new Response(
-        JSON.stringify({ ok: false, error: { kind: "bad_request", message: "Invalid type. Must be 'scan', 'wardrobe', or 'golden_set'" } }),
+        JSON.stringify({ ok: false, error: { kind: "bad_request", message: "Invalid type. Must be 'scan', 'wardrobe', 'golden_set', or 'scan_direct'" } }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -420,6 +421,112 @@ Deno.serve(async (req) => {
 
       } catch (error) {
         console.error(`[style-signals] Golden set error:`, error);
+        return new Response(
+          JSON.stringify({ ok: false, error: { kind: "analysis_error", message: String(error) } }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // ============================================
+    // SCAN DIRECT MODE (for unsaved scans with local images)
+    // Accepts base64 image data, returns signals without storing to DB
+    // ============================================
+    
+    if (type === 'scan_direct') {
+      // Auth required
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader?.startsWith("Bearer ")) {
+        return new Response(
+          JSON.stringify({ ok: false, error: { kind: "unauthorized", message: "Missing auth token" } }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (!imageDataUrl) {
+        return new Response(
+          JSON.stringify({ ok: false, error: { kind: "bad_request", message: "Missing imageDataUrl" } }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Validate image data URL format
+      if (!imageDataUrl.startsWith("data:image/")) {
+        return new Response(
+          JSON.stringify({ ok: false, error: { kind: "bad_request", message: "Invalid image format. Must be data:image/..." } }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      console.log(`[style-signals] scan_direct: analyzing base64 image`);
+
+      const openaiKey = Deno.env.get("OPENAI_API_KEY");
+      if (!openaiKey) {
+        return new Response(
+          JSON.stringify({ ok: false, error: { kind: "server_error", message: "Analysis service not configured" } }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      try {
+        const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${openaiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: STYLE_SIGNALS_PROMPT },
+                  { type: "image_url", image_url: { url: imageDataUrl } },
+                ],
+              },
+            ],
+            max_tokens: 800,
+            temperature: 0,
+          }),
+        });
+
+        if (!openaiResponse.ok) {
+          const errorText = await openaiResponse.text();
+          console.error(`[style-signals] OpenAI error for scan_direct:`, errorText);
+          return new Response(
+            JSON.stringify({ ok: false, error: { kind: "openai_error", message: `OpenAI error: ${openaiResponse.status}` } }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const openaiData = await openaiResponse.json();
+        const responseText = openaiData.choices?.[0]?.message?.content ?? "";
+
+        let cleanedResponse = responseText.trim();
+        if (cleanedResponse.startsWith("```json")) cleanedResponse = cleanedResponse.slice(7);
+        if (cleanedResponse.startsWith("```")) cleanedResponse = cleanedResponse.slice(3);
+        if (cleanedResponse.endsWith("```")) cleanedResponse = cleanedResponse.slice(0, -3);
+        cleanedResponse = cleanedResponse.trim();
+
+        const rawSignals = JSON.parse(cleanedResponse);
+        const signals = validateAndNormalizeSignals(rawSignals);
+
+        const durationMs = Date.now() - startTime;
+        console.log(`[style-signals] scan_direct complete in ${durationMs}ms`);
+
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            data: signals,
+            durationMs,
+            cached: false,
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+
+      } catch (error) {
+        console.error(`[style-signals] scan_direct error:`, error);
         return new Response(
           JSON.stringify({ ok: false, error: { kind: "analysis_error", message: String(error) } }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

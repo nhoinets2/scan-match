@@ -33,6 +33,7 @@ import {
   getItemsNeedingEnrichment,
   enqueueWardrobeEnrichmentBatch,
   generateScanStyleSignals,
+  generateScanStyleSignalsDirect,
 } from './style-signals-service';
 import {
   trackTrustFilterStarted,
@@ -142,6 +143,10 @@ export function useTrustFilter(
         // Fetch scan signals (from DB cache or generate)
         let fetchedScanSignals: StyleSignalsV1 | null = null;
 
+        // Get the scan's image URI
+        const scanImageUri = scannedItem?.imageUri || '';
+        const isLocalImage = scanImageUri.startsWith('file://');
+
         if (scanId) {
           // Try to fetch from DB first
           if (__DEV__) {
@@ -155,15 +160,30 @@ export function useTrustFilter(
 
           // If not cached and style signals are enabled, generate
           if (!fetchedScanSignals && isStyleSignalsEnabled()) {
-            if (__DEV__) {
-              console.log('[useTrustFilter] Generating scan style signals via Edge Function...');
-            }
-            const response = await generateScanStyleSignals(scanId);
-            if (__DEV__) {
-              console.log('[useTrustFilter] Edge Function response:', response.ok ? 'success' : response.error);
-            }
-            if (response.ok && response.data) {
-              fetchedScanSignals = response.data;
+            if (isLocalImage && scanImageUri) {
+              // For local images (unsaved scans), use direct generation with base64
+              if (__DEV__) {
+                console.log('[useTrustFilter] Generating scan style signals directly from local image...');
+              }
+              const response = await generateScanStyleSignalsDirect(scanImageUri);
+              if (__DEV__) {
+                console.log('[useTrustFilter] Direct generation response:', response.ok ? 'success' : response.error);
+              }
+              if (response.ok && response.data) {
+                fetchedScanSignals = response.data;
+              }
+            } else {
+              // For cloud images (saved scans), use server-side generation
+              if (__DEV__) {
+                console.log('[useTrustFilter] Generating scan style signals via Edge Function...');
+              }
+              const response = await generateScanStyleSignals(scanId);
+              if (__DEV__) {
+                console.log('[useTrustFilter] Edge Function response:', response.ok ? 'success' : response.error);
+              }
+              if (response.ok && response.data) {
+                fetchedScanSignals = response.data;
+              }
             }
           } else if (!fetchedScanSignals && !isStyleSignalsEnabled()) {
             if (__DEV__) {
@@ -206,7 +226,7 @@ export function useTrustFilter(
     };
 
     fetchSignals();
-  }, [scanId, matchedItemIds, confidenceResult.matches.length, signalsFetched]);
+  }, [scanId, matchedItemIds, confidenceResult.matches.length, signalsFetched, scannedItem?.imageUri]);
 
   // Reset when scan changes
   useEffect(() => {
