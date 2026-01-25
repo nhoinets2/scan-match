@@ -147,52 +147,36 @@ export function useTrustFilter(
         const scanImageUri = scannedItem?.imageUri || '';
         const isLocalImage = scanImageUri.startsWith('file://');
 
+        // DEBUG: Log image URI detection (key for diagnosing direct generation path)
         if (__DEV__) {
-          console.log('[useTrustFilter] scanImageUri:', scanImageUri ? scanImageUri.substring(0, 50) + '...' : 'EMPTY');
-          console.log('[useTrustFilter] isLocalImage:', isLocalImage);
+          console.log('[TF] Image:', isLocalImage ? 'LOCAL' : (scanImageUri ? 'CLOUD' : 'EMPTY'), 
+            scanImageUri ? `(${scanImageUri.substring(0, 40)}...)` : '');
         }
 
         if (scanId) {
           // Try to fetch from DB first
-          if (__DEV__) {
-            console.log('[useTrustFilter] Fetching scan signals for:', scanId);
-          }
           fetchedScanSignals = await fetchScanStyleSignals(scanId);
-
-          if (__DEV__) {
-            console.log('[useTrustFilter] DB cache result:', fetchedScanSignals ? 'found' : 'not found');
-          }
 
           // If not cached and style signals are enabled, generate
           if (!fetchedScanSignals && isStyleSignalsEnabled()) {
             if (isLocalImage && scanImageUri) {
               // For local images (unsaved scans), use direct generation with base64
-              if (__DEV__) {
-                console.log('[useTrustFilter] Generating scan style signals directly from local image...');
-              }
               const response = await generateScanStyleSignalsDirect(scanImageUri);
               if (__DEV__) {
-                console.log('[useTrustFilter] Direct generation response:', response.ok ? 'success' : response.error);
+                console.log('[TF] Direct generation:', response.ok ? 'SUCCESS' : `FAILED (${response.error?.kind})`);
               }
               if (response.ok && response.data) {
                 fetchedScanSignals = response.data;
               }
             } else {
               // For cloud images (saved scans), use server-side generation
-              if (__DEV__) {
-                console.log('[useTrustFilter] Generating scan style signals via Edge Function...');
-              }
               const response = await generateScanStyleSignals(scanId);
               if (__DEV__) {
-                console.log('[useTrustFilter] Edge Function response:', response.ok ? 'success' : response.error);
+                console.log('[TF] Server generation:', response.ok ? 'SUCCESS' : `FAILED (${response.error?.kind})`);
               }
               if (response.ok && response.data) {
                 fetchedScanSignals = response.data;
               }
-            }
-          } else if (!fetchedScanSignals && !isStyleSignalsEnabled()) {
-            if (__DEV__) {
-              console.log('[useTrustFilter] Style signals disabled, skipping generation');
             }
           }
         }
@@ -201,22 +185,13 @@ export function useTrustFilter(
 
         // Fetch wardrobe signals for matched items
         if (matchedItemIds.length > 0) {
-          if (__DEV__) {
-            console.log('[useTrustFilter] Fetching wardrobe signals for', matchedItemIds.length, 'items');
-          }
           const fetchedWardrobeSignals = await fetchWardrobeStyleSignalsBatch(matchedItemIds);
-          if (__DEV__) {
-            console.log('[useTrustFilter] Wardrobe signals found:', fetchedWardrobeSignals.size, '/', matchedItemIds.length);
-          }
           setWardrobeSignals(fetchedWardrobeSignals);
 
           // Enqueue enrichment for items without signals
           if (isLazyEnrichmentEnabled()) {
             const needsEnrichment = await getItemsNeedingEnrichment(matchedItemIds);
             if (needsEnrichment.length > 0) {
-              if (__DEV__) {
-                console.log('[useTrustFilter] Enqueueing enrichment for:', needsEnrichment.length, 'items');
-              }
               enqueueWardrobeEnrichmentBatch(needsEnrichment);
             }
           }
@@ -391,20 +366,11 @@ export function useTrustFilter(
       telemetrySentRef.current = telemetryKey;
     }
 
-    // Log in development
+    // Log summary in development (single line)
     if (__DEV__) {
-      console.log('[useTrustFilter] Applied:', {
-        originalMatches: matches.length,
-        highFinal: highFinal.length,
-        demoted: demoted.length,
-        hidden: hiddenCount,
-        hasScanSignals: !!scanSignals,
-        wardrobeSignalsCount: wardrobeSignals.size,
-      });
-
-      if (enableTrace && batchResult.decisions.size > 0) {
-        console.log('[useTrustFilter] Decisions:', Object.fromEntries(batchResult.decisions));
-      }
+      const signalsStatus = scanSignals ? 'scan+' : 'scan-';
+      const wardrobeStatus = wardrobeSignals.size > 0 ? `ward${wardrobeSignals.size}` : 'ward-';
+      console.log(`[TF] Result: ${highFinal.length} keep, ${demoted.length} demoted, ${hiddenCount} hidden (${signalsStatus}/${wardrobeStatus})`);
     }
 
     return {

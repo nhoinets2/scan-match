@@ -142,10 +142,6 @@ async function resizeAndCompressImage(localImageUri: string): Promise<string> {
 
   // Second pass if still too large (> 1.5MB)
   if (dataUrl.length > SECOND_PASS_THRESHOLD) {
-    if (__DEV__) {
-      console.log(`[StyleSignalsService] First pass ${Math.round(dataUrl.length / 1024)}KB > 1.5MB, doing second pass...`);
-    }
-    
     result = await ImageManipulator.manipulateAsync(
       localImageUri,
       [{ resize: { width: SECOND_PASS_DIMENSION, height: SECOND_PASS_DIMENSION } }],
@@ -157,10 +153,6 @@ async function resizeAndCompressImage(localImageUri: string): Promise<string> {
     }
 
     dataUrl = `data:image/jpeg;base64,${result.base64}`;
-    
-    if (__DEV__) {
-      console.log(`[StyleSignalsService] Second pass result: ${Math.round(dataUrl.length / 1024)}KB`);
-    }
   }
 
   return dataUrl;
@@ -200,10 +192,7 @@ export async function generateScanStyleSignalsDirect(
     const now = Date.now();
     
     if (cached && cached.expiresAt > now) {
-      if (__DEV__) {
-        const ttlRemaining = Math.round((cached.expiresAt - now) / 1000 / 60);
-        console.log(`[StyleSignalsService] Returning cached direct signals (TTL: ${ttlRemaining}min)`);
-      }
+      // Cache hit - skip compression and API call
       return { ok: true, data: cached.signals };
     }
 
@@ -223,14 +212,12 @@ export async function generateScanStyleSignalsDirect(
     }
 
     // Resize and compress image before converting to base64
-    if (__DEV__) {
-      console.log('[StyleSignalsService] Resizing and compressing local image...');
-    }
     const imageDataUrl = await resizeAndCompressImage(localImageUri);
+    const sizeKB = Math.round(imageDataUrl.length / 1024);
 
     // Client-side payload size check
     if (imageDataUrl.length > MAX_BASE64_LENGTH) {
-      console.warn('[StyleSignalsService] Image too large even after compression');
+      console.warn(`[StyleSignals] Image too large: ${sizeKB}KB > 6MB limit`);
       return {
         ok: false,
         error: { kind: 'payload_too_large', message: 'Image too large for analysis' },
@@ -238,9 +225,7 @@ export async function generateScanStyleSignalsDirect(
     }
 
     if (__DEV__) {
-      // Log size info but NEVER log the actual base64 data
-      const sizeKB = Math.round(imageDataUrl.length / 1024);
-      console.log(`[StyleSignalsService] Sending ${sizeKB}KB compressed image for direct analysis`);
+      console.log(`[StyleSignals] Compressed to ${sizeKB}KB, calling API...`);
     }
 
     const response = await fetch(getStyleSignalsUrl(), {
@@ -268,10 +253,6 @@ export async function generateScanStyleSignalsDirect(
       if (directSignalsCache.size > MAX_CACHE_ENTRIES) {
         const firstKey = directSignalsCache.keys().next().value;
         if (firstKey) directSignalsCache.delete(firstKey);
-      }
-
-      if (__DEV__) {
-        console.log(`[StyleSignalsService] Cached signals for ${Math.round(CACHE_TTL_MS / 1000 / 60)}min`);
       }
     }
 
