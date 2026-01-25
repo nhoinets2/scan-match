@@ -47,17 +47,17 @@ export interface FeatureFlags {
 declare const __DEV__: boolean;
 
 const DEFAULT_FLAGS: FeatureFlags = {
-  // Trust Filter is disabled by default until fully tested
-  trust_filter_enabled: false,
+  // Trust Filter enabled for testing
+  trust_filter_enabled: true,
 
-  // Trace logging only in development
+  // Trace logging enabled in development
   trust_filter_trace_enabled: typeof __DEV__ !== 'undefined' ? __DEV__ : false,
 
-  // Style signals disabled until Edge Function is deployed
-  style_signals_enabled: false,
+  // Style signals enabled (required for Trust Filter)
+  style_signals_enabled: true,
 
-  // Lazy enrichment disabled until tested
-  lazy_enrichment_enabled: false,
+  // Lazy enrichment enabled for background wardrobe enrichment
+  lazy_enrichment_enabled: true,
 };
 
 // ============================================
