@@ -18,7 +18,6 @@ import {
 import { useColorScheme } from "@/lib/useColorScheme";
 import { QueryClientProvider, focusManager } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { KeyboardProvider } from "react-native-keyboard-controller";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { AuthGuard } from "@/components/AuthGuard";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
@@ -504,10 +503,8 @@ export default function RootLayout() {
         <FocusManagerInitializer />
         <DeepLinkHandler />
         <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg.primary }}>
-          <KeyboardProvider>
-            <StatusBar style="dark" />
-            <RootLayoutNav colorScheme={colorScheme} />
-          </KeyboardProvider>
+          <StatusBar style="dark" />
+          <RootLayoutNav colorScheme={colorScheme} />
         </GestureHandlerRootView>
       </AuthProvider>
     </QueryClientProvider>

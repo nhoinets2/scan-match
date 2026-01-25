@@ -37,7 +37,7 @@ import {
   AlertCircle,
 } from "lucide-react-native";
 import { ImageWithFallback } from "@/components/PlaceholderImage";
-import Clipboard from "@react-native-clipboard/clipboard";
+import * as Clipboard from "expo-clipboard";
 
 import {
   useWardrobe,
@@ -343,8 +343,8 @@ function DebugSnapshotModal({
   const snapshotJson = JSON.stringify(snapshot, null, 2);
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
-    Clipboard.setString(snapshotJson);
+  const handleCopy = async () => {
+    await Clipboard.setStringAsync(snapshotJson);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
