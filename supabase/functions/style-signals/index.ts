@@ -134,9 +134,10 @@ Respond with ONLY the JSON object, no explanation.`;
 // ============================================
 
 interface StyleSignalsRequest {
-  type: 'scan' | 'wardrobe';
+  type: 'scan' | 'wardrobe' | 'golden_set';
   scanId?: string;
   itemId?: string;
+  imageName?: string; // For golden_set type: filename in golden_set bucket
 }
 
 interface StyleSignalsV1 {
@@ -339,13 +340,117 @@ Deno.serve(async (req) => {
 
     // Parse request body
     const body: StyleSignalsRequest = await req.json();
-    const { type, scanId, itemId } = body;
+    const { type, scanId, itemId, imageName } = body;
 
-    if (!type || (type !== 'scan' && type !== 'wardrobe')) {
+    if (!type || (type !== 'scan' && type !== 'wardrobe' && type !== 'golden_set')) {
       return new Response(
-        JSON.stringify({ ok: false, error: { kind: "bad_request", message: "Invalid type. Must be 'scan' or 'wardrobe'" } }),
+        JSON.stringify({ ok: false, error: { kind: "bad_request", message: "Invalid type. Must be 'scan', 'wardrobe', or 'golden_set'" } }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // ============================================
+    // GOLDEN SET MODE (for testing)
+    // ============================================
+    
+    if (type === 'golden_set') {
+      if (!imageName) {
+        return new Response(
+          JSON.stringify({ ok: false, error: { kind: "bad_request", message: "Missing imageName" } }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Generate signed URL for private golden_set bucket
+      // imageName should be the full path including subfolder, e.g., "v1/AMB-01_simple_black_slip_dress.webp"
+      const { data: signedData, error: signError } = await supabaseAdmin.storage
+        .from('golden_set')
+        .createSignedUrl(imageName, 3600); // 1 hour expiry
+
+      if (signError || !signedData?.signedUrl) {
+        console.error(`[style-signals] Failed to create signed URL:`, signError);
+        return new Response(
+          JSON.stringify({ ok: false, error: { kind: "storage_error", message: "Failed to access image" } }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const goldenSetUrl = signedData.signedUrl;
+      console.log(`[style-signals] Golden set analysis for: ${imageName}`);
+
+      const openaiKey = Deno.env.get("OPENAI_API_KEY");
+      if (!openaiKey) {
+        return new Response(
+          JSON.stringify({ ok: false, error: { kind: "server_error", message: "Analysis service not configured" } }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      try {
+        const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${openaiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: STYLE_SIGNALS_PROMPT },
+                  { type: "image_url", image_url: { url: goldenSetUrl } },
+                ],
+              },
+            ],
+            max_tokens: 800,
+            temperature: 0,
+          }),
+        });
+
+        if (!openaiResponse.ok) {
+          const errorText = await openaiResponse.text();
+          console.error(`[style-signals] OpenAI error for golden set:`, errorText);
+          return new Response(
+            JSON.stringify({ ok: false, error: { kind: "openai_error", message: `OpenAI error: ${openaiResponse.status}` } }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const openaiData = await openaiResponse.json();
+        const responseText = openaiData.choices?.[0]?.message?.content ?? "";
+
+        let cleanedResponse = responseText.trim();
+        if (cleanedResponse.startsWith("```json")) cleanedResponse = cleanedResponse.slice(7);
+        if (cleanedResponse.startsWith("```")) cleanedResponse = cleanedResponse.slice(3);
+        if (cleanedResponse.endsWith("```")) cleanedResponse = cleanedResponse.slice(0, -3);
+        cleanedResponse = cleanedResponse.trim();
+
+        const rawSignals = JSON.parse(cleanedResponse);
+        const signals = validateAndNormalizeSignals(rawSignals);
+
+        const durationMs = Date.now() - startTime;
+        console.log(`[style-signals] Golden set complete in ${durationMs}ms: ${imageName}`);
+
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            data: signals,
+            imageName,
+            imageUrl: goldenSetUrl,
+            durationMs,
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+
+      } catch (error) {
+        console.error(`[style-signals] Golden set error:`, error);
+        return new Response(
+          JSON.stringify({ ok: false, error: { kind: "analysis_error", message: String(error) } }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     let imageUri: string;
