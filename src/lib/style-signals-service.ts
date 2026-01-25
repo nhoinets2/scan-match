@@ -8,9 +8,6 @@
 import { supabase } from './supabase';
 import type { StyleSignalsV1 } from './trust-filter/types';
 
-// Declare __DEV__ for TypeScript (provided by React Native runtime)
-declare const __DEV__: boolean;
-
 // ============================================
 // TYPES
 // ============================================
