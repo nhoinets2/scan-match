@@ -8,6 +8,9 @@
 import { supabase } from './supabase';
 import type { StyleSignalsV1 } from './trust-filter/types';
 
+// Declare __DEV__ for TypeScript (provided by React Native runtime)
+declare const __DEV__: boolean;
+
 // ============================================
 // TYPES
 // ============================================
@@ -289,9 +292,6 @@ export async function generateScanStyleSignalsDirect(
 export function clearDirectSignalsCache(): void {
   directSignalsCache.clear();
 }
-
-// Declare __DEV__ for TypeScript
-declare const __DEV__: boolean;
 
 /**
  * Generate style signals for a wardrobe item.
@@ -700,7 +700,3 @@ export async function triggerBulkReEnrichment(
 }
 
 // ============================================
-// __DEV__ DECLARATION
-// ============================================
-
-declare const __DEV__: boolean;
