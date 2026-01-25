@@ -147,6 +147,11 @@ export function useTrustFilter(
         const scanImageUri = scannedItem?.imageUri || '';
         const isLocalImage = scanImageUri.startsWith('file://');
 
+        if (__DEV__) {
+          console.log('[useTrustFilter] scanImageUri:', scanImageUri ? scanImageUri.substring(0, 50) + '...' : 'EMPTY');
+          console.log('[useTrustFilter] isLocalImage:', isLocalImage);
+        }
+
         if (scanId) {
           // Try to fetch from DB first
           if (__DEV__) {
