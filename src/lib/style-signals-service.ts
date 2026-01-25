@@ -87,35 +87,92 @@ export async function generateScanStyleSignals(
 // DIRECT SCAN SIGNALS (for unsaved local images)
 // ============================================
 
+// Cache entry with TTL
+interface CacheEntry {
+  signals: StyleSignalsV1;
+  expiresAt: number;
+}
+
 // In-memory cache for direct signals (avoids repeated base64 + API calls)
-const directSignalsCache = new Map<string, StyleSignalsV1>();
+const directSignalsCache = new Map<string, CacheEntry>();
+
+// Cache TTL: 20 minutes
+const CACHE_TTL_MS = 20 * 60 * 1000;
+
+// Max cache entries
+const MAX_CACHE_ENTRIES = 10;
 
 // Max payload size for base64 image (6MB base64 ≈ 4.5MB raw image)
 const MAX_BASE64_LENGTH = 6 * 1024 * 1024;
 
-// Target dimensions for resizing (keeps quality good enough for style analysis)
-const RESIZE_MAX_DIMENSION = 1280;
-const JPEG_QUALITY = 0.75;
+// Threshold for second-pass compression (1.5MB)
+const SECOND_PASS_THRESHOLD = 1.5 * 1024 * 1024;
+
+// First pass: 1280px, quality 0.75
+const FIRST_PASS_DIMENSION = 1280;
+const FIRST_PASS_QUALITY = 0.75;
+
+// Second pass: 1024px, quality 0.70 (for large images)
+const SECOND_PASS_DIMENSION = 1024;
+const SECOND_PASS_QUALITY = 0.70;
 
 /**
  * Resize and compress an image to reduce payload size.
+ * If the first pass is still > 1.5MB, does a second pass with more aggressive compression.
  * Returns a base64 data URL ready for the Edge Function.
  */
 async function resizeAndCompressImage(localImageUri: string): Promise<string> {
   const ImageManipulator = await import('expo-image-manipulator');
   
-  // Resize to max 1280px on longest side, compress to JPEG 0.75
-  const result = await ImageManipulator.manipulateAsync(
+  // First pass: 1280px + JPEG 0.75
+  let result = await ImageManipulator.manipulateAsync(
     localImageUri,
-    [{ resize: { width: RESIZE_MAX_DIMENSION, height: RESIZE_MAX_DIMENSION } }],
-    { compress: JPEG_QUALITY, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+    [{ resize: { width: FIRST_PASS_DIMENSION, height: FIRST_PASS_DIMENSION } }],
+    { compress: FIRST_PASS_QUALITY, format: ImageManipulator.SaveFormat.JPEG, base64: true }
   );
 
   if (!result.base64) {
     throw new Error('Failed to compress image to base64');
   }
 
-  return `data:image/jpeg;base64,${result.base64}`;
+  let dataUrl = `data:image/jpeg;base64,${result.base64}`;
+
+  // Second pass if still too large (> 1.5MB)
+  if (dataUrl.length > SECOND_PASS_THRESHOLD) {
+    if (__DEV__) {
+      console.log(`[StyleSignalsService] First pass ${Math.round(dataUrl.length / 1024)}KB > 1.5MB, doing second pass...`);
+    }
+    
+    result = await ImageManipulator.manipulateAsync(
+      localImageUri,
+      [{ resize: { width: SECOND_PASS_DIMENSION, height: SECOND_PASS_DIMENSION } }],
+      { compress: SECOND_PASS_QUALITY, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+    );
+
+    if (!result.base64) {
+      throw new Error('Failed to compress image on second pass');
+    }
+
+    dataUrl = `data:image/jpeg;base64,${result.base64}`;
+    
+    if (__DEV__) {
+      console.log(`[StyleSignalsService] Second pass result: ${Math.round(dataUrl.length / 1024)}KB`);
+    }
+  }
+
+  return dataUrl;
+}
+
+/**
+ * Clean expired entries from cache
+ */
+function cleanExpiredCache(): void {
+  const now = Date.now();
+  for (const [key, entry] of directSignalsCache.entries()) {
+    if (entry.expiresAt < now) {
+      directSignalsCache.delete(key);
+    }
+  }
 }
 
 /**
@@ -132,13 +189,24 @@ export async function generateScanStyleSignalsDirect(
   localImageUri: string
 ): Promise<StyleSignalsResponse> {
   try {
+    // Clean expired entries periodically
+    cleanExpiredCache();
+
     // Check in-memory cache first (avoid repeated base64 + API calls on re-renders)
     const cached = directSignalsCache.get(localImageUri);
-    if (cached) {
+    const now = Date.now();
+    
+    if (cached && cached.expiresAt > now) {
       if (__DEV__) {
-        console.log('[StyleSignalsService] Returning cached direct signals');
+        const ttlRemaining = Math.round((cached.expiresAt - now) / 1000 / 60);
+        console.log(`[StyleSignalsService] Returning cached direct signals (TTL: ${ttlRemaining}min)`);
       }
-      return { ok: true, data: cached };
+      return { ok: true, data: cached.signals };
+    }
+
+    // Remove expired entry if exists
+    if (cached) {
+      directSignalsCache.delete(localImageUri);
     }
 
     const { data: sessionData } = await supabase.auth.getSession();
@@ -186,14 +254,21 @@ export async function generateScanStyleSignalsDirect(
 
     const result = await response.json();
     
-    // Cache successful results
+    // Cache successful results with TTL
     if (result.ok && result.data) {
-      directSignalsCache.set(localImageUri, result.data);
+      directSignalsCache.set(localImageUri, {
+        signals: result.data,
+        expiresAt: Date.now() + CACHE_TTL_MS,
+      });
       
-      // Limit cache size (keep last 10 scans)
-      if (directSignalsCache.size > 10) {
+      // Limit cache size (keep last MAX_CACHE_ENTRIES scans, evict oldest)
+      if (directSignalsCache.size > MAX_CACHE_ENTRIES) {
         const firstKey = directSignalsCache.keys().next().value;
         if (firstKey) directSignalsCache.delete(firstKey);
+      }
+
+      if (__DEV__) {
+        console.log(`[StyleSignalsService] Cached signals for ${Math.round(CACHE_TTL_MS / 1000 / 60)}min`);
       }
     }
 

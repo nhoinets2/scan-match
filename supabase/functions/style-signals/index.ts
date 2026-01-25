@@ -21,9 +21,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Rate limiting: in-memory store (resets on function cold start)
-const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
-
 // Current prompt version - increment when prompt changes significantly
 const CURRENT_PROMPT_VERSION = 1;
 
@@ -462,22 +459,61 @@ Deno.serve(async (req) => {
 
       const userId = userData.user.id;
 
-      // Rate limiting for scan_direct (prevent abuse)
-      const directRateLimit = rateLimitStore.get(`direct:${userId}`);
-      const now = Date.now();
-      const DIRECT_LIMIT_PER_HOUR = 30; // Max 30 direct scans per hour
+      // Persistent rate limiting via Postgres (survives cold starts, shared across instances)
+      const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
       
-      if (directRateLimit && directRateLimit.resetAt > now) {
-        if (directRateLimit.count >= DIRECT_LIMIT_PER_HOUR) {
-          const retryAfter = Math.ceil((directRateLimit.resetAt - now) / 1000);
-          return new Response(
-            JSON.stringify({ ok: false, error: { kind: "rate_limited", message: `Rate limit exceeded. Try again in ${retryAfter}s` } }),
-            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": String(retryAfter) } }
-          );
-        }
-        directRateLimit.count++;
-      } else {
-        rateLimitStore.set(`direct:${userId}`, { count: 1, resetAt: now + 3600000 }); // 1 hour
+      // Rate limits: 10 per 5 minutes (burst) + 30 per hour
+      const BURST_LIMIT = 10;
+      const HOURLY_LIMIT = 30;
+
+      // Check burst limit first (stricter, shorter window)
+      const { data: burstCheck, error: burstError } = await supabaseAdmin.rpc('check_tf_rate_limit', {
+        p_user_id: userId,
+        p_bucket_type: 'burst',
+        p_limit: BURST_LIMIT
+      });
+
+      if (burstError) {
+        console.error(`[style-signals] Rate limit check failed:`, burstError);
+        // Fail open on DB errors (don't block user, but log for monitoring)
+      } else if (burstCheck && !burstCheck.allowed) {
+        console.warn(`[style-signals] Burst limit hit: user=${userId.slice(0, 8)}..., count=${burstCheck.current_count}/${BURST_LIMIT}`);
+        return new Response(
+          JSON.stringify({ 
+            ok: false, 
+            error: { 
+              kind: "rate_limited_burst", 
+              message: `Too many requests. Try again in ${burstCheck.retry_after_seconds}s`,
+              retry_after_seconds: burstCheck.retry_after_seconds
+            } 
+          }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": String(burstCheck.retry_after_seconds) } }
+        );
+      }
+
+      // Check hourly limit
+      const { data: hourlyCheck, error: hourlyError } = await supabaseAdmin.rpc('check_tf_rate_limit', {
+        p_user_id: userId,
+        p_bucket_type: 'hour',
+        p_limit: HOURLY_LIMIT
+      });
+
+      if (hourlyError) {
+        console.error(`[style-signals] Hourly rate limit check failed:`, hourlyError);
+        // Fail open on DB errors
+      } else if (hourlyCheck && !hourlyCheck.allowed) {
+        console.warn(`[style-signals] Hourly limit hit: user=${userId.slice(0, 8)}..., count=${hourlyCheck.current_count}/${HOURLY_LIMIT}`);
+        return new Response(
+          JSON.stringify({ 
+            ok: false, 
+            error: { 
+              kind: "rate_limited", 
+              message: `Hourly limit reached. Try again in ${hourlyCheck.retry_after_seconds}s`,
+              retry_after_seconds: hourlyCheck.retry_after_seconds
+            } 
+          }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": String(hourlyCheck.retry_after_seconds) } }
+        );
       }
 
       if (!imageDataUrl) {
