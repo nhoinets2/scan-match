@@ -44,7 +44,7 @@
        }
      },
      "approved": true,
-     "notes": "Expected primary=minimalist; allow primary=classic. Expected formality=smart_casual; allow formality=office. Boots sit on the boundary."
+     "notes": "Ankle boots; allow primary=classic; allow primary=minimalist; allow formality=office; allow formality=smart_casual. Boundary item."
    },
    {
      "filename": "v1/MIN-01_white_crewneck_tee.webp",
@@ -687,7 +687,7 @@
        }
      },
      "approved": true,
-     "notes": "HARD: primary=romantic. Formality is boundary for satin; expected=smart_casual but allow formal (optionally evening if very shiny)."
+     "notes": "HARD: primary=romantic. Formality is boundary for satin; allow formality=formal; allow formality=evening."
    },
    {
      "filename": "v1/ROM-03_pearl_necklace.webp",
@@ -856,7 +856,7 @@
        }
      },
      "approved": true,
-     "notes": "HARD: primary=edgy. Accessory formality flexible; expected=casual but allow smart_casual. Primary_confidence=0.8 acceptable."
+     "notes": "Accessory formality flexible; allow primary=edgy; allow primary=minimalist; allow formality=smart_casual. Simple silver chain is ambiguous."
    },
     {
      "filename": "v1/PRP-02_pleated_mini_skirt.webp",
@@ -984,7 +984,7 @@
        }
      },
      "approved": true,
-     "notes": "Adjusted: trainers should anchor sporty+athleisure. Street can be secondary if chunky."
+     "notes": "Trainers; allow primary=sporty; allow primary=street. Both valid depending on design/context."
    },
    {
      "filename": "v1/WES-01_white_cowboy_boots.webp",
@@ -1371,7 +1371,7 @@
         }
       },
       "approved": true,
-      "notes": "Approved: strong preppy cue (cable-knit sweater layered over collared shirt). Manual override: aesthetic set to preppy."
+      "notes": "Cable-knit sweater; allow primary=preppy; allow primary=classic. Boundary between preppy and classic."
     },
     {
       "filename": "v1/SPT-01_gray_cropped_athletic_sweatshirt.webp",
@@ -1413,7 +1413,7 @@
         }
       },
       "approved": true,
-      "notes": "Approved SPT anchor: cropped quarter-zip athletic pullover reads athleisure; manual override from minimalist/casual to sporty/athleisure."
+      "notes": "Gray athletic sweatshirt; allow primary=sporty; allow primary=minimalist; allow formality=athleisure; allow formality=casual. Ambiguous styling."
     },
     {
       "filename": "v1/STR-01_graphic_t-shirt.webp",
@@ -1671,7 +1671,7 @@
         }
       },
       "approved": true,
-      "notes": "Approved as dark denim basics. Reads more classic than utility-workwear; tagged classic primary with workwear secondary."
+      "notes": "Dark denim jeans; allow primary=workwear; allow primary=classic. Plain dark jeans read classic, not utility."
     }
   ]
 }
