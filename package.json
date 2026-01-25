@@ -15,7 +15,10 @@
     "prebuild:ios": "EXPO_USE_NPM=1 npx expo prebuild --platform ios",
     "build:ios": "bash scripts/run-ios-maestro.sh",
     "ios:maestro": "bash scripts/run-ios-simple.sh",
-    "compare-models": "npx tsx scripts/compare-models.ts"
+    "compare-models": "npx tsx scripts/compare-models.ts",
+    "golden:baseline": "bun run scripts/generate-golden-set-baseline.ts",
+    "golden:run": "bun run scripts/golden-set-run.ts",
+    "golden:diff": "bun run scripts/golden-set-diff.ts"
   },
   "dependencies": {
     "@babel/plugin-proposal-export-namespace-from": "^7.18.9",
