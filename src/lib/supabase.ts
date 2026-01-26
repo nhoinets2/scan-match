@@ -2,8 +2,27 @@ import "react-native-url-polyfill/auto";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
+// Get and trim environment variables (removes any invisible whitespace)
+const supabaseUrl = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? "").trim();
+const supabaseAnonKey = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "").trim();
+
+// Validate URL format
+const isValidUrl = (url: string): boolean => {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+// Log startup configuration for debugging
+console.log("[Supabase] Initializing client...");
+console.log(`[Supabase] URL present: ${!!supabaseUrl}, length: ${supabaseUrl.length}`);
+console.log(`[Supabase] Anon key present: ${!!supabaseAnonKey}, length: ${supabaseAnonKey.length}`);
+if (supabaseUrl && !isValidUrl(supabaseUrl)) {
+  console.warn(`[Supabase] ⚠️ URL is not valid: "${supabaseUrl.substring(0, 50)}..."`);
+}
 
 // Helper to clear invalid auth tokens from storage
 const clearInvalidTokens = async () => {
@@ -22,11 +41,12 @@ const clearInvalidTokens = async () => {
   }
 };
 
-// Create a placeholder client if credentials are missing
+// Create a placeholder client if credentials are missing or invalid
 // This prevents the app from crashing during development
 let supabase: SupabaseClient;
 
-if (supabaseUrl && supabaseAnonKey) {
+if (supabaseUrl && supabaseAnonKey && isValidUrl(supabaseUrl)) {
+  console.log("[Supabase] ✅ Credentials valid, creating real client");
   supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       storage: AsyncStorage,
@@ -74,18 +94,65 @@ if (supabaseUrl && supabaseAnonKey) {
     }
   })();
 } else {
-  console.warn(
-    "⚠️ Supabase credentials not found. Please add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to your environment variables in the ENV tab."
-  );
+  const reason = !supabaseUrl
+    ? "EXPO_PUBLIC_SUPABASE_URL is missing"
+    : !supabaseAnonKey
+    ? "EXPO_PUBLIC_SUPABASE_ANON_KEY is missing"
+    : !isValidUrl(supabaseUrl)
+    ? `EXPO_PUBLIC_SUPABASE_URL is not a valid URL: "${supabaseUrl.substring(0, 30)}..."`
+    : "Unknown reason";
+  console.warn(`⚠️ Supabase not configured: ${reason}`);
+  console.warn("Please check your environment variables in the ENV tab.");
   // Create a mock client that won't crash but won't work either
+  // This includes all commonly used methods to prevent runtime errors
+  const mockError = new Error("Supabase not configured");
+  const mockQueryBuilder = {
+    select: () => mockQueryBuilder,
+    insert: () => mockQueryBuilder,
+    update: () => mockQueryBuilder,
+    delete: () => mockQueryBuilder,
+    eq: () => mockQueryBuilder,
+    neq: () => mockQueryBuilder,
+    gt: () => mockQueryBuilder,
+    gte: () => mockQueryBuilder,
+    lt: () => mockQueryBuilder,
+    lte: () => mockQueryBuilder,
+    like: () => mockQueryBuilder,
+    ilike: () => mockQueryBuilder,
+    is: () => mockQueryBuilder,
+    in: () => mockQueryBuilder,
+    contains: () => mockQueryBuilder,
+    containedBy: () => mockQueryBuilder,
+    order: () => mockQueryBuilder,
+    limit: () => mockQueryBuilder,
+    range: () => mockQueryBuilder,
+    single: () => Promise.resolve({ data: null, error: mockError }),
+    maybeSingle: () => Promise.resolve({ data: null, error: null }),
+    then: (resolve: (value: { data: null; error: Error }) => void) => resolve({ data: null, error: mockError }),
+  };
   supabase = {
     auth: {
       getSession: async () => ({ data: { session: null }, error: null }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-      signUp: async () => ({ data: { user: null, session: null }, error: new Error("Supabase not configured") }),
-      signInWithPassword: async () => ({ data: { user: null, session: null }, error: new Error("Supabase not configured") }),
+      signUp: async () => ({ data: { user: null, session: null }, error: mockError }),
+      signInWithPassword: async () => ({ data: { user: null, session: null }, error: mockError }),
+      signInWithOAuth: async () => ({ data: { provider: "", url: "" }, error: mockError }),
       signOut: async () => ({ error: null }),
+      setSession: async () => ({ data: { session: null, user: null }, error: mockError }),
+      updateUser: async () => ({ data: { user: null }, error: mockError }),
+      resetPasswordForEmail: async () => ({ data: {}, error: mockError }),
     },
+    from: () => mockQueryBuilder,
+    storage: {
+      from: () => ({
+        upload: async () => ({ data: null, error: mockError }),
+        download: async () => ({ data: null, error: mockError }),
+        getPublicUrl: () => ({ data: { publicUrl: "" } }),
+        remove: async () => ({ data: null, error: mockError }),
+        list: async () => ({ data: null, error: mockError }),
+      }),
+    },
+    rpc: async () => ({ data: null, error: mockError }),
   } as unknown as SupabaseClient;
 }
 

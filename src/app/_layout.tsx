@@ -464,6 +464,22 @@ function SplashHider({ fontsLoaded, fontError }: { fontsLoaded: boolean; fontErr
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
+  // Log environment configuration on startup
+  useEffect(() => {
+    const hasSupabaseUrl = !!process.env.EXPO_PUBLIC_SUPABASE_URL;
+    const hasSupabaseAnon = !!process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+    const hasRCTestKey = !!process.env.EXPO_PUBLIC_VIBECODE_REVENUECAT_TEST_KEY;
+    const hasRCAppleKey = !!process.env.EXPO_PUBLIC_VIBECODE_REVENUECAT_APPLE_KEY;
+    const hasRCGoogleKey = !!process.env.EXPO_PUBLIC_VIBECODE_REVENUECAT_GOOGLE_KEY;
+    
+    console.log("[Config] Environment variables:");
+    console.log(`  - Supabase URL: ${hasSupabaseUrl ? "✅" : "❌"}`);
+    console.log(`  - Supabase Anon Key: ${hasSupabaseAnon ? "✅" : "❌"}`);
+    console.log(`  - RevenueCat Test Key: ${hasRCTestKey ? "✅" : "❌"}`);
+    console.log(`  - RevenueCat Apple Key: ${hasRCAppleKey ? "✅" : "❌"}`);
+    console.log(`  - RevenueCat Google Key: ${hasRCGoogleKey ? "✅" : "❌"}`);
+  }, []);
+
   // Load custom fonts
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,

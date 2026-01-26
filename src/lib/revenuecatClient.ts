@@ -103,7 +103,9 @@ let isInitialized = false;
  */
 export const initializeRevenueCat = async (userId?: string): Promise<void> => {
   if (!isEnabled) {
-    console.log(`${LOG_PREFIX} Initialization skipped: not configured`);
+    console.warn(
+      `⚠️ RevenueCat not configured. To enable subscriptions, add RevenueCat API keys in the ENV tab or Payments tab.`
+    );
     return;
   }
 
