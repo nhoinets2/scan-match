@@ -1,13 +1,15 @@
 /**
- * Hook for using ComboAssembler with ConfidenceEngine results.
+ * Hook for using ComboAssembler with finalized matches.
  *
- * Bridges the CE output to ComboAssembler input.
+ * Bridges the finalized match output (from useTrustFilter) to ComboAssembler input.
+ * Uses highFinal for "Wear now" outfits and nearFinal for "Worth trying" outfits.
  */
 
 import { useMemo } from 'react';
 import type { WardrobeItem, ScannedItem, Category } from './types';
-import type { ConfidenceEngineResult } from './useConfidenceEngine';
+import type { EnrichedMatch } from './useConfidenceEngine';
 import type { PairEvaluation } from './confidence-engine';
+import { effectiveEvaluation } from './useTrustFilter';
 import {
   assembleCombos,
   compareCombosForShadowMode,
@@ -66,22 +68,27 @@ export interface UseComboAssemblerResult {
 // ============================================
 
 /**
- * Use ComboAssembler with CE results to generate outfit combos.
+ * Use ComboAssembler with finalized matches to generate outfit combos.
+ *
+ * IMPORTANT: This hook now uses finalized matches (after Trust Filter + AI Safety)
+ * instead of raw CE results. This ensures outfit assembly respects all filtering.
  *
  * @param scannedItem - The scanned item
  * @param wardrobeItems - All wardrobe items (for category lookup)
- * @param confidenceResult - Result from useConfidenceEngine
+ * @param highCandidates - Finalized HIGH matches (from useTrustFilter.finalized.highFinal)
+ * @param nearCandidates - Finalized NEAR matches (from useTrustFilter.finalized.nearFinal)
  * @param config - Optional assembly configuration
  */
 export function useComboAssembler(
   scannedItem: ScannedItem | null,
   wardrobeItems: WardrobeItem[],
-  confidenceResult: ConfidenceEngineResult,
+  highCandidates: EnrichedMatch[],
+  nearCandidates: EnrichedMatch[],
   config?: Partial<ComboAssemblerConfig>
 ): UseComboAssemblerResult {
   return useMemo(() => {
-    // No scanned item or no evaluation = no combos
-    if (!scannedItem || !confidenceResult.evaluated) {
+    // No scanned item = no combos
+    if (!scannedItem) {
       return {
         combos: [],
         canFormCombos: false,
@@ -104,22 +111,40 @@ export function useComboAssembler(
       wardrobeCategoryMap.set(item.id, item.category);
     }
 
-    // Gather all evaluations from CE (HIGH matches + near matches)
+    // Gather all evaluations from finalized matches (HIGH + NEAR)
+    // These have already been filtered by Trust Filter + AI Safety
     const allEvaluations: PairEvaluation[] = [];
+    const seenIds = new Set<string>();
 
-    // Add HIGH matches
-    for (const match of confidenceResult.matches) {
-      allEvaluations.push(match.evaluation);
+    // Add HIGH candidates first (they keep their HIGH tier)
+    for (const match of highCandidates) {
+      if (!seenIds.has(match.wardrobeItem.id)) {
+        seenIds.add(match.wardrobeItem.id);
+        allEvaluations.push(match.evaluation);
+      }
     }
 
-    // Add near matches (MEDIUM tier) from raw evaluation
-    if (confidenceResult.rawEvaluation?.near_matches) {
-      for (const nearMatch of confidenceResult.rawEvaluation.near_matches) {
-        // Avoid duplicates (shouldn't happen, but guard)
-        if (!allEvaluations.some(e => e.item_b_id === nearMatch.item_b_id)) {
-          allEvaluations.push(nearMatch);
-        }
+    // Add NEAR candidates (deduplicated)
+    // CRITICAL: Use effectiveEvaluation helper to force tier to 'MEDIUM'
+    // This ensures demoted items (which have confidence_tier='HIGH' in their evaluation)
+    // are treated as MEDIUM when building outfits. Without this, a combo of demoted
+    // items would have tierFloor='HIGH' and appear in "Wear now" tab.
+    for (const match of nearCandidates) {
+      if (!seenIds.has(match.wardrobeItem.id)) {
+        seenIds.add(match.wardrobeItem.id);
+        // Use centralized helper for tier adjustment (NEAR → MEDIUM)
+        allEvaluations.push(effectiveEvaluation(match, 'NEAR'));
       }
+    }
+
+    // Log inputs in development
+    if (__DEV__) {
+      const highShoes = highCandidates.filter(x => x.wardrobeItem.category === 'shoes').length;
+      console.log('[ComboAssembler Inputs]', {
+        high: highCandidates.length,
+        near: nearCandidates.length,
+        highShoes,
+      });
     }
 
     // Run combo assembler
@@ -256,8 +281,10 @@ export function useComboAssembler(
         rejectedHighCount,
       },
     };
-  }, [scannedItem, wardrobeItems, confidenceResult, config]);
+  }, [scannedItem, wardrobeItems, highCandidates, nearCandidates, config]);
 }
+
+declare const __DEV__: boolean;
 
 // Re-export OutfitSlot for use in useResultsTabs
 export type { OutfitSlot };

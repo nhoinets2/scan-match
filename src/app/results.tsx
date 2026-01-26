@@ -1963,13 +1963,23 @@ function ResultsSuccess({
   // Confidence Engine evaluation - primary matching system
   const rawConfidenceResult = useConfidenceEngine(scannedItem, wardrobe);
 
+  // Create scannedItem with resolved imageUri for Trust Filter
+  // The scannedItem from analysisState.item doesn't include imageUri (it comes from AI response)
+  // We need to merge resolvedImageUri so Trust Filter can generate style signals
+  const scannedItemForTrustFilter = useMemo(() => ({
+    ...scannedItem,
+    imageUri: resolvedImageUri || scannedItem.imageUri || '',
+  }), [scannedItem, resolvedImageUri]);
+
   // Trust Filter - post-CE filtering of HIGH matches
   // Applies style-based guardrails to prevent trust-breaking matches
+  // Also runs AI Safety Check in dry_run mode (when enabled)
   const trustFilterResult = useTrustFilter(
     rawConfidenceResult,
-    scannedItem,
+    scannedItemForTrustFilter,
     wardrobe,
-    currentCheckId // Use scan ID for fetching cached signals
+    currentCheckId, // Use scan ID for fetching cached signals
+    user?.id // User ID for AI Safety rollout bucketing
   );
 
   // Merge Trust Filter results into confidence result
@@ -2024,13 +2034,21 @@ function ResultsSuccess({
     return new Set(trustFilterResult.demotedMatches.map(m => m.wardrobeItem.id));
   }, [trustFilterResult.demotedMatches]);
 
-  // ComboAssembler: Generate outfit combos from CE-ranked items
-  const comboAssemblerResult = useComboAssembler(scannedItem, wardrobe, confidenceResult);
+  // ComboAssembler: Generate outfit combos from finalized matches
+  // IMPORTANT: Uses trustFilterResult.finalized to respect TF + AI Safety decisions
+  const comboAssemblerResult = useComboAssembler(
+    scannedItem,
+    wardrobe,
+    trustFilterResult.finalized.highFinal,
+    trustFilterResult.finalized.nearFinal
+  );
 
   // Results Tabs: Manages "Wear now" vs "Worth trying" tab state
+  // IMPORTANT: Uses finalized matches to ensure tabs reflect all filtering decisions
   const tabsState = useResultsTabs(
     scannedItem?.id ?? null,
-    confidenceResult,
+    trustFilterResult.finalized.highFinal,
+    trustFilterResult.finalized.nearFinal,
     comboAssemblerResult,
     wardrobe,
     scannedItem?.category ?? null // For diversity slot selection

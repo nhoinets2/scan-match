@@ -43,6 +43,28 @@ export interface FeatureFlags {
    * @default false
    */
   lazy_enrichment_enabled: boolean;
+
+  /**
+   * Enable AI Safety Check
+   * When enabled, risky HIGH matches are sent to AI for additional validation.
+   * @default false
+   */
+  ai_safety_enabled: boolean;
+
+  /**
+   * AI Safety dry run mode
+   * When enabled, AI Safety verdicts are logged but NOT applied to results.
+   * Use this to validate verdict quality before enabling apply mode.
+   * @default true
+   */
+  ai_safety_dry_run: boolean;
+
+  /**
+   * AI Safety rollout percentage (0-100)
+   * Only users in this percentage bucket will have AI Safety enabled.
+   * @default 10
+   */
+  ai_safety_rollout_pct: number;
 }
 
 // ============================================
@@ -55,6 +77,15 @@ function getEnvBoolean(key: string, defaultValue: boolean): boolean {
     return defaultValue;
   }
   return value === 'true' || value === '1';
+}
+
+function getEnvNumber(key: string, defaultValue: number): number {
+  const value = process.env[key];
+  if (value === undefined || value === '') {
+    return defaultValue;
+  }
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? defaultValue : parsed;
 }
 
 // ============================================
@@ -79,6 +110,15 @@ const DEFAULT_FLAGS: FeatureFlags = {
 
   // Lazy enrichment: EXPO_PUBLIC_LAZY_ENRICHMENT_ENABLED or default false
   lazy_enrichment_enabled: getEnvBoolean('EXPO_PUBLIC_LAZY_ENRICHMENT_ENABLED', false),
+
+  // AI Safety: EXPO_PUBLIC_AI_SAFETY_ENABLED or default false
+  ai_safety_enabled: getEnvBoolean('EXPO_PUBLIC_AI_SAFETY_ENABLED', false),
+
+  // AI Safety dry run: EXPO_PUBLIC_AI_SAFETY_DRY_RUN or default true (safe default)
+  ai_safety_dry_run: getEnvBoolean('EXPO_PUBLIC_AI_SAFETY_DRY_RUN', true),
+
+  // AI Safety rollout: EXPO_PUBLIC_AI_SAFETY_ROLLOUT_PCT or default 10%
+  ai_safety_rollout_pct: getEnvNumber('EXPO_PUBLIC_AI_SAFETY_ROLLOUT_PCT', 10),
 };
 
 // ============================================
@@ -131,6 +171,27 @@ export function isStyleSignalsEnabled(): boolean {
  */
 export function isLazyEnrichmentEnabled(): boolean {
   return currentFlags.lazy_enrichment_enabled;
+}
+
+/**
+ * Check if AI Safety is enabled
+ */
+export function isAiSafetyEnabled(): boolean {
+  return currentFlags.ai_safety_enabled;
+}
+
+/**
+ * Check if AI Safety is in dry run mode
+ */
+export function isAiSafetyDryRun(): boolean {
+  return currentFlags.ai_safety_dry_run;
+}
+
+/**
+ * Get AI Safety rollout percentage
+ */
+export function getAiSafetyRolloutPct(): number {
+  return currentFlags.ai_safety_rollout_pct;
 }
 
 // ============================================

@@ -14,7 +14,7 @@
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import type { Category, WardrobeItem } from './types';
-import type { ConfidenceEngineResult, EnrichedMatch } from './useConfidenceEngine';
+import type { EnrichedMatch } from './useConfidenceEngine';
 import type { UseComboAssemblerResult, OutfitSlot } from './useComboAssembler';
 import type { AssembledCombo, CandidatesBySlot } from './combo-assembler';
 import type { PairEvaluation, ConfidenceTier } from './confidence-engine';
@@ -453,15 +453,20 @@ function storeTab(scanId: string, tab: ResultsTab): void {
 /**
  * Hook for managing results screen tab state.
  *
+ * IMPORTANT: This hook now uses finalized matches (after Trust Filter + AI Safety)
+ * instead of raw CE results. This ensures tabs correctly reflect all filtering decisions.
+ *
  * @param scanId - Unique identifier for the current scan (for tab persistence)
- * @param confidenceResult - Result from useConfidenceEngine
+ * @param highMatches - Finalized HIGH matches (from useTrustFilter.finalized.highFinal)
+ * @param nearMatches - Finalized NEAR matches (from useTrustFilter.finalized.nearFinal)
  * @param comboResult - Result from useComboAssembler
  * @param wardrobeItems - Wardrobe items for category lookup
  * @param scannedCategory - Category of the scanned item (for diversity slot selection)
  */
 export function useResultsTabs(
   scanId: string | null,
-  confidenceResult: ConfidenceEngineResult,
+  highMatches: EnrichedMatch[],
+  nearMatches: EnrichedMatch[],
   comboResult: UseComboAssemblerResult,
   wardrobeItems: WardrobeItem[] = [],
   scannedCategory: Category | null = null
@@ -575,9 +580,8 @@ export function useResultsTabs(
     return selected;
   }, [nearOutfits, scannedCategory, comboResult.penaltyById]);
 
-  // Get matches from confidence engine
-  const highMatches = confidenceResult.matches; // Already HIGH only
-  const nearMatches = confidenceResult.rawEvaluation?.near_matches ?? [];
+  // Note: highMatches and nearMatches are now passed as parameters
+  // They come from useTrustFilter.finalized.highFinal and .nearFinal
 
   // ─────────────────────────────────────────────
   // Compute tab visibility
@@ -609,12 +613,10 @@ export function useResultsTabs(
   const coreHighMatches = highMatches.filter(m => 
     isCoreCategory(m.wardrobeItem.category)
   );
-  const coreNearMatches = nearMatches.filter(m => {
-    // Near matches have item_a (scanned) and item_b (wardrobe)
-    // We need to look up the wardrobe item's category
-    const wardrobeItem = wardrobeMap.get(m.item_b_id) ?? wardrobeMap.get(m.item_a_id);
-    return wardrobeItem ? isCoreCategory(wardrobeItem.category) : false;
-  });
+  // nearMatches is now EnrichedMatch[] (from finalized.nearFinal), same structure as highMatches
+  const coreNearMatches = nearMatches.filter(m =>
+    isCoreCategory(m.wardrobeItem.category)
+  );
 
   const showHigh = highOutfits.length > 0 || coreHighMatches.length > 0;
   const showNear = nearOutfits.length > 0 || coreNearMatches.length > 0;
@@ -1041,15 +1043,21 @@ export function useResultsTabs(
     [highMatches, highOutfits, highOutfitEmptyReason, buildMissingMessage]
   );
 
+  // Extract PairEvaluation[] from EnrichedMatch[] for Mode B bullet generation
+  const nearMatchEvaluations: PairEvaluation[] = useMemo(
+    () => nearMatches.map(m => m.evaluation),
+    [nearMatches]
+  );
+
   const nearTab: TabContent = useMemo(
     () => ({
-      matches: [], // NEAR tab shows near matches differently
-      nearMatches,
+      matches: nearMatches, // NEAR tab shows near matches as EnrichedMatch[]
+      nearMatches: nearMatchEvaluations, // PairEvaluation[] for Mode B bullets
       outfits: diversifiedNearOutfits, // Use diversity-selected outfits
       outfitEmptyReason: nearOutfitEmptyReason,
       missingMessage: buildMissingMessage(nearOutfitEmptyReason),
     }),
-    [nearMatches, diversifiedNearOutfits, nearOutfitEmptyReason, buildMissingMessage]
+    [nearMatches, nearMatchEvaluations, diversifiedNearOutfits, nearOutfitEmptyReason, buildMissingMessage]
   );
 
   // ─────────────────────────────────────────────

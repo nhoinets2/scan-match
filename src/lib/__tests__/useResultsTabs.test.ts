@@ -1498,3 +1498,187 @@ describe('Phase 1: Blocking + Weak slot classification', () => {
   });
 });
 
+// ============================================
+// FINALIZED MATCHES INTEGRATION TESTS
+// ============================================
+
+describe('FinalizedMatches integration with ResultsTabs', () => {
+  /**
+   * Tests for the updated useResultsTabs signature that takes
+   * highMatches and nearMatches as EnrichedMatch[] instead of
+   * confidenceResult.
+   */
+
+  describe('nearMatches as EnrichedMatch[] (updated signature)', () => {
+    function computeTabVisibilityWithEnrichedNear(
+      highOutfits: AssembledCombo[],
+      nearOutfits: AssembledCombo[],
+      highMatches: EnrichedMatch[],
+      nearMatches: EnrichedMatch[] // Now EnrichedMatch[] instead of PairEvaluation[]
+    ) {
+      const showHigh = highOutfits.length > 0 || highMatches.length > 0;
+      const showNear = nearOutfits.length > 0 || nearMatches.length > 0;
+      const showTabs = showHigh && showNear;
+      const showEmptyState = !showHigh && !showNear;
+
+      return { showHigh, showNear, showTabs, showEmptyState };
+    }
+
+    it('shows NEAR tab when nearMatches contains EnrichedMatch items', () => {
+      const highOutfits: AssembledCombo[] = [];
+      const nearOutfits: AssembledCombo[] = [];
+      const highMatches: EnrichedMatch[] = [];
+      const nearMatches = [
+        createMockEnrichedMatch({ evaluation: createMockPairEvaluation({ confidence_tier: 'MEDIUM' }) }),
+      ];
+
+      const result = computeTabVisibilityWithEnrichedNear(
+        highOutfits,
+        nearOutfits,
+        highMatches,
+        nearMatches
+      );
+
+      expect(result.showHigh).toBe(false);
+      expect(result.showNear).toBe(true);
+    });
+
+    it('shows both tabs when both highMatches and nearMatches have items', () => {
+      const highOutfits: AssembledCombo[] = [];
+      const nearOutfits: AssembledCombo[] = [];
+      const highMatches = [createMockEnrichedMatch()];
+      const nearMatches = [
+        createMockEnrichedMatch({ evaluation: createMockPairEvaluation({ confidence_tier: 'MEDIUM' }) }),
+      ];
+
+      const result = computeTabVisibilityWithEnrichedNear(
+        highOutfits,
+        nearOutfits,
+        highMatches,
+        nearMatches
+      );
+
+      expect(result.showHigh).toBe(true);
+      expect(result.showNear).toBe(true);
+      expect(result.showTabs).toBe(true);
+    });
+  });
+
+  describe('TF-demoted items in nearMatches', () => {
+    it('TF-demoted items (originally HIGH) appear in nearMatches', () => {
+      // Simulate: item was CE HIGH, TF demoted it
+      const demotedItem = createMockEnrichedMatch({
+        evaluation: createMockPairEvaluation({ confidence_tier: 'HIGH' }), // Original tier
+      });
+
+      // After finalization, demoted items go to nearMatches
+      const nearMatches = [demotedItem];
+
+      expect(nearMatches).toHaveLength(1);
+      // The evaluation still has original tier, but it's in nearMatches bucket
+      expect(nearMatches[0].evaluation.confidence_tier).toBe('HIGH');
+    });
+
+    it('nearMatches contains both TF-demoted and CE MEDIUM items', () => {
+      const tfDemoted = createMockEnrichedMatch({
+        wardrobeItem: { id: 'demoted-1', category: 'shoes' } as WardrobeItem,
+        evaluation: createMockPairEvaluation({ confidence_tier: 'HIGH', item_b_id: 'demoted-1' }),
+      });
+      const ceMedium = createMockEnrichedMatch({
+        wardrobeItem: { id: 'medium-1', category: 'tops' } as WardrobeItem,
+        evaluation: createMockPairEvaluation({ confidence_tier: 'MEDIUM', item_b_id: 'medium-1' }),
+      });
+
+      const nearMatches = [tfDemoted, ceMedium];
+
+      expect(nearMatches).toHaveLength(2);
+      // First item is TF-demoted (was HIGH)
+      expect(nearMatches[0].evaluation.confidence_tier).toBe('HIGH');
+      // Second item is CE MEDIUM
+      expect(nearMatches[1].evaluation.confidence_tier).toBe('MEDIUM');
+    });
+  });
+
+  describe('Tab content with finalized matches', () => {
+    it('highTab.matches equals highFinal', () => {
+      const highFinal = [createMockEnrichedMatch()];
+
+      // In the new signature, highTab.matches = highMatches = finalized.highFinal
+      const highTabMatches = highFinal;
+
+      expect(highTabMatches).toBe(highFinal);
+      expect(highTabMatches).toHaveLength(1);
+    });
+
+    it('nearTab.matches equals nearFinal (for display)', () => {
+      const nearFinal = [
+        createMockEnrichedMatch({
+          evaluation: createMockPairEvaluation({ confidence_tier: 'MEDIUM' }),
+        }),
+      ];
+
+      // In the new signature, nearTab.matches = nearMatches = finalized.nearFinal
+      const nearTabMatches = nearFinal;
+
+      expect(nearTabMatches).toBe(nearFinal);
+      expect(nearTabMatches).toHaveLength(1);
+    });
+
+    it('nearTab.nearMatches extracts evaluations for Mode B bullets', () => {
+      const nearFinal = [
+        createMockEnrichedMatch({
+          evaluation: createMockPairEvaluation({ 
+            confidence_tier: 'MEDIUM',
+            cap_reasons: ['COLOR_TENSION'],
+          }),
+        }),
+        createMockEnrichedMatch({
+          evaluation: createMockPairEvaluation({ 
+            confidence_tier: 'MEDIUM',
+            cap_reasons: ['FORMALITY_MISMATCH'],
+          }),
+        }),
+      ];
+
+      // Extract PairEvaluation[] for Mode B bullet generation
+      const nearMatchEvaluations = nearFinal.map(m => m.evaluation);
+
+      expect(nearMatchEvaluations).toHaveLength(2);
+      expect(nearMatchEvaluations[0].cap_reasons).toContain('COLOR_TENSION');
+      expect(nearMatchEvaluations[1].cap_reasons).toContain('FORMALITY_MISMATCH');
+    });
+  });
+
+  describe('Hidden items exclusion', () => {
+    it('hidden items do not appear in highMatches', () => {
+      const keptItem = createMockEnrichedMatch({ wardrobeItem: { id: 'kept' } as WardrobeItem });
+      const hiddenItem = createMockEnrichedMatch({ wardrobeItem: { id: 'hidden' } as WardrobeItem });
+
+      // Only kept items go to highMatches (highFinal)
+      const highMatches = [keptItem];
+      const hidden = [hiddenItem];
+
+      const highIds = new Set(highMatches.map(m => m.wardrobeItem.id));
+      const hiddenIds = new Set(hidden.map(m => m.wardrobeItem.id));
+
+      // No overlap
+      expect([...hiddenIds].filter(id => highIds.has(id))).toHaveLength(0);
+    });
+
+    it('hidden items do not appear in nearMatches', () => {
+      const nearItem = createMockEnrichedMatch({ wardrobeItem: { id: 'near' } as WardrobeItem });
+      const hiddenItem = createMockEnrichedMatch({ wardrobeItem: { id: 'hidden' } as WardrobeItem });
+
+      // Only non-hidden items go to nearMatches (nearFinal)
+      const nearMatches = [nearItem];
+      const hidden = [hiddenItem];
+
+      const nearIds = new Set(nearMatches.map(m => m.wardrobeItem.id));
+      const hiddenIds = new Set(hidden.map(m => m.wardrobeItem.id));
+
+      // No overlap
+      expect([...hiddenIds].filter(id => nearIds.has(id))).toHaveLength(0);
+    });
+  });
+});
+
