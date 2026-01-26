@@ -14,13 +14,25 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_NO_CAPABILITY_SYNC": "1"
+        "EXPO_NO_CAPABILITY_SYNC": "1",
+        "EXPO_PUBLIC_TRUST_FILTER_ENABLED": "true",
+        "EXPO_PUBLIC_STYLE_SIGNALS_ENABLED": "true",
+        "EXPO_PUBLIC_LAZY_ENRICHMENT_ENABLED": "true",
+        "EXPO_PUBLIC_AI_SAFETY_ENABLED": "true",
+        "EXPO_PUBLIC_AI_SAFETY_DRY_RUN": "true",
+        "EXPO_PUBLIC_AI_SAFETY_ROLLOUT_PCT": "10"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_NO_CAPABILITY_SYNC": "1"
+        "EXPO_NO_CAPABILITY_SYNC": "1",
+        "EXPO_PUBLIC_TRUST_FILTER_ENABLED": "true",
+        "EXPO_PUBLIC_STYLE_SIGNALS_ENABLED": "true",
+        "EXPO_PUBLIC_LAZY_ENRICHMENT_ENABLED": "true",
+        "EXPO_PUBLIC_AI_SAFETY_ENABLED": "true",
+        "EXPO_PUBLIC_AI_SAFETY_DRY_RUN": "true",
+        "EXPO_PUBLIC_AI_SAFETY_ROLLOUT_PCT": "10"
       }
     }
   },

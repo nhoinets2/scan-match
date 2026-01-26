@@ -44,6 +44,7 @@ const ANALYTICS_CONFIG = {
     style_signals_completed: 1,
     style_signals_failed: 1,
     style_signals_started: 1,
+    finalized_matches_invariant_violation: 1, // Always send - should be rare/never
     // Sample at 5% (high volume)
     trust_filter_pair_decision: 0.05,
     // Default for unlisted events
@@ -137,7 +138,9 @@ export type AnalyticsEvent =
   // Style Signals events
   | StyleSignalsStarted
   | StyleSignalsCompleted
-  | StyleSignalsFailed;
+  | StyleSignalsFailed
+  // FinalizedMatches invariant events
+  | FinalizedMatchesInvariantViolation;
 
 // ============================================
 // TRUST FILTER EVENT TYPES
@@ -229,6 +232,44 @@ interface StyleSignalsFailed {
     item_id: string;
     error_type: string;
     error_message: string;
+  };
+}
+
+// ============================================
+// FINALIZED MATCHES EVENT TYPES
+// ============================================
+
+/**
+ * Invariant violation in FinalizedMatches pipeline.
+ * This is a production-safe telemetry event that fires when
+ * internal invariants are violated (should be rare/never).
+ * 
+ * Severity levels:
+ *   - warning: Unexpected state, but recoverable (e.g., unexpected ID type)
+ *   - critical: Data corruption or logic error (e.g., bucket overlap)
+ */
+interface FinalizedMatchesInvariantViolation {
+  name: "finalized_matches_invariant_violation";
+  properties: {
+    /** Type of invariant violated */
+    type: 
+      | "hidden_id_not_string"
+      | "ghost_demote"
+      | "ghost_hide"
+      | "high_near_overlap"
+      | "hidden_overlap";
+    /** Scan ID for debugging */
+    scan_id: string;
+    /** Number of IDs involved in the violation */
+    item_ids_count: number;
+    /** Severity level */
+    severity: "warning" | "critical";
+    /** Additional context */
+    context?: string;
+    /** Feature flag states for correlation */
+    tf_enabled: boolean;
+    ai_enabled: boolean;
+    ai_dry_run: boolean;
   };
 }
 
@@ -1073,6 +1114,67 @@ export function trackStyleSignalsFailed(params: {
     item_id: params.itemId,
     error_type: params.errorType,
     error_message: params.errorMessage,
+  });
+}
+
+// ============================================
+// FINALIZED MATCHES ANALYTICS
+// ============================================
+
+/**
+ * Track FinalizedMatches invariant violation.
+ * 
+ * This is a production-safe telemetry event for detecting
+ * rare edge cases in the finalization pipeline. In dev mode,
+ * it also logs to console.error for immediate visibility.
+ * 
+ * @param params.type - Type of invariant violated
+ * @param params.scanId - Scan ID for debugging
+ * @param params.itemIdsCount - Number of IDs involved
+ * @param params.severity - 'warning' for recoverable, 'critical' for data corruption
+ * @param params.context - Optional additional context
+ * @param params.tfEnabled - Trust Filter enabled state
+ * @param params.aiEnabled - AI Safety enabled state
+ * @param params.aiDryRun - AI Safety dry run state
+ */
+export function trackFinalizedMatchesInvariantViolation(params: {
+  type: 
+    | "hidden_id_not_string"
+    | "ghost_demote"
+    | "ghost_hide"
+    | "high_near_overlap"
+    | "hidden_overlap";
+  scanId: string;
+  itemIdsCount: number;
+  severity: "warning" | "critical";
+  context?: string;
+  tfEnabled: boolean;
+  aiEnabled: boolean;
+  aiDryRun: boolean;
+}): void {
+  // Always log to console in dev for immediate visibility
+  if (__DEV__) {
+    console.error(
+      `[FinalizedMatches] INVARIANT VIOLATED: ${params.type}`,
+      { 
+        scanId: params.scanId, 
+        count: params.itemIdsCount, 
+        context: params.context,
+        flags: { tf: params.tfEnabled, ai: params.aiEnabled, dryRun: params.aiDryRun },
+      }
+    );
+  }
+
+  // Send to production telemetry (always - not sampled)
+  trackEvent("finalized_matches_invariant_violation", {
+    type: params.type,
+    scan_id: params.scanId,
+    item_ids_count: params.itemIdsCount,
+    severity: params.severity,
+    context: params.context,
+    tf_enabled: params.tfEnabled,
+    ai_enabled: params.aiEnabled,
+    ai_dry_run: params.aiDryRun,
   });
 }
 

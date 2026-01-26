@@ -52,6 +52,7 @@ import {
   trackTrustFilterCompleted,
   trackTrustFilterPairDecision,
   trackTrustFilterError,
+  trackFinalizedMatchesInvariantViolation,
 } from './analytics';
 
 // ============================================
@@ -725,28 +726,54 @@ export function useTrustFilter(
       });
 
       // ─────────────────────────────────────────────
-      // INVARIANT CHECKS
+      // INVARIANT CHECKS (with production telemetry)
       // ─────────────────────────────────────────────
 
+      // Capture flag states for telemetry correlation
+      const flagStates = {
+        tfEnabled: isTrustFilterEnabled(),
+        aiEnabled: isAiSafetyEnabled(),
+        aiDryRun: isAiSafetyDryRun(),
+      };
+
       // 1. ID type assertion: all IDs should be strings (wardrobeItem.id)
-      for (const id of hiddenIds) {
-        if (typeof id !== 'string') {
-          console.error('[FinalizedMatches] INVARIANT VIOLATED: Hidden id not string', id);
-        }
+      const nonStringIds = [...hiddenIds].filter(id => typeof id !== 'string');
+      if (nonStringIds.length > 0) {
+        trackFinalizedMatchesInvariantViolation({
+          type: 'hidden_id_not_string',
+          scanId: scanId || 'unknown',
+          itemIdsCount: nonStringIds.length,
+          severity: 'warning',
+          context: `Non-string ID types found in hidden set`,
+          ...flagStates,
+        });
       }
 
       // 2. Ghost demote/hide check: demoted/hidden IDs should be subset of CE HIGH
       // (prevents stale IDs from polluting nearFinal)
       const ceHighIds = new Set(matches.map(m => m.wardrobeItem.id));
-      for (const id of batchResult.demoted) {
-        if (!ceHighIds.has(id)) {
-          console.error('[FinalizedMatches] INVARIANT VIOLATED: Demoted id not in CE HIGH', id);
-        }
+      const ghostDemotes = batchResult.demoted.filter(id => !ceHighIds.has(id));
+      const ghostHides = batchResult.hidden.filter(id => !ceHighIds.has(id));
+      
+      if (ghostDemotes.length > 0) {
+        trackFinalizedMatchesInvariantViolation({
+          type: 'ghost_demote',
+          scanId: scanId || 'unknown',
+          itemIdsCount: ghostDemotes.length,
+          severity: 'critical',
+          context: `Demoted IDs not in CE HIGH: ${ghostDemotes.slice(0, 3).join(', ')}${ghostDemotes.length > 3 ? '...' : ''}`,
+          ...flagStates,
+        });
       }
-      for (const id of batchResult.hidden) {
-        if (!ceHighIds.has(id)) {
-          console.error('[FinalizedMatches] INVARIANT VIOLATED: Hidden id not in CE HIGH', id);
-        }
+      if (ghostHides.length > 0) {
+        trackFinalizedMatchesInvariantViolation({
+          type: 'ghost_hide',
+          scanId: scanId || 'unknown',
+          itemIdsCount: ghostHides.length,
+          severity: 'critical',
+          context: `Hidden IDs not in CE HIGH: ${ghostHides.slice(0, 3).join(', ')}${ghostHides.length > 3 ? '...' : ''}`,
+          ...flagStates,
+        });
       }
 
       // 3. Bucket exclusivity: no overlap between highFinal, nearFinal, hidden
@@ -757,12 +784,24 @@ export function useTrustFilter(
       );
       
       if (highOverlap.length > 0) {
-        console.error('[FinalizedMatches] INVARIANT VIOLATED: highFinal overlaps with nearFinal', 
-          highOverlap.map(m => m.wardrobeItem.id));
+        trackFinalizedMatchesInvariantViolation({
+          type: 'high_near_overlap',
+          scanId: scanId || 'unknown',
+          itemIdsCount: highOverlap.length,
+          severity: 'critical',
+          context: `Items in both highFinal and nearFinal: ${highOverlap.slice(0, 3).map(m => m.wardrobeItem.id).join(', ')}`,
+          ...flagStates,
+        });
       }
       if (hiddenOverlap.length > 0) {
-        console.error('[FinalizedMatches] INVARIANT VIOLATED: hidden overlaps with high/near', 
-          hiddenOverlap.map(m => m.wardrobeItem.id));
+        trackFinalizedMatchesInvariantViolation({
+          type: 'hidden_overlap',
+          scanId: scanId || 'unknown',
+          itemIdsCount: hiddenOverlap.length,
+          severity: 'critical',
+          context: `Hidden items overlapping with high/near: ${hiddenOverlap.slice(0, 3).map(m => m.wardrobeItem.id).join(', ')}`,
+          ...flagStates,
+        });
       }
     }
 
