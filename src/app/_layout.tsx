@@ -27,6 +27,7 @@ import { initializeBackgroundUploads } from "@/lib/storage";
 import { queryClient } from "@/lib/queryClient";
 import { initializeAnalytics, setAnalyticsUserId, resetAnalyticsSession } from "@/lib/analytics";
 import { preloadRemoteConfig } from "@/lib/trust-filter-remote-config";
+import { initAnonId } from "@/lib/ai-safety";
 
 export const unstable_settings = {
   initialRouteName: "login",
@@ -34,6 +35,24 @@ export const unstable_settings = {
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
+
+/**
+ * Initializes anonymous ID for pre-login AI Safety rollout.
+ * This ensures consistent rollout behavior before user logs in.
+ */
+function AnonIdInitializer() {
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    if (!initialized.current) {
+      initialized.current = true;
+      // Initialize async but don't block - cached value will be available for later
+      void initAnonId();
+    }
+  }, []);
+
+  return null;
+}
 
 /**
  * Initializes background uploads only after auth is ready.
@@ -514,6 +533,7 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <SplashHider fontsLoaded={fontsLoaded} fontError={fontError} />
+        <AnonIdInitializer />
         <BackgroundUploadInitializer />
         <AnalyticsInitializer />
         <FocusManagerInitializer />

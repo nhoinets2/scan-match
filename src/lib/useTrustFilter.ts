@@ -31,6 +31,7 @@ import {
   shouldRunAiSafety,
   inRollout,
   computePairType,
+  AI_SAFETY_POLICY_VERSION,
   type AiSafetyVerdict,
 } from './ai-safety';
 import {
@@ -46,6 +47,7 @@ import {
   enqueueWardrobeEnrichmentBatch,
   generateScanStyleSignals,
   generateScanStyleSignalsDirect,
+  persistScanSignalsToDb,
 } from './style-signals-service';
 import {
   trackTrustFilterStarted,
@@ -173,6 +175,15 @@ export interface TrustFilterResult {
    */
   finalized: FinalizedMatches;
 
+  /**
+   * Whether all processing (TF + AI Safety) is complete.
+   * Use this to gate UI display - don't show matches until isFullyReady.
+   * 
+   * false when: signals loading, AI Safety pending
+   * true when: all filtering complete (or AI Safety not needed)
+   */
+  isFullyReady: boolean;
+
   /** @internal Batch result for AI Safety integration */
   _batchResult?: TrustFilterBatchResult;
   
@@ -245,6 +256,8 @@ export function useTrustFilter(
   const [wardrobeSignals, setWardrobeSignals] = useState<Map<string, StyleSignalsV1>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
   const [signalsFetched, setSignalsFetched] = useState(false);
+  const [signalsFetchTimeout, setSignalsFetchTimeout] = useState(false);
+  const SIGNALS_TIMEOUT_MS = 10000; // 10 seconds max wait for signals
 
   // Get matched wardrobe item IDs
   const matchedItemIds = useMemo(() => {
@@ -299,6 +312,9 @@ export function useTrustFilter(
               }
               if (response.ok && response.data) {
                 fetchedScanSignals = response.data;
+                // Persist to DB for instant reopen (fire-and-forget with retry)
+                // scanId is the checkId - row may not exist yet, so persist retries
+                persistScanSignalsToDb(scanId, response.data);
               }
             } else {
               // For cloud images (saved scans), use server-side generation
@@ -329,7 +345,16 @@ export function useTrustFilter(
           }
         }
 
+        // Always mark as fetched after attempt completes
         setSignalsFetched(true);
+        
+        if (__DEV__) {
+          if (fetchedScanSignals) {
+            console.log('[TF] Signals fetched successfully');
+          } else {
+            console.log('[TF] No scan signals available - will proceed with insufficient_info');
+          }
+        }
       } catch (error) {
         console.error('[useTrustFilter] Error fetching signals:', error);
       } finally {
@@ -345,7 +370,32 @@ export function useTrustFilter(
     setScanSignals(null);
     setWardrobeSignals(new Map());
     setSignalsFetched(false);
+    setSignalsFetchTimeout(false);
+    setAiSafetyResult(null);
+    setAiSafetyPending(false);
+    aiSafetyCalledRef.current = null;
   }, [scanId]);
+
+  // Timeout fallback: if signals aren't available within SIGNALS_TIMEOUT_MS, proceed anyway
+  // This prevents infinite loading if the signal generation fails or takes too long
+  useEffect(() => {
+    if (!isTrustFilterEnabled() || signalsFetched || signalsFetchTimeout) {
+      return;
+    }
+    
+    const timeoutId = setTimeout(() => {
+      if (!signalsFetched && !scanSignals) {
+        if (__DEV__) {
+          console.log(`[TF] Timeout reached (${SIGNALS_TIMEOUT_MS}ms) - proceeding with insufficient_info`);
+        }
+        setSignalsFetchTimeout(true);
+      }
+    }, SIGNALS_TIMEOUT_MS);
+    
+    return () => clearTimeout(timeoutId);
+  }, [signalsFetched, scanSignals, signalsFetchTimeout]);
+
+  // Note: AI Safety reset on matches change is handled below, after tfMatchesKey is defined
 
   // Track if we've already sent telemetry for this evaluation
   const telemetrySentRef = useRef<string | null>(null);
@@ -359,6 +409,9 @@ export function useTrustFilter(
     dryRun: boolean;
     stats: { cacheHits: number; aiCalls: number; totalLatencyMs: number };
   } | null>(null);
+
+  // Track if AI Safety is currently pending (for isFullyReady calculation)
+  const [aiSafetyPending, setAiSafetyPending] = useState(false);
 
   // Apply Trust Filter
   const result = useMemo((): TrustFilterResult => {
@@ -462,8 +515,11 @@ export function useTrustFilter(
       };
     }
 
-    // If still loading, return original matches temporarily
-    if (isLoading) {
+    // If still loading OR signals haven't been fetched yet, return loading state
+    // This prevents showing "kept by insufficient_info" results before signals are available
+    // The signalsFetched flag ensures we wait for the fetch attempt to complete
+    const needsSignals = !signalsFetched && matches.length > 0;
+    if (isLoading || needsSignals) {
       const nearFromCE = convertCeNearMatches();
       const finalized = buildEarlyFinalized(matches, nearFromCE, false, true, null);
       return {
@@ -823,101 +879,190 @@ export function useTrustFilter(
       _batchResult: batchResult,
       _wardrobeSignals: wardrobeSignals,
     };
-  }, [confidenceResult.matches, confidenceResult.rawEvaluation, wardrobeItems, scanSignals, wardrobeSignals, scannedItem?.category, isLoading, scanId]);
+  }, [confidenceResult.matches, confidenceResult.rawEvaluation, wardrobeItems, scanSignals, wardrobeSignals, scannedItem?.category, isLoading, scanId, signalsFetched]);
 
   // ============================================
   // AI SAFETY CHECK (after Trust Filter)
   // ============================================
 
+  // Extract stable primitives from result for dependency array
+  // This prevents re-triggers when result object identity changes
+  const tfIsLoading = result.isLoading;
+  const tfWasApplied = result.wasApplied;
+  const tfScanSignals = result.scanSignals;
+  const tfMatchCount = result.matches.length;
+  
+  // Stable key for matches - prevents re-triggers when array identity changes but content is same
+  // Sort to ensure consistent key regardless of match order
+  const tfMatchesKey = useMemo(
+    () => result.matches.map(m => m.wardrobeItem.id).sort().join('|'),
+    [result.matches]
+  );
+
+  // Reset AI Safety when matches change (e.g., wardrobe add/delete)
+  // This prevents stale verdicts from being applied to new/different matches
+  // Uses tfMatchesKey as single source of truth for match identity
+  const prevMatchesKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    // Skip if AI Safety is disabled
-    if (!isAiSafetyEnabled()) return;
+    if (prevMatchesKeyRef.current !== null && prevMatchesKeyRef.current !== tfMatchesKey) {
+      // Matches changed - clear AI Safety state to force re-evaluation
+      if (__DEV__) {
+        console.log('[AI Safety] Matches changed, resetting AI Safety state');
+      }
+      setAiSafetyResult(null);
+      setAiSafetyPending(false);
+      aiSafetyCalledRef.current = null;
+    }
+    prevMatchesKeyRef.current = tfMatchesKey;
+  }, [tfMatchesKey]);
 
-    // Skip if Trust Filter wasn't applied or is still loading
-    if (!result.wasApplied || result.isLoading) return;
+  // ============================================
+  // COMPUTE RISKY PAIRS SYNCHRONOUSLY (in useMemo)
+  // ============================================
+  // This prevents the timing gap where isFullyReady briefly becomes true
+  // before AI Safety starts. By computing risky pairs synchronously,
+  // we can determine IMMEDIATELY if AI Safety will run.
 
-    // Skip if no scan signals
-    if (!result.scanSignals) return;
+  type RiskyPair = {
+    match: EnrichedMatch;
+    matchSignals: StyleSignalsV1;
+    decision: TrustFilterBatchResult['decisions'] extends Map<string, infer V> ? V : never;
+  };
 
-    // Skip if no HIGH matches to evaluate
-    if (result.matches.length === 0) return;
+  const riskyPairsComputation = useMemo((): {
+    riskyPairs: RiskyPair[];
+    willRun: boolean;
+    skipReason: string | null;
+  } => {
+    // Early exits - compute skip reason for debugging
+    if (!isAiSafetyEnabled()) {
+      return { riskyPairs: [], willRun: false, skipReason: 'ai_safety_disabled' };
+    }
 
-    // Skip if already called for this scan
-    const aiSafetyKey = `${scanId}-${result.matches.length}`;
-    if (aiSafetyCalledRef.current === aiSafetyKey) return;
+    if (!tfWasApplied || tfIsLoading) {
+      return { riskyPairs: [], willRun: false, skipReason: 'tf_not_ready' };
+    }
 
-    // Check rollout
+    if (!tfScanSignals) {
+      return { riskyPairs: [], willRun: false, skipReason: 'no_scan_signals' };
+    }
+
+    if (tfMatchCount === 0) {
+      return { riskyPairs: [], willRun: false, skipReason: 'no_high_matches' };
+    }
+
+    // Check rollout (deterministic, safe to call in memo)
     const rolloutPct = getAiSafetyRolloutPct();
     const inAiSafetyRollout = inRollout(userId, rolloutPct);
     if (!inAiSafetyRollout) {
-      if (__DEV__) {
-        console.log(`[AI Safety] User not in rollout (bucket check failed for ${rolloutPct}%)`);
+      return { riskyPairs: [], willRun: false, skipReason: `not_in_rollout_${rolloutPct}` };
+    }
+
+    // Get batch result internals
+    const batchResult = (result as unknown as { _batchResult?: TrustFilterBatchResult })._batchResult;
+    const wardrobeSignalsMap = (result as unknown as { _wardrobeSignals?: Map<string, StyleSignalsV1> })._wardrobeSignals;
+
+    if (!batchResult || !wardrobeSignalsMap) {
+      return { riskyPairs: [], willRun: false, skipReason: 'no_batch_result' };
+    }
+
+    // Select top K HIGH_FINAL matches (sorted by CE score)
+    const topK = 5;
+    const highFinalSorted = [...result.matches].sort(
+      (a, b) => (b.evaluation.raw_score ?? 0) - (a.evaluation.raw_score ?? 0)
+    );
+    const candidates = highFinalSorted.slice(0, topK);
+
+    // Filter to "risky" pairs that match trigger conditions
+    const riskyPairs: RiskyPair[] = [];
+
+    for (const match of candidates) {
+      const matchSignals = wardrobeSignalsMap.get(match.wardrobeItem.id);
+      const decision = batchResult.decisions.get(match.wardrobeItem.id);
+
+      if (!matchSignals || !decision) continue;
+
+      // Check trigger conditions
+      const distance = decision.debug.archetype_distance ?? 'medium';
+      const shouldRun = shouldRunAiSafety({
+        scanSignals: tfScanSignals,
+        matchSignals,
+        distance,
+      });
+
+      if (shouldRun) {
+        riskyPairs.push({ match, matchSignals, decision });
+      }
+    }
+
+    if (riskyPairs.length === 0) {
+      return { riskyPairs: [], willRun: false, skipReason: `no_risky_pairs_0_of_${candidates.length}` };
+    }
+
+    return { riskyPairs, willRun: true, skipReason: null };
+  }, [tfIsLoading, tfWasApplied, tfScanSignals, tfMatchCount, result, userId]);
+
+  // Derive whether AI Safety will run but hasn't completed yet
+  // This is used to keep isFullyReady=false until AI Safety completes (or is skipped)
+  const aiSafetyWillRunButNotDone = riskyPairsComputation.willRun && aiSafetyResult === null;
+
+  // These are needed inside the effect but we access them via result to avoid stale closures
+  // The aiSafetyCalledRef check prevents actual duplicate API calls even if effect re-runs
+
+  useEffect(() => {
+    // Helper to mark AI Safety as complete
+    const markComplete = () => {
+      setAiSafetyPending(false);
+    };
+
+    // If AI Safety won't run, ensure pending is false
+    if (!riskyPairsComputation.willRun) {
+      if (__DEV__ && riskyPairsComputation.skipReason && tfWasApplied && !tfIsLoading) {
+        // Only log skip reason when TF is done (to avoid spamming during loading)
+        if (riskyPairsComputation.skipReason.startsWith('no_risky_pairs')) {
+          console.log(`[AI Safety] No risky pairs found (${riskyPairsComputation.skipReason})`);
+        } else if (riskyPairsComputation.skipReason.startsWith('not_in_rollout')) {
+          console.log(`[AI Safety] User not in rollout (${riskyPairsComputation.skipReason})`);
+        }
+        // Don't log other reasons (disabled, not ready, etc.) as they're expected
+      }
+      markComplete();
+      return;
+    }
+
+    // Skip if already called for this exact configuration
+    // Include policy version in key so prompt updates invalidate locally
+    const dryRun = isAiSafetyDryRun();
+    const aiSafetyKey = `${scanId}-${tfMatchesKey}-dry=${dryRun}-policy=${AI_SAFETY_POLICY_VERSION}`;
+    if (aiSafetyCalledRef.current === aiSafetyKey) {
+      // Already called, check if we have a result
+      if (aiSafetyResult !== null) {
+        markComplete();
       }
       return;
     }
 
-    const dryRun = isAiSafetyDryRun();
+    // ============================================
+    // NOW we know we have risky pairs - set pending and call API
+    // ============================================
+    setAiSafetyPending(true);
+
     const scanCategory = scannedItem?.category ?? 'tops';
+    const riskyPairs = riskyPairsComputation.riskyPairs;
+
+    if (__DEV__) {
+      console.log(`[AI Safety] Calling for ${riskyPairs.length} risky pairs (requested_dry_run=${dryRun})...`);
+    }
+
+    // Mark as called to prevent duplicate calls
+    aiSafetyCalledRef.current = aiSafetyKey;
 
     // Run AI Safety asynchronously
     const runAiSafety = async () => {
       try {
-        // Get batch result internals (safely typed)
-        const batchResult = (result as unknown as { _batchResult?: TrustFilterBatchResult })._batchResult;
-        const wardrobeSignalsMap = (result as unknown as { _wardrobeSignals?: Map<string, StyleSignalsV1> })._wardrobeSignals;
-
-        if (!batchResult || !wardrobeSignalsMap) return;
-
-        // Select top K HIGH_FINAL matches (sorted by CE score)
-        const topK = 5;
-        const highFinalSorted = [...result.matches].sort(
-          (a, b) => (b.evaluation.raw_score ?? 0) - (a.evaluation.raw_score ?? 0)
-        );
-        const candidates = highFinalSorted.slice(0, topK);
-
-        // Filter to "risky" pairs that match trigger conditions
-        const riskyPairs: Array<{
-          match: EnrichedMatch;
-          matchSignals: StyleSignalsV1;
-          decision: TrustFilterBatchResult['decisions'] extends Map<string, infer V> ? V : never;
-        }> = [];
-
-        for (const match of candidates) {
-          const matchSignals = wardrobeSignalsMap.get(match.wardrobeItem.id);
-          const decision = batchResult.decisions.get(match.wardrobeItem.id);
-
-          if (!matchSignals || !decision) continue;
-
-          // Check trigger conditions
-          const distance = decision.debug.archetype_distance ?? 'medium';
-          const shouldRun = shouldRunAiSafety({
-            scanSignals: result.scanSignals!,
-            matchSignals,
-            distance,
-          });
-
-          if (shouldRun) {
-            riskyPairs.push({ match, matchSignals, decision });
-          }
-        }
-
-        if (riskyPairs.length === 0) {
-          if (__DEV__) {
-            console.log(`[AI Safety] No risky pairs found (0/${candidates.length} matched trigger conditions)`);
-          }
-          return;
-        }
-
-        if (__DEV__) {
-          console.log(`[AI Safety] Calling for ${riskyPairs.length} risky pairs (dry_run=${dryRun})...`);
-        }
-
-        // Mark as called to prevent duplicate calls
-        aiSafetyCalledRef.current = aiSafetyKey;
-
         // Call AI Safety Edge Function
         const aiResponse = await aiSafetyCheckBatch({
-          scanSignals: result.scanSignals!,
+          scanSignals: tfScanSignals!,
           pairs: riskyPairs.map((p) => ({
             itemId: p.match.wardrobeItem.id,
             pairType: computePairType(
@@ -927,12 +1072,17 @@ export function useTrustFilter(
             distance: p.decision.debug.archetype_distance ?? 'medium',
             matchSignals: p.matchSignals,
           })),
+          // Pass client's requested dry_run preference
+          requestedDryRun: dryRun,
         });
+
+        // Use server's effective_dry_run for all logic (this is what actually matters)
+        const effectiveDryRun = aiResponse.effective_dry_run;
 
         // Store result for potential future use (and debugging)
         setAiSafetyResult({
           verdicts: aiResponse.verdicts,
-          dryRun: aiResponse.dry_run,
+          dryRun: effectiveDryRun, // Use server's decision
           stats: {
             cacheHits: aiResponse.stats?.cache_hits ?? 0,
             aiCalls: aiResponse.stats?.ai_calls ?? 0,
@@ -942,16 +1092,18 @@ export function useTrustFilter(
 
         // Log results in development
         if (__DEV__) {
+          // Log dry_run status clearly showing both client request and server decision
           console.log(`[AI Safety] Completed: ${aiResponse.verdicts.length} verdicts, ` +
             `${aiResponse.stats?.cache_hits ?? 0} cache hits, ` +
-            `${aiResponse.stats?.total_latency_ms ?? 0}ms`);
+            `${aiResponse.stats?.total_latency_ms ?? 0}ms ` +
+            `(requested_dry_run=${aiResponse.requested_dry_run}, effective_dry_run=${effectiveDryRun})`);
 
-          // Log what would be hidden/demoted (dry_run visibility)
+          // Log what would be hidden/demoted
           const wouldHide = aiResponse.verdicts.filter(v => v.action === 'hide');
           const wouldDemote = aiResponse.verdicts.filter(v => v.action === 'demote');
           const wouldKeep = aiResponse.verdicts.filter(v => v.action === 'keep');
 
-          if (dryRun) {
+          if (effectiveDryRun) {
             console.log(`[AI Safety DRY_RUN] Would hide: ${wouldHide.length}, demote: ${wouldDemote.length}, keep: ${wouldKeep.length}`);
           }
 
@@ -962,25 +1114,179 @@ export function useTrustFilter(
           }
         }
 
-        // In apply mode (not dry_run), we would modify the results here
-        // For now, we only log - apply mode will be added in Step 4
-        if (!dryRun) {
-          // TODO: Apply AI Safety overrides to result
-          // This will be implemented when we enable apply mode
-          console.log('[AI Safety] Apply mode not yet implemented - verdicts logged only');
+        // Apply mode logging (actual application happens in finalResult below)
+        if (!effectiveDryRun) {
+          const aiHideCount = aiResponse.verdicts.filter(v => v.action === 'hide').length;
+          const aiDemoteCount = aiResponse.verdicts.filter(v => v.action === 'demote').length;
+          console.log(`[AI Safety APPLY] Will apply ${aiHideCount} hides, ${aiDemoteCount} demotes`);
         }
 
       } catch (error) {
         console.error('[AI Safety] Error:', error);
         // Fail silently - AI Safety should never break the main flow
+      } finally {
+        // ALWAYS mark complete - whether success, empty response, or error
+        markComplete();
       }
     };
 
     void runAiSafety();
-  }, [result, scanId, userId, scannedItem?.category]);
+  }, [
+    // Use risky pairs computation result as dependency
+    riskyPairsComputation,
+    tfIsLoading,
+    tfWasApplied,
+    tfScanSignals,
+    tfMatchesKey,
+    scanId,
+    scannedItem?.category,
+    aiSafetyResult,
+  ]);
 
-  // Return the Trust Filter result (AI Safety runs async and logs in dry_run mode)
-  return result;
+  // ============================================
+  // APPLY AI SAFETY VERDICTS (when not dry_run)
+  // ============================================
+
+  const finalResult = useMemo((): TrustFilterResult => {
+    // Compute isFullyReady:
+    // 1. finalized buckets must exist
+    // 2. not loading TF signals
+    // 3. not waiting for AI Safety (use BOTH: pending state AND computed willRun flag)
+    //    - aiSafetyPending: true when API call is in progress
+    //    - aiSafetyWillRunButNotDone: true when risky pairs exist but no result yet
+    //    Using both ensures NO timing gap where isFullyReady becomes true before AI Safety starts
+    // 4. Either TF is disabled OR we have meaningful scan signals OR timeout reached (fallback)
+    const hasMeaningfulSignals = !isTrustFilterEnabled() || !!result.scanSignals || signalsFetchTimeout;
+    const waitingForAiSafety = aiSafetyPending || aiSafetyWillRunButNotDone;
+    const isFullyReady = !!result.finalized && !result.isLoading && !waitingForAiSafety && hasMeaningfulSignals;
+
+    // Debug log isFullyReady computation
+    if (__DEV__) {
+      console.log('[isFullyReady]', {
+        isFullyReady,
+        hasFinalized: !!result.finalized,
+        isLoading: result.isLoading,
+        aiSafetyPending,
+        aiSafetyWillRunButNotDone,
+        waitingForAiSafety,
+        hasMeaningfulSignals,
+        signalsFetchTimeout,
+        hasActualSignals: !!result.scanSignals,
+        wasApplied: result.wasApplied,
+      });
+    }
+
+    // If no AI Safety results, or dry_run mode, return original result with isFullyReady
+    if (!aiSafetyResult || aiSafetyResult.dryRun) {
+      return {
+        ...result,
+        isFullyReady,
+      };
+    }
+
+    // Apply AI Safety verdicts to the result
+    const verdicts = aiSafetyResult.verdicts;
+    if (verdicts.length === 0) {
+      return {
+        ...result,
+        isFullyReady,
+      };
+    }
+
+    // Build verdict lookup
+    const verdictById = new Map<string, AiSafetyVerdict>();
+    for (const verdict of verdicts) {
+      verdictById.set(verdict.itemId, verdict);
+    }
+
+    // Apply verdicts to finalized buckets
+    // Merge precedence: hide > demote > keep
+    // AI hide always wins, AI demote wins unless TF hid, AI keep never upgrades
+    const newHighFinal: EnrichedMatch[] = [];
+    const newNearFinal: EnrichedMatch[] = [...result.finalized.nearFinal];
+    const newHidden: EnrichedMatch[] = [...result.finalized.hidden];
+    const newActionById = new Map(result.finalized.actionById);
+    const newFinalTierById = new Map(result.finalized.finalTierById);
+
+    let aiHiddenCount = 0;
+    let aiDemotedCount = 0;
+
+    for (const match of result.finalized.highFinal) {
+      const verdict = verdictById.get(match.wardrobeItem.id);
+
+      if (!verdict) {
+        // No AI verdict for this item, keep as-is
+        newHighFinal.push(match);
+        continue;
+      }
+
+      if (verdict.action === 'hide') {
+        // AI says hide → move to hidden
+        newHidden.push(match);
+        newActionById.set(match.wardrobeItem.id, 'hide');
+        newFinalTierById.set(match.wardrobeItem.id, 'HIDDEN');
+        aiHiddenCount++;
+        if (__DEV__) {
+          console.log(`[AI Safety APPLY] 🚫 Hiding ${match.wardrobeItem.id.slice(0, 8)} - "${verdict.ai_reason}"`);
+        }
+      } else if (verdict.action === 'demote') {
+        // AI says demote → move to nearFinal
+        newNearFinal.unshift(match); // Add at front (AI-demoted first)
+        newActionById.set(match.wardrobeItem.id, 'demote');
+        newFinalTierById.set(match.wardrobeItem.id, 'NEAR');
+        aiDemotedCount++;
+        if (__DEV__) {
+          console.log(`[AI Safety APPLY] ⬇️ Demoting ${match.wardrobeItem.id.slice(0, 8)} - "${verdict.ai_reason}"`);
+        }
+      } else {
+        // AI says keep → keep in highFinal
+        newHighFinal.push(match);
+      }
+    }
+
+    // Build updated finalized
+    const updatedFinalized: FinalizedMatches = {
+      highFinal: newHighFinal,
+      nearFinal: newNearFinal,
+      hidden: newHidden,
+      meta: {
+        ...result.finalized.meta,
+        aiDemotedCount,
+        aiHiddenCount,
+        aiDryRun: false,
+      },
+      actionById: newActionById,
+      finalTierById: newFinalTierById,
+      scanSignals: result.finalized.scanSignals,
+      effectiveEvaluations: {
+        matches: newHighFinal,
+        demotedMatches: [
+          // TF-demoted + AI-demoted
+          ...result.demotedMatches,
+          ...result.finalized.highFinal.filter(m => verdictById.get(m.wardrobeItem.id)?.action === 'demote'),
+        ],
+      },
+    };
+
+    if (__DEV__) {
+      console.log('[AI Safety APPLY] Result:', {
+        before: { high: result.finalized.highFinal.length, near: result.finalized.nearFinal.length },
+        after: { high: newHighFinal.length, near: newNearFinal.length, hidden: newHidden.length },
+        aiActions: { hidden: aiHiddenCount, demoted: aiDemotedCount },
+      });
+    }
+
+    // Return updated result
+    return {
+      ...result,
+      matches: newHighFinal,
+      finalized: updatedFinalized,
+      isFullyReady,
+    };
+  }, [result, aiSafetyResult, aiSafetyPending, aiSafetyWillRunButNotDone, signalsFetchTimeout]);
+
+  // Return the final result (with AI Safety applied if not dry_run)
+  return finalResult;
 }
 
 // ============================================

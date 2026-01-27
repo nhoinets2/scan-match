@@ -30,6 +30,7 @@ const AI_SAFETY_TIMEOUT_MS = parseInt(Deno.env.get("AI_SAFETY_TIMEOUT_MS") || "3
 const AI_SAFETY_DAILY_CAP = parseInt(Deno.env.get("AI_SAFETY_DAILY_CAP") || "50", 10);
 const AI_SAFETY_MODEL_ID = Deno.env.get("AI_SAFETY_MODEL_ID") || "gpt-4o";
 const AI_SAFETY_PROMPT_VERSION = parseInt(Deno.env.get("AI_SAFETY_PROMPT_VERSION") || "1", 10);
+const AI_SAFETY_CACHE_TTL_DAYS = parseInt(Deno.env.get("AI_SAFETY_CACHE_TTL_DAYS") || "7", 10);
 
 // CORS headers
 const corsHeaders = {
@@ -100,6 +101,10 @@ interface AISafetyRequest {
     signals: StyleSignalsV1;
   };
   pairs: PairInput[];
+  /** Client's requested dry_run preference (informational only - server decides) */
+  dry_run?: boolean;
+  /** Client's policy version (for debugging/logging - server uses its own) */
+  policy_version?: number;
 }
 
 interface VerdictResult {
@@ -306,7 +311,10 @@ Deno.serve(async (req) => {
 
     // Parse request body
     const body: AISafetyRequest = await req.json();
-    const { scan, pairs } = body;
+    const { scan, pairs, dry_run: requestedDryRun, policy_version: clientPolicyVersion } = body;
+
+    // Server decides effective dry_run (from env var), but we track what client requested
+    const effectiveDryRun = AI_SAFETY_DRY_RUN;
 
     if (!scan?.input_hash || !scan?.signals || !pairs?.length) {
       return new Response(
@@ -355,7 +363,13 @@ Deno.serve(async (req) => {
     const userId = userData.user.id;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log(`[ai-safety] Request: user=${userId.slice(0, 8)}..., pairs=${pairs.length}, dry_run=${AI_SAFETY_DRY_RUN}`);
+    // Log policy version mismatch for debugging (server version is source of truth)
+    const policyVersionMismatch = clientPolicyVersion !== undefined && clientPolicyVersion !== AI_SAFETY_PROMPT_VERSION;
+    if (policyVersionMismatch) {
+      console.warn(`[ai-safety] Policy version mismatch: client=${clientPolicyVersion}, server=${AI_SAFETY_PROMPT_VERSION}`);
+    }
+
+    console.log(`[ai-safety] Request: user=${userId.slice(0, 8)}..., pairs=${pairs.length}, requested_dry_run=${requestedDryRun ?? 'not_specified'}, effective_dry_run=${effectiveDryRun}, server_policy_v=${AI_SAFETY_PROMPT_VERSION}`);
 
     // ============================================
     // STEP 1: CACHE-FIRST LOOKUP
@@ -427,7 +441,8 @@ Deno.serve(async (req) => {
         JSON.stringify({
           ok: true,
           verdicts: results,
-          dry_run: AI_SAFETY_DRY_RUN,
+          requested_dry_run: requestedDryRun ?? null,
+          effective_dry_run: effectiveDryRun,
           stats: {
             total_pairs: pairs.length,
             cache_hits: cacheHits,
@@ -473,7 +488,8 @@ Deno.serve(async (req) => {
         JSON.stringify({
           ok: true,
           verdicts: results,
-          dry_run: AI_SAFETY_DRY_RUN,
+          requested_dry_run: requestedDryRun ?? null,
+          effective_dry_run: effectiveDryRun,
           rate_limited: true,
           stats: {
             total_pairs: pairs.length,
@@ -513,7 +529,8 @@ Deno.serve(async (req) => {
         JSON.stringify({
           ok: true,
           verdicts: results,
-          dry_run: AI_SAFETY_DRY_RUN,
+          requested_dry_run: requestedDryRun ?? null,
+          effective_dry_run: effectiveDryRun,
           stats: { total_pairs: pairs.length, cache_hits: cacheHits, ai_calls: 0, total_latency_ms: Date.now() - startTime },
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -578,6 +595,9 @@ Deno.serve(async (req) => {
     // STEP 5: STORE VERDICTS AND BUILD RESULTS
     // ============================================
 
+    // Calculate expiry time for cache TTL
+    const expiresAt = new Date(Date.now() + AI_SAFETY_CACHE_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
     const verdictsToStore: Array<{
       unique_key: string;
       scan_input_hash: string;
@@ -590,6 +610,7 @@ Deno.serve(async (req) => {
       source: string;
       latency_ms: number | null;
       model_id: string | null;
+      expires_at: string;
     }> = [];
 
     for (let i = 0; i < uncachedPairs.length; i++) {
@@ -622,6 +643,7 @@ Deno.serve(async (req) => {
         source: "ai_call",
         latency_ms: aiResult.latencyMs,
         model_id: AI_SAFETY_MODEL_ID,
+        expires_at: expiresAt,
       });
     }
 
@@ -662,7 +684,8 @@ Deno.serve(async (req) => {
     const responsePayload = {
       ok: true,
       verdicts: results,
-      dry_run: AI_SAFETY_DRY_RUN,
+      requested_dry_run: requestedDryRun ?? null,
+      effective_dry_run: effectiveDryRun,
       stats: {
         total_pairs: pairs.length,
         cache_hits: cacheHits,

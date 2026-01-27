@@ -1742,9 +1742,15 @@ export default function ResultsScreen() {
 
   console.log("ResultsScreen mount, currentScan exists:", !!currentScan, "savedCheck:", !!savedCheck);
 
-  // Get the ID of the most recently added check (for saving)
+  // Get the ID of the current check (for Trust Filter signal fetching and saving)
   // Works for both fresh scans (imageUri flow) and saved checks (checkId flow)
   const currentCheckId = useMemo(() => {
+    // Saved check flow: use checkId from URL params directly
+    // This ensures Trust Filter has the scanId for fetching cached signals on reopen
+    if (checkId) {
+      return checkId;
+    }
+    
     if (recentChecks.length === 0) return null;
     
     // New imageUri flow: match by imageUri param
@@ -1764,7 +1770,7 @@ export default function ResultsScreen() {
     }
     
     return null;
-  }, [imageUri, currentScan, recentChecks]);
+  }, [checkId, imageUri, currentScan, recentChecks]);
 
   // ============================================
   // EARLY RETURNS FOR STATE MACHINE
@@ -1803,8 +1809,23 @@ export default function ResultsScreen() {
   // IMPORTANT: Use the top-level imageUri from savedCheck if available
   // The scannedItem.imageUri is stored in JSONB and never gets updated after upload
   // savedCheck.imageUri is what gets updated to the remote URL after successful upload
-  // For new imageUri flow, use the imageUri from params (freshest source)
-  const resolvedImageUri = imageUri ?? savedCheck?.imageUri ?? scannedItem?.imageUri;
+  // For saved checks, ALWAYS prefer savedCheck.imageUri (remote URL) to trigger server-side
+  // signal generation with DB caching, avoiding slow client-side regeneration on each visit
+  // For fresh scans (imageUri flow), use imageUri from params (freshest source)
+  const resolvedImageUri = isViewingSavedCheck
+    ? (savedCheck?.imageUri ?? scannedItem?.imageUri)
+    : (imageUri ?? savedCheck?.imageUri ?? scannedItem?.imageUri);
+  
+  // Debug log for image URI resolution
+  if (__DEV__) {
+    console.log('[Results] ImageUri resolution:', {
+      isViewingSavedCheck,
+      resolved: resolvedImageUri?.substring(0, 50),
+      savedCheckUri: savedCheck?.imageUri?.substring(0, 50),
+      scannedItemUri: scannedItem?.imageUri?.substring(0, 50),
+      paramUri: imageUri?.substring(0, 50),
+    });
+  }
 
   // Guard for missing data
   if (!scannedItem) {
@@ -3316,6 +3337,21 @@ function ResultsSuccess({
   };
 
   const explanationData = getContextAwareExplanation();
+
+  // ============================================
+  // AI SAFETY LOADING GATE
+  // ============================================
+  // If Trust Filter + AI Safety haven't completed, keep showing loading screen.
+  // This prevents "flicker" where bad matches appear briefly before being hidden.
+  if (!trustFilterResult.isFullyReady) {
+    return (
+      <ResultsLoading 
+        imageUri={resolvedImageUri || ''} 
+        insets={insets} 
+        fromScan={fromScan} 
+      />
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>

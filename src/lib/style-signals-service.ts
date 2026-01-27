@@ -341,6 +341,82 @@ export function enqueueWardrobeEnrichmentBatch(itemIds: string[]): void {
 }
 
 // ============================================
+// PERSIST SCAN SIGNALS TO DATABASE
+// ============================================
+
+/**
+ * Persist scan signals to the database after direct generation.
+ * Fire-and-forget with retry logic to handle race condition where
+ * the recent_checks row might not exist yet (scan still being saved).
+ * 
+ * @param checkId - The scan check ID
+ * @param signals - The generated StyleSignalsV1
+ * @param maxRetries - Max retry attempts (default 3)
+ * @param retryDelayMs - Delay between retries (default 500ms)
+ */
+export async function persistScanSignalsToDb(
+  checkId: string,
+  signals: StyleSignalsV1,
+  maxRetries: number = 3,
+  retryDelayMs: number = 500
+): Promise<void> {
+  const attempt = async (retryCount: number): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase
+        .from('recent_checks')
+        .update({
+          style_signals_v1: signals,
+          style_signals_status: 'ready',
+          style_signals_source: 'scan_ai',
+          style_signals_prompt_version: CURRENT_PROMPT_VERSION,
+          style_signals_updated_at: new Date().toISOString(),
+        })
+        .eq('id', checkId)
+        .select('id');
+
+      if (error) {
+        console.warn(`[TF] Failed to persist scan signals (attempt ${retryCount + 1}):`, error.message);
+        return false;
+      }
+
+      // Check if any row was updated
+      const rowsUpdated = data?.length ?? 0;
+      if (rowsUpdated === 0) {
+        // Row doesn't exist yet - retry
+        if (__DEV__) {
+          console.log(`[TF] No row found for checkId ${checkId.slice(0, 8)}, will retry...`);
+        }
+        return false;
+      }
+
+      if (__DEV__) {
+        console.log(`[TF] Persisted scan signals to DB: ${checkId.slice(0, 8)}`);
+      }
+      return true;
+    } catch (e) {
+      console.warn(`[TF] Error persisting scan signals (attempt ${retryCount + 1}):`, e);
+      return false;
+    }
+  };
+
+  // Fire-and-forget with retries
+  (async () => {
+    for (let i = 0; i < maxRetries; i++) {
+      const success = await attempt(i);
+      if (success) return;
+
+      // Wait before retry (exponential backoff)
+      if (i < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, retryDelayMs * (i + 1)));
+      }
+    }
+
+    // All retries failed - log but don't throw (signal regeneration is fallback)
+    console.warn(`[TF] Failed to persist scan signals after ${maxRetries} attempts: ${checkId.slice(0, 8)}`);
+  })();
+}
+
+// ============================================
 // FETCH CACHED SIGNALS
 // ============================================
 
