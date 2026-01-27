@@ -1,3 +1,5 @@
+import type { AestheticArchetype } from "./trust-filter/types";
+
 // Scan & Match Types
 
 export type StyleVibe =
@@ -29,6 +31,63 @@ export type Category =
   | "unknown"; // Non-fashion items
 
 export type FitPreference = "oversized" | "regular" | "slim";
+
+// ============================================
+// Personalized Suggestions (AI)
+// ============================================
+
+/** Structured suggestion output - prevents hallucination */
+export interface PersonalizedSuggestions {
+  version: 1;
+  why_it_works: SuggestionBullet[]; // exactly 2
+  to_elevate: ElevateBullet[]; // exactly 2
+}
+
+export interface SuggestionBullet {
+  text: string; // Model writes explanation WITHOUT mentioning item names/IDs
+  mentions: string[]; // item IDs from highFinal (validated against input)
+}
+
+export interface ElevateBullet {
+  text: string;
+  recommend: {
+    type: "consider_adding"; // enforced - never reference owned items
+    category: Category;
+    attributes: string[]; // e.g., ["tan", "structured"]
+  };
+}
+
+/**
+ * Safe subset of wardrobe item data sent to model.
+ * IMPORTANT: aesthetic comes from the WARDROBE ITEM's signals,
+ * NOT the scan's signals (which would be confusing to the model).
+ */
+export interface SafeMatchInfo {
+  id: string;
+  category: Category;
+  dominant_color: string;
+  aesthetic: AestheticArchetype; // From wardrobeItem.style_signals_v1.aesthetic.primary
+  label?: string; // Optional: detected label like "navy blazer"
+}
+
+export interface WardrobeSummary {
+  total: number;
+  by_category: Record<Category, number>;
+  dominant_aesthetics: AestheticArchetype[];
+  updated_at: string;
+}
+
+/** Allowed category values for to_elevate recommendations */
+export const ALLOWED_ELEVATE_CATEGORIES: Category[] = [
+  "tops",
+  "bottoms",
+  "shoes",
+  "outerwear",
+  "dresses",
+  "accessories",
+  "bags",
+  "skirts",
+];
 
 // ============================================
 // HYBRID SCHEMA: Volume + Shape + Length
