@@ -92,8 +92,10 @@ async function getStyleSignalsFromCache(
     const elapsedMs = Date.now() - startMs;
 
     if (error) {
+      // DB error → return null → caller will fall through to API call
+      // This keeps UX resilient if Supabase has a hiccup
       if (__DEV__) {
-        console.log(`[StyleSignals] DB lookup error (${elapsedMs}ms): ${error.message}`);
+        console.log(`[StyleSignals] DB lookup error (${elapsedMs}ms): ${error.message} → falling back to API`);
       }
       return null;
     }
@@ -119,7 +121,9 @@ async function getStyleSignalsFromCache(
 
     return data.style_signals as StyleSignalsV1;
   } catch (err) {
-    console.warn('[StyleSignals] Cache lookup exception:', err);
+    // Exception → return null → caller will fall through to API call
+    // Never let cache issues block the scan
+    console.warn('[StyleSignals] Cache lookup exception (falling back to API):', err);
     return null;
   }
 }
@@ -133,7 +137,8 @@ async function getStyleSignalsFromCache(
  * - Two scans of same image might compute signals simultaneously
  * - "Last write wins" is fine since same input = same output
  * 
- * Fire-and-forget - errors are logged but don't block.
+ * RESILIENCE: Fire-and-forget - errors are logged but NEVER block the scan.
+ * If DB is down, we just skip caching and the scan still succeeds.
  */
 async function setStyleSignalsInCache(
   userId: string,
@@ -160,12 +165,14 @@ async function setStyleSignalsInCache(
       );
 
     if (error) {
-      console.warn('[StyleSignals] Cache store error:', error.message);
+      // Log but don't throw - caching is optional, scan already succeeded
+      console.warn('[StyleSignals] Cache store error (non-blocking):', error.message);
     } else if (__DEV__) {
       console.log(`[StyleSignals] Cached signals for hash ${imageSha256.slice(0, 8)}`);
     }
   } catch (err) {
-    console.warn('[StyleSignals] Cache store exception:', err);
+    // Log but don't throw - caching is optional, scan already succeeded
+    console.warn('[StyleSignals] Cache store exception (non-blocking):', err);
   }
 }
 
