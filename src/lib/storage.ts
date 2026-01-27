@@ -438,7 +438,14 @@ async function uploadWorker(job: UploadJob): Promise<void> {
     });
 
   if (upErr) {
-    console.error('[UploadWorker] Upload error:', upErr);
+    // Check for common issues and provide clearer error messages
+    const errorMessage = upErr.message || String(upErr);
+    if (errorMessage.includes('JSON Parse error') || errorMessage.includes('Unexpected character')) {
+      console.error(`[UploadWorker] Upload failed - bucket "${bucket}" may not exist or Supabase returned HTML error page:`, upErr);
+      console.error('[UploadWorker] Please ensure the storage bucket exists in Supabase Dashboard > Storage');
+    } else {
+      console.error('[UploadWorker] Upload error:', upErr);
+    }
     throw upErr;
   }
 
