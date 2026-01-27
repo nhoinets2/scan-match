@@ -10,8 +10,15 @@
 -- - Same image analyzed with different prompts = different cache entries
 -- ============================================
 
+-- Drop old table if exists (schema changed from single-column to composite key)
+DROP TABLE IF EXISTS style_signals_cache CASCADE;
+
+-- Drop old functions if they exist (signature changed)
+DROP FUNCTION IF EXISTS increment_style_signals_cache_hit(TEXT);
+DROP FUNCTION IF EXISTS increment_style_signals_cache_hit(UUID, TEXT, INT, TEXT);
+
 -- Create the cache table with composite primary key
-CREATE TABLE IF NOT EXISTS style_signals_cache (
+CREATE TABLE style_signals_cache (
   -- User who generated this cache entry
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   
@@ -42,11 +49,11 @@ CREATE TABLE IF NOT EXISTS style_signals_cache (
 );
 
 -- Index for cleanup queries (delete old entries)
-CREATE INDEX IF NOT EXISTS idx_style_signals_cache_created_at 
+CREATE INDEX idx_style_signals_cache_created_at 
   ON style_signals_cache(created_at);
 
 -- Index for user lookups (RLS will filter by user_id anyway)
-CREATE INDEX IF NOT EXISTS idx_style_signals_cache_user_id
+CREATE INDEX idx_style_signals_cache_user_id
   ON style_signals_cache(user_id);
 
 -- ============================================
