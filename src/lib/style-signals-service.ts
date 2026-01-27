@@ -3,9 +3,15 @@
  *
  * Client-side service for generating and fetching style signals.
  * Calls the style-signals Edge Function.
+ * 
+ * CACHING STRATEGY:
+ * - Style signals are cached by image hash (SHA256) in the database
+ * - Same image = same signals, even across different scans/users
+ * - Cache is invalidated when prompt version changes
  */
 
 import { supabase } from './supabase';
+import * as Crypto from 'expo-crypto';
 import type { StyleSignalsV1 } from './trust-filter/types';
 
 // ============================================
@@ -33,6 +39,98 @@ function getStyleSignalsUrl(): string {
     throw new Error('EXPO_PUBLIC_SUPABASE_URL not configured');
   }
   return `${supabaseUrl}/functions/v1/style-signals`;
+}
+
+// ============================================
+// IMAGE HASH CACHE (DB-BACKED)
+// ============================================
+
+/**
+ * Compute SHA-256 hash of a string (base64 image data).
+ * Used for cache key generation.
+ */
+async function sha256Hex(data: string): Promise<string> {
+  const hash = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    data
+  );
+  return hash;
+}
+
+/**
+ * Get cached style signals by image hash.
+ * Returns null if not found, expired, or on error.
+ */
+async function getStyleSignalsFromCache(
+  imageSha256: string
+): Promise<StyleSignalsV1 | null> {
+  try {
+    const { data, error } = await supabase
+      .from('style_signals_cache')
+      .select('style_signals, prompt_version')
+      .eq('image_sha256', imageSha256)
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    // Check prompt version - invalidate if outdated
+    if (data.prompt_version < CURRENT_PROMPT_VERSION) {
+      if (__DEV__) {
+        console.log(`[StyleSignals] Cache outdated (v${data.prompt_version} < v${CURRENT_PROMPT_VERSION})`);
+      }
+      return null;
+    }
+
+    if (__DEV__) {
+      console.log(`[StyleSignals] Cache HIT for hash ${imageSha256.slice(0, 8)}`);
+    }
+
+    // Fire-and-forget hit count increment
+    supabase.rpc('increment_style_signals_cache_hit', { p_image_sha256: imageSha256 })
+      .then(() => {})
+      .catch(() => {});
+
+    return data.style_signals as StyleSignalsV1;
+  } catch (err) {
+    console.warn('[StyleSignals] Cache lookup error:', err);
+    return null;
+  }
+}
+
+/**
+ * Store style signals in cache by image hash.
+ * Fire-and-forget - errors are logged but don't block.
+ */
+async function setStyleSignalsInCache(
+  imageSha256: string,
+  signals: StyleSignalsV1
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('style_signals_cache')
+      .upsert(
+        {
+          image_sha256: imageSha256,
+          style_signals: signals,
+          prompt_version: CURRENT_PROMPT_VERSION,
+          hit_count: 0,
+        },
+        {
+          onConflict: 'image_sha256',
+          ignoreDuplicates: true, // First-writer-wins
+        }
+      );
+
+    if (error) {
+      console.warn('[StyleSignals] Cache store error:', error.message);
+    } else if (__DEV__) {
+      console.log(`[StyleSignals] Cached signals for hash ${imageSha256.slice(0, 8)}`);
+    }
+  } catch (err) {
+    console.warn('[StyleSignals] Cache store exception:', err);
+  }
 }
 
 // ============================================
@@ -172,7 +270,9 @@ function cleanExpiredCache(): void {
  * Resizes/compresses the image, converts to base64, and sends to the Edge Function.
  * Used for unsaved scans where the image hasn't been uploaded yet.
  * 
- * Results are cached in-memory by image URI to avoid repeated API calls.
+ * CACHING STRATEGY (2-tier):
+ * 1. In-memory cache by URI (fast, avoids re-renders triggering API calls)
+ * 2. DB cache by image hash (persistent, shared across sessions/users)
  *
  * @param localImageUri - Local file:// URI of the image
  * @returns StyleSignalsResponse with the generated signals
@@ -184,17 +284,17 @@ export async function generateScanStyleSignalsDirect(
     // Clean expired entries periodically
     cleanExpiredCache();
 
-    // Check in-memory cache first (avoid repeated base64 + API calls on re-renders)
-    const cached = directSignalsCache.get(localImageUri);
+    // TIER 1: Check in-memory cache first (avoid repeated base64 + API calls on re-renders)
+    const memoryCached = directSignalsCache.get(localImageUri);
     const now = Date.now();
     
-    if (cached && cached.expiresAt > now) {
-      // Cache hit - skip compression and API call
-      return { ok: true, data: cached.signals };
+    if (memoryCached && memoryCached.expiresAt > now) {
+      // Memory cache hit - skip everything
+      return { ok: true, data: memoryCached.signals, cached: true };
     }
 
     // Remove expired entry if exists
-    if (cached) {
+    if (memoryCached) {
       directSignalsCache.delete(localImageUri);
     }
 
@@ -221,8 +321,24 @@ export async function generateScanStyleSignalsDirect(
       };
     }
 
+    // Extract base64 data for hashing (strip data URL prefix)
+    const base64Data = imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
+    const imageSha256 = await sha256Hex(base64Data);
+
+    // TIER 2: Check DB cache by image hash (persistent, cross-session)
+    const dbCached = await getStyleSignalsFromCache(imageSha256);
+    if (dbCached) {
+      // DB cache hit - store in memory cache too for faster subsequent lookups
+      directSignalsCache.set(localImageUri, {
+        signals: dbCached,
+        expiresAt: Date.now() + CACHE_TTL_MS,
+      });
+      return { ok: true, data: dbCached, cached: true };
+    }
+
+    // Cache miss - call API
     if (__DEV__) {
-      console.log(`[StyleSignals] Compressed to ${sizeKB}KB, calling API...`);
+      console.log(`[StyleSignals] Cache miss for hash ${imageSha256.slice(0, 8)}, compressed to ${sizeKB}KB, calling API...`);
     }
 
     const response = await fetch(getStyleSignalsUrl(), {
@@ -239,18 +355,22 @@ export async function generateScanStyleSignalsDirect(
 
     const result = await response.json();
     
-    // Cache successful results with TTL
+    // Cache successful results
     if (result.ok && result.data) {
+      // Store in memory cache (fast re-renders)
       directSignalsCache.set(localImageUri, {
         signals: result.data,
         expiresAt: Date.now() + CACHE_TTL_MS,
       });
       
-      // Limit cache size (keep last MAX_CACHE_ENTRIES scans, evict oldest)
+      // Limit memory cache size
       if (directSignalsCache.size > MAX_CACHE_ENTRIES) {
         const firstKey = directSignalsCache.keys().next().value;
         if (firstKey) directSignalsCache.delete(firstKey);
       }
+
+      // Store in DB cache (persistent, fire-and-forget)
+      setStyleSignalsInCache(imageSha256, result.data);
     }
 
     return result as StyleSignalsResponse;
