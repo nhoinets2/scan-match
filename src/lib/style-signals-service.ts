@@ -78,6 +78,8 @@ async function getStyleSignalsFromCache(
   imageSha256: string
 ): Promise<StyleSignalsV1 | null> {
   try {
+    const startMs = Date.now();
+    
     const { data, error } = await supabase
       .from('style_signals_cache')
       .select('style_signals')
@@ -87,22 +89,24 @@ async function getStyleSignalsFromCache(
       .eq('model_version', STYLE_SIGNALS_MODEL_VERSION)
       .maybeSingle();
 
+    const elapsedMs = Date.now() - startMs;
+
     if (error) {
       if (__DEV__) {
-        console.log(`[StyleSignals] Cache lookup error: ${error.message}`);
+        console.log(`[StyleSignals] DB lookup error (${elapsedMs}ms): ${error.message}`);
       }
       return null;
     }
 
     if (!data) {
       if (__DEV__) {
-        console.log(`[StyleSignals] Cache MISS for hash ${imageSha256.slice(0, 8)}`);
+        console.log(`[StyleSignals] DB MISS for hash ${imageSha256.slice(0, 8)} (${elapsedMs}ms)`);
       }
       return null;
     }
 
     if (__DEV__) {
-      console.log(`[StyleSignals] Cache HIT for hash ${imageSha256.slice(0, 8)}`);
+      console.log(`[StyleSignals] DB HIT for hash ${imageSha256.slice(0, 8)} (${elapsedMs}ms)`);
     }
 
     // Fire-and-forget hit count increment
