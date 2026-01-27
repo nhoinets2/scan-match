@@ -77,6 +77,7 @@ import {
   useRecentChecks,
   useAddRecentCheck,
   useUpdateRecentCheckOutcome,
+  useUpdateFinalizedCounts,
   usePreferences,
 } from "@/lib/database";
 import {
@@ -117,7 +118,12 @@ import {
 } from "@/lib/results-ui-policy";
 // Debug feature flags
 import { shouldSaveDebugData } from "@/lib/debug-config";
-import { isTrustFilterTraceEnabled } from "@/lib/feature-flags";
+import { 
+  isTrustFilterEnabled,
+  isTrustFilterTraceEnabled,
+  isAiSafetyEnabled,
+  isAiSafetyDryRun,
+} from "@/lib/feature-flags";
 import { buildEngineSnapshot } from "@/lib/debug-snapshot";
 import { ButtonPrimary } from "@/components/ButtonPrimary";
 import { ButtonTertiary } from "@/components/ButtonTertiary";
@@ -1491,6 +1497,7 @@ export default function ResultsScreen() {
   const queryClient = useQueryClient();
   const addRecentCheckMutation = useAddRecentCheck();
   const updateRecentCheckOutcomeMutation = useUpdateRecentCheckOutcome();
+  const updateFinalizedCountsMutation = useUpdateFinalizedCounts();
   const { refetch: refetchProStatus } = useProStatus();
 
   // Refresh wardrobe data when screen regains focus
@@ -2051,6 +2058,77 @@ function ResultsSuccess({
       });
     }
   }, [confidenceResult, trustFilterResult]);
+
+  // ============================================
+  // SAVE FINALIZED MATCH COUNTS
+  // ============================================
+  // Persist finalized counts to DB when Trust Filter + AI Safety complete.
+  // This ensures useMatchCount shows consistent badge counts across the app.
+  
+  // Track if we've already saved counts for this check+session to avoid duplicate writes
+  const finalizedCountsSavedRef = useRef<string | null>(null);
+  
+  useEffect(() => {
+    // Wait until fully ready (TF + AI Safety complete)
+    if (!trustFilterResult.isFullyReady) {
+      return;
+    }
+    
+    // Need a valid check ID
+    if (!currentCheckId) {
+      return;
+    }
+    
+    // Create a key to track what we've saved
+    const saveKey = `${currentCheckId}-${trustFilterResult.finalized.highFinal.length}-${trustFilterResult.finalized.nearFinal.length}`;
+    
+    // Skip if we've already saved these exact counts for this check
+    if (finalizedCountsSavedRef.current === saveKey) {
+      return;
+    }
+    
+    // Mark as saved to prevent duplicates
+    finalizedCountsSavedRef.current = saveKey;
+    
+    // Save the finalized counts
+    const finalHighCount = trustFilterResult.finalized.highFinal.length;
+    const finalNearCount = trustFilterResult.finalized.nearFinal.length;
+    
+    if (__DEV__) {
+      console.log('[Results] Saving finalized counts:', { 
+        checkId: currentCheckId, 
+        high: finalHighCount, 
+        near: finalNearCount,
+        flags: {
+          tf_enabled: isTrustFilterEnabled(),
+          ai_enabled: isAiSafetyEnabled(),
+          ai_dry_run: isAiSafetyDryRun(),
+        }
+      });
+    }
+    
+    updateFinalizedCountsMutation.mutate({
+      id: currentCheckId,
+      finalHighCount,
+      finalNearCount,
+      finalizedFlags: {
+        tf_enabled: isTrustFilterEnabled(),
+        ai_enabled: isAiSafetyEnabled(),
+        ai_dry_run: isAiSafetyDryRun(),
+      },
+    });
+  }, [
+    trustFilterResult.isFullyReady,
+    trustFilterResult.finalized.highFinal.length,
+    trustFilterResult.finalized.nearFinal.length,
+    currentCheckId,
+    updateFinalizedCountsMutation,
+  ]);
+  
+  // Reset saved ref when check changes
+  useEffect(() => {
+    finalizedCountsSavedRef.current = null;
+  }, [currentCheckId]);
 
   // Create Set of demoted item IDs for debug UI (efficient lookup)
   const demotedItemIds = useMemo(() => {

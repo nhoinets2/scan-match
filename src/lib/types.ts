@@ -309,6 +309,17 @@ export interface RecentCheck {
   scannedItem: ScannedItem;
   createdAt: number;
   engineSnapshot?: any; // TEMPORARY: Debug snapshot (remove when feature is removed)
+  
+  // Finalized match counts (after Trust Filter + AI Safety)
+  // Used by useMatchCount for consistent badge display
+  finalHighCount?: number | null;
+  finalNearCount?: number | null;
+  finalizedAt?: string | null; // ISO timestamp
+  finalizedFlags?: {
+    tf_enabled: boolean;
+    ai_enabled: boolean;
+    ai_dry_run: boolean;
+  } | null;
 }
 
 // Color palette for wardrobe selection

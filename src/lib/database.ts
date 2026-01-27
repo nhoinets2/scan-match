@@ -389,7 +389,7 @@ export const useRecentChecksCount = () => {
 
 // Base fields for recent checks (excludes debug data for performance)
 const RECENT_CHECK_COLUMNS = 
-  "id, user_id, item_name, category, image_uri, outcome, confidence, confidence_score, scanned_item, created_at";
+  "id, user_id, item_name, category, image_uri, outcome, confidence, confidence_score, scanned_item, created_at, final_high_count, final_near_count, finalized_at, finalized_flags";
 
 interface DbRecentCheck {
   id: string;
@@ -402,6 +402,11 @@ interface DbRecentCheck {
   confidence_score: number;
   scanned_item: Record<string, unknown>;
   created_at: string;
+  // Finalized match counts (after Trust Filter + AI Safety)
+  final_high_count: number | null;
+  final_near_count: number | null;
+  finalized_at: string | null;
+  finalized_flags: { tf_enabled: boolean; ai_enabled: boolean; ai_dry_run: boolean } | null;
 }
 
 const mapDbToRecentCheck = (check: DbRecentCheck): RecentCheck => ({
@@ -414,6 +419,11 @@ const mapDbToRecentCheck = (check: DbRecentCheck): RecentCheck => ({
   confidenceScore: check.confidence_score,
   scannedItem: check.scanned_item as unknown as RecentCheck["scannedItem"],
   createdAt: new Date(check.created_at).getTime(),
+  // Finalized match counts
+  finalHighCount: check.final_high_count,
+  finalNearCount: check.final_near_count,
+  finalizedAt: check.finalized_at,
+  finalizedFlags: check.finalized_flags,
 });
 
 export const useRecentChecks = () => {
@@ -625,6 +635,91 @@ export const useUpdateRecentCheckOutcome = () => {
           refetchType: 'none', // Don't refetch immediately, just mark as stale
         });
       }, 0);
+    },
+  });
+};
+
+// ============================================
+// FINALIZED MATCH COUNTS
+// ============================================
+
+export interface UpdateFinalizedCountsParams {
+  id: string;
+  finalHighCount: number;
+  finalNearCount: number;
+  finalizedFlags: {
+    tf_enabled: boolean;
+    ai_enabled: boolean;
+    ai_dry_run: boolean;
+  };
+}
+
+export const useUpdateFinalizedCounts = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      id, 
+      finalHighCount,
+      finalNearCount,
+      finalizedFlags,
+    }: UpdateFinalizedCountsParams) => {
+      if (!user?.id) throw new Error("Not authenticated");
+
+      const updateData = {
+        final_high_count: finalHighCount,
+        final_near_count: finalNearCount,
+        finalized_at: new Date().toISOString(),
+        finalized_flags: finalizedFlags,
+      };
+
+      const { error } = await supabase
+        .from("recent_checks")
+        .update(updateData)
+        .eq("id", id)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+      
+      return { id, finalHighCount, finalNearCount, finalizedFlags };
+    },
+    // Optimistic update - update cache immediately
+    onMutate: async ({ id, finalHighCount, finalNearCount, finalizedFlags }) => {
+      await queryClient.cancelQueries({ queryKey: ["recentChecks", user?.id] });
+
+      const previousChecks = queryClient.getQueryData<RecentCheck[]>(["recentChecks", user?.id]);
+
+      if (previousChecks) {
+        queryClient.setQueryData<RecentCheck[]>(
+          ["recentChecks", user?.id],
+          previousChecks.map((check) =>
+            check.id === id 
+              ? { 
+                  ...check, 
+                  finalHighCount, 
+                  finalNearCount,
+                  finalizedAt: new Date().toISOString(),
+                  finalizedFlags,
+                } 
+              : check
+          )
+        );
+      }
+
+      return { previousChecks };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousChecks) {
+        queryClient.setQueryData(["recentChecks", user?.id], context.previousChecks);
+      }
+    },
+    // Don't invalidate - we just set the data optimistically
+    onSuccess: () => {
+      // Silent success - cache is already updated
+      if (__DEV__) {
+        console.log('[Database] Finalized counts saved');
+      }
     },
   });
 };

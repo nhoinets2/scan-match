@@ -1,7 +1,11 @@
 /**
  * useMatchCount Hook & Utilities
  * 
- * CANONICAL SOURCE for calculating match counts against the user's wardrobe.
+ * CANONICAL SOURCE for match counts displayed on check cards/badges.
+ * 
+ * PRIORITY ORDER:
+ * 1. Stored finalized counts (finalHighCount + finalNearCount) - from DB after TF + AI Safety
+ * 2. Fallback: Recalculate using Confidence Engine only (for older checks without stored counts)
  * 
  * ⚠️ WARNING: Never use debugSnapshot.engines.confidence.matchesHighCount for UI display!
  * That data is FROZEN at scan time and becomes stale when wardrobe changes.
@@ -9,8 +13,6 @@
  * USE THIS MODULE INSTEAD:
  * - useMatchCount() - React hook for single item (use in components)
  * - calculateMatchCountsForChecks() - Batch function for grids/lists (use in useMemo)
- * 
- * Performance: Both functions recalculate in real-time against current wardrobe.
  */
 
 import { useMemo } from 'react';
@@ -21,6 +23,15 @@ import {
   evaluateAgainstWardrobe,
   selectNearMatches,
 } from '@/lib/confidence-engine';
+
+/**
+ * Format match count for display
+ */
+function formatMatchCount(total: number): string {
+  if (total === 0) return "0 matches";
+  if (total === 1) return "1 match";
+  return `${total} matches`;
+}
 
 /**
  * Core categories that drive match counts.
@@ -38,6 +49,10 @@ function isCoreCategory(category: string): boolean {
  * Calculate match counts for multiple checks at once (for grids/lists)
  * 
  * Use this in useMemo when displaying a list of checks to avoid N hook calls.
+ * 
+ * PRIORITY:
+ * 1. Use stored finalized counts (finalHighCount + finalNearCount) if available
+ * 2. Fallback: Recalculate using CE only (for older checks)
  * 
  * NOTE: Only counts CORE category matches (tops, bottoms, shoes, dresses, skirts).
  * Optional categories (outerwear, bags, accessories) are shown in "Optional add-ons"
@@ -59,24 +74,31 @@ export function calculateMatchCountsForChecks(
 ): Record<string, string | null> {
   const map: Record<string, string | null> = {};
   
-  // Skip if no wardrobe items
-  if (wardrobeItems.length === 0) {
-    for (const check of checks) {
-      map[check.id] = null;
-    }
-    return map;
-  }
-  
-  // Build lookup map for wardrobe item categories
+  // Build lookup map for wardrobe item categories (for CE fallback)
   const wardrobeCategoryMap = new Map<string, string>();
   for (const item of wardrobeItems) {
     wardrobeCategoryMap.set(item.id, item.category);
   }
   
-  // Convert wardrobe items once (optimization)
-  const wardrobeConfidenceItems = wardrobeItems.map(wardrobeItemToConfidenceItem);
+  // Convert wardrobe items once (optimization for CE fallback)
+  const wardrobeConfidenceItems = wardrobeItems.length > 0 
+    ? wardrobeItems.map(wardrobeItemToConfidenceItem)
+    : [];
   
   for (const check of checks) {
+    // PRIORITY 1: Use stored finalized counts if available
+    if (check.finalHighCount != null && check.finalNearCount != null) {
+      const total = check.finalHighCount + check.finalNearCount;
+      map[check.id] = formatMatchCount(total);
+      continue;
+    }
+    
+    // PRIORITY 2: Fallback to CE recalculation (for older checks without stored counts)
+    if (wardrobeItems.length === 0) {
+      map[check.id] = null;
+      continue;
+    }
+    
     if (check.scannedItem) {
       try {
         const targetItem = scannedItemToConfidenceItem(check.scannedItem as ScannedItem);
@@ -97,14 +119,7 @@ export function calculateMatchCountsForChecks(
         const nearCount = nearMatches.length;
         
         const totalMatches = highCount + nearCount;
-        
-        if (totalMatches === 0) {
-          map[check.id] = "0 matches";
-        } else if (totalMatches === 1) {
-          map[check.id] = "1 match";
-        } else {
-          map[check.id] = `${totalMatches} matches`;
-        }
+        map[check.id] = formatMatchCount(totalMatches);
       } catch (error) {
         map[check.id] = null;
       }
@@ -118,6 +133,10 @@ export function calculateMatchCountsForChecks(
 
 /**
  * Calculate match count for a check against current wardrobe
+ * 
+ * PRIORITY:
+ * 1. Use stored finalized counts (finalHighCount + finalNearCount) if available
+ * 2. Fallback: Recalculate using CE only (for older checks)
  * 
  * NOTE: Only counts CORE category matches (tops, bottoms, shoes, dresses, skirts).
  * Optional categories (outerwear, bags, accessories) are shown in "Optional add-ons"
@@ -136,11 +155,20 @@ export function useMatchCount(check: RecentCheck, wardrobeItems: WardrobeItem[])
   );
   
   return useMemo(() => {
-    if (__DEV__) {
-      console.log('[useMatchCount] Recalculating for check:', check.id, 'wardrobe size:', wardrobeItems.length, 'IDs:', wardrobeIds);
+    // PRIORITY 1: Use stored finalized counts if available
+    if (check.finalHighCount != null && check.finalNearCount != null) {
+      const total = check.finalHighCount + check.finalNearCount;
+      if (__DEV__) {
+        console.log('[useMatchCount] Using stored counts for check:', check.id, { high: check.finalHighCount, near: check.finalNearCount, total });
+      }
+      return formatMatchCount(total);
     }
     
-    // Attempt to recalculate against current wardrobe
+    if (__DEV__) {
+      console.log('[useMatchCount] No stored counts, falling back to CE for check:', check.id, 'wardrobe size:', wardrobeItems.length);
+    }
+    
+    // PRIORITY 2: Fallback to CE recalculation (for older checks without stored counts)
     if (check.scannedItem && wardrobeItems.length > 0) {
       try {
         const scannedItem = check.scannedItem as ScannedItem;
@@ -155,34 +183,8 @@ export function useMatchCount(check: RecentCheck, wardrobeItems: WardrobeItem[])
         const targetItem = scannedItemToConfidenceItem(scannedItem);
         const wardrobeConfidenceItems = wardrobeItems.map(wardrobeItemToConfidenceItem);
         
-        // DEBUG: Log scanned item category and wardrobe categories
-        if (__DEV__) {
-          const wardrobeCategories = wardrobeItems.map(item => item.category);
-          const categoryCounts = wardrobeCategories.reduce((acc, cat) => {
-            acc[cat] = (acc[cat] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>);
-          console.log('[useMatchCount] DEBUG scanned category:', scannedItem.category, 'wardrobe categories:', categoryCounts);
-        }
-        
         // Evaluate against current wardrobe
         const evaluations = evaluateAgainstWardrobe(targetItem, wardrobeConfidenceItems);
-        
-        // DEBUG: Log evaluation details
-        if (__DEV__) {
-          const tierCounts = evaluations.reduce((acc, e) => {
-            acc[e.confidence_tier] = (acc[e.confidence_tier] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>);
-          console.log('[useMatchCount] DEBUG evaluations:', evaluations.length, 'tiers:', tierCounts);
-          
-          // Show which categories were evaluated
-          const evalCategories = evaluations.map(e => {
-            const cat = wardrobeCategoryMap.get(e.item_b_id) ?? wardrobeCategoryMap.get(e.item_a_id);
-            return cat;
-          });
-          console.log('[useMatchCount] DEBUG evaluated categories:', evalCategories);
-        }
         
         // Filter to core categories only (matches Results screen behavior)
         const coreEvaluations = evaluations.filter(e => {
@@ -201,24 +203,18 @@ export function useMatchCount(check: RecentCheck, wardrobeItems: WardrobeItem[])
         const totalMatches = highCount + nearCount;
         
         if (__DEV__) {
-          console.log('[useMatchCount] Result for check', check.id, ':', { highCount, nearCount, totalMatches, coreEvaluations: coreEvaluations.length });
+          console.log('[useMatchCount] CE fallback result for check', check.id, ':', { highCount, nearCount, totalMatches });
         }
         
-        // Format display string
-        if (totalMatches === 0) return "0 matches";
-        if (totalMatches === 1) return "1 match";
-        return `${totalMatches} matches`;
+        return formatMatchCount(totalMatches);
       } catch (error) {
-        // If recalculation fails, fall back to snapshot
         if (__DEV__) {
-          console.warn('[useMatchCount] Failed to recalculate matches for check:', check.id, error);
+          console.warn('[useMatchCount] CE fallback failed for check:', check.id, error);
         }
       }
     }
     
-    // Fallback: If recalculation fails or wardrobe is empty
-    // Note: engineSnapshot is no longer loaded from DB for performance,
-    // so this path will typically return empty string
+    // Fallback: If everything fails or wardrobe is empty
     if (__DEV__) {
       console.log('[useMatchCount] No matches calculated for check:', check.id);
     }
@@ -226,6 +222,8 @@ export function useMatchCount(check: RecentCheck, wardrobeItems: WardrobeItem[])
   }, [
     check.id,
     check.scannedItem,
+    check.finalHighCount,
+    check.finalNearCount,
     wardrobeIds, // Stable string that changes when wardrobe IDs change
     wardrobeItems, // Still need this for access to actual items inside useMemo
   ]);
