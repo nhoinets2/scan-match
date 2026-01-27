@@ -2082,8 +2082,20 @@ function ResultsSuccess({
       return;
     }
     
-    // Create a key to track what we've saved
-    const saveKey = `${currentCheckId}-${trustFilterResult.finalized.highFinal.length}-${trustFilterResult.finalized.nearFinal.length}`;
+    // Filter to CORE categories only (matches badge calculation in useMatchCount)
+    // Optional categories (outerwear, bags, accessories) are shown in "Optional add-ons"
+    // section and don't contribute to the badge count.
+    const coreHighFinal = trustFilterResult.finalized.highFinal.filter(
+      m => isCoreCategory(m.wardrobeItem.category)
+    );
+    const coreNearFinal = trustFilterResult.finalized.nearFinal.filter(
+      m => isCoreCategory(m.wardrobeItem.category)
+    );
+    const finalHighCount = coreHighFinal.length;
+    const finalNearCount = coreNearFinal.length;
+    
+    // Create a key to track what we've saved (using filtered counts)
+    const saveKey = `${currentCheckId}-${finalHighCount}-${finalNearCount}`;
     
     // Skip if we've already saved these exact counts for this check
     if (finalizedCountsSavedRef.current === saveKey) {
@@ -2093,15 +2105,13 @@ function ResultsSuccess({
     // Mark as saved to prevent duplicates
     finalizedCountsSavedRef.current = saveKey;
     
-    // Save the finalized counts
-    const finalHighCount = trustFilterResult.finalized.highFinal.length;
-    const finalNearCount = trustFilterResult.finalized.nearFinal.length;
-    
     if (__DEV__) {
       console.log('[Results] Saving finalized counts:', { 
         checkId: currentCheckId, 
         high: finalHighCount, 
         near: finalNearCount,
+        totalHigh: trustFilterResult.finalized.highFinal.length,
+        totalNear: trustFilterResult.finalized.nearFinal.length,
         flags: {
           tf_enabled: isTrustFilterEnabled(),
           ai_enabled: isAiSafetyEnabled(),
