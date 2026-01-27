@@ -65,7 +65,7 @@ function checkRateLimit(userId: string): { allowed: boolean; retryAfter?: number
   return { allowed: true };
 }
 
-// OpenAI prompt for clothing analysis (combined with style signals for single API call)
+// OpenAI prompt for clothing analysis
 const ANALYSIS_PROMPT = `Analyze this image and respond ONLY with a valid JSON object (no markdown, no explanation).
 
 The JSON must have exactly this structure:
@@ -88,21 +88,6 @@ The JSON must have exactly this structure:
     "style_family": "minimal" | "classic" | "street" | "athleisure" | "romantic" | "edgy" | "boho" | "preppy" | "formal" | "unknown",
     "formality_level": 1 | 2 | 3 | 4 | 5,
     "texture_type": "smooth" | "textured" | "soft" | "structured" | "mixed" | "unknown"
-  },
-  "styleSignals": {
-    "version": 1,
-    "aesthetic": {
-      "primary": "<archetype>",
-      "primary_confidence": <0.0-1.0>,
-      "secondary": "<archetype|none>",
-      "secondary_confidence": <0.0-1.0>
-    },
-    "formality": { "band": "<formality_band>", "confidence": <0.0-1.0> },
-    "statement": { "level": "<statement_level>", "confidence": <0.0-1.0> },
-    "season": { "heaviness": "<season_heaviness>", "confidence": <0.0-1.0> },
-    "palette": { "colors": ["<color1>", "<color2>"], "confidence": <0.0-1.0> },
-    "pattern": { "level": "<pattern_level>", "confidence": <0.0-1.0> },
-    "material": { "family": "<material_family>", "confidence": <0.0-1.0> }
   }
 }
 
@@ -187,43 +172,6 @@ For bags/accessories:
   "stylingRisk": "low"
 
 stylingRisk: "low" = versatile, "medium" = needs thought, "high" = statement piece
-
-STYLE SIGNALS (for outfit matching - REQUIRED):
-
-AESTHETIC ARCHETYPES (primary required, secondary optional):
-- minimalist: Clean lines, simple silhouettes, neutral colors, understated
-- classic: Timeless, tailored fits, traditional patterns, refined
-- workwear: Functional, utility-inspired, durable fabrics, practical
-- romantic: Soft, feminine, flowy fabrics, delicate details, florals
-- boho: Free-spirited, earthy, layered, ethnic prints, relaxed
-- western: Cowboy-inspired, leather, fringe, boots, denim, rustic
-- street: Urban, casual, graphic elements, sneaker culture, bold
-- sporty: Athletic-inspired, technical fabrics, active silhouettes
-- edgy: Dark, unconventional, leather, studs, asymmetric, rebellious
-- glam: Luxurious, sparkle, bold colors, statement pieces
-- preppy: Polished casual, collegiate, clean-cut, polo/blazer vibes
-- outdoor_utility: Technical outdoor, hiking, performance fabrics
-Use "none" for secondary if purely one aesthetic (confidence < 0.35).
-
-FORMALITY BANDS:
-- athleisure: Gym-to-street, activewear, joggers
-- casual: Everyday relaxed, t-shirts, jeans, sneakers
-- smart_casual: Polished but relaxed, nice jeans, button-downs
-- office: Professional, business casual to business formal
-- formal: Dressy events, cocktail, suits
-- evening: Black tie, gala, very formal
-
-STATEMENT LEVEL: low (basic, versatile) | medium (some visual interest) | high (eye-catching, bold)
-
-SEASON HEAVINESS: light (summer, thin) | mid (transitional, year-round) | heavy (winter, thick)
-
-PALETTE COLORS (pick 2-4): black, white, cream, gray, brown, tan, beige, navy, denim_blue, blue, red, pink, green, olive, yellow, orange, purple, metallic, multicolor
-
-PATTERN LEVEL: solid (no pattern) | subtle (quiet pattern) | bold (loud pattern, graphic)
-
-MATERIAL FAMILY: denim | knit | leather | silk_satin | cotton | wool | synthetic_tech | other
-
-CONFIDENCE SCORING: 0.9-1.0=certain, 0.7-0.89=confident, 0.5-0.69=moderate, 0.3-0.49=low, 0.0-0.29=uncertain
 
 Respond with ONLY the JSON object.`;
 
@@ -418,7 +366,7 @@ Deno.serve(async (req) => {
             ],
           },
         ],
-        max_tokens: 1500, // Increased for combined analysis + style signals
+        max_tokens: 800,
         temperature: 0,
       }),
     });

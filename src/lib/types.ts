@@ -203,8 +203,6 @@ export interface UserPreferences {
   onboardingComplete: boolean;
 }
 
-import type { StyleSignalsV1 } from './trust-filter/types';
-
 export interface ScannedItem {
   id: string;
   imageUri: string;
@@ -235,8 +233,6 @@ export interface ScannedItem {
   contextSufficient?: boolean;
   /** False if image is not wearable fashion (mug, electronics, food, etc.) */
   isFashionItem?: boolean;
-  /** Style signals from combined analysis (for Trust Filter) */
-  styleSignals?: StyleSignalsV1;
 }
 
 export interface OutfitCombo {

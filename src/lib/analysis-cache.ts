@@ -26,9 +26,9 @@ export const ANALYSIS_CACHE_VERSION = 'v1';
  * 
  * History:
  * - 2026-01-05: Initial version
- * - 2026-01-25: Combined analysis + style signals in single API call
+ * - 2026-01-25: Reverted combined analysis (separate style signals fetch)
  */
-export const PROMPT_VERSION = '2026-01-25';
+export const PROMPT_VERSION = '2026-01-25-rev';
 
 /**
  * Model used for analysis
