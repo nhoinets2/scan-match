@@ -46,8 +46,17 @@ function getStyleSignalsUrl(): string {
 // ============================================
 
 /**
+ * Model version for style signals generation.
+ * Bump when switching models to invalidate cache.
+ */
+export const STYLE_SIGNALS_MODEL_VERSION = 'default';
+
+/**
  * Compute SHA-256 hash of a string (base64 image data).
  * Used for cache key generation.
+ * 
+ * IMPORTANT: Hash is computed from the resized/normalized bytes
+ * (same bytes that would be sent to the API).
  */
 async function sha256Hex(data: string): Promise<string> {
   const hash = await Crypto.digestStringAsync(
@@ -58,27 +67,36 @@ async function sha256Hex(data: string): Promise<string> {
 }
 
 /**
- * Get cached style signals by image hash.
- * Returns null if not found, expired, or on error.
+ * Get cached style signals by composite key.
+ * Key: (user_id, image_sha256, prompt_version, model_version)
+ * 
+ * Returns null if not found or on error.
+ * Automatic invalidation: different prompt/model version = cache miss.
  */
 async function getStyleSignalsFromCache(
+  userId: string,
   imageSha256: string
 ): Promise<StyleSignalsV1 | null> {
   try {
     const { data, error } = await supabase
       .from('style_signals_cache')
-      .select('style_signals, prompt_version')
+      .select('style_signals')
+      .eq('user_id', userId)
       .eq('image_sha256', imageSha256)
+      .eq('prompt_version', CURRENT_PROMPT_VERSION)
+      .eq('model_version', STYLE_SIGNALS_MODEL_VERSION)
       .maybeSingle();
 
-    if (error || !data) {
+    if (error) {
+      if (__DEV__) {
+        console.log(`[StyleSignals] Cache lookup error: ${error.message}`);
+      }
       return null;
     }
 
-    // Check prompt version - invalidate if outdated
-    if (data.prompt_version < CURRENT_PROMPT_VERSION) {
+    if (!data) {
       if (__DEV__) {
-        console.log(`[StyleSignals] Cache outdated (v${data.prompt_version} < v${CURRENT_PROMPT_VERSION})`);
+        console.log(`[StyleSignals] Cache MISS for hash ${imageSha256.slice(0, 8)}`);
       }
       return null;
     }
@@ -88,22 +106,33 @@ async function getStyleSignalsFromCache(
     }
 
     // Fire-and-forget hit count increment
-    supabase.rpc('increment_style_signals_cache_hit', { p_image_sha256: imageSha256 })
-      .then(() => {})
-      .catch(() => {});
+    supabase.rpc('increment_style_signals_cache_hit', { 
+      p_user_id: userId,
+      p_image_sha256: imageSha256,
+      p_prompt_version: CURRENT_PROMPT_VERSION,
+      p_model_version: STYLE_SIGNALS_MODEL_VERSION,
+    }).then(() => {}).catch(() => {});
 
     return data.style_signals as StyleSignalsV1;
   } catch (err) {
-    console.warn('[StyleSignals] Cache lookup error:', err);
+    console.warn('[StyleSignals] Cache lookup exception:', err);
     return null;
   }
 }
 
 /**
- * Store style signals in cache by image hash.
+ * Store style signals in cache using UPSERT.
+ * 
+ * Key: (user_id, image_sha256, prompt_version, model_version)
+ * 
+ * Uses UPSERT to handle race conditions:
+ * - Two scans of same image might compute signals simultaneously
+ * - "Last write wins" is fine since same input = same output
+ * 
  * Fire-and-forget - errors are logged but don't block.
  */
 async function setStyleSignalsInCache(
+  userId: string,
   imageSha256: string,
   signals: StyleSignalsV1
 ): Promise<void> {
@@ -112,14 +141,17 @@ async function setStyleSignalsInCache(
       .from('style_signals_cache')
       .upsert(
         {
+          user_id: userId,
           image_sha256: imageSha256,
-          style_signals: signals,
           prompt_version: CURRENT_PROMPT_VERSION,
+          model_version: STYLE_SIGNALS_MODEL_VERSION,
+          style_signals: signals,
+          updated_at: new Date().toISOString(),
           hit_count: 0,
         },
         {
-          onConflict: 'image_sha256',
-          ignoreDuplicates: true, // First-writer-wins
+          // Composite key conflict handling
+          onConflict: 'user_id,image_sha256,prompt_version,model_version',
         }
       );
 
@@ -270,9 +302,21 @@ function cleanExpiredCache(): void {
  * Resizes/compresses the image, converts to base64, and sends to the Edge Function.
  * Used for unsaved scans where the image hasn't been uploaded yet.
  * 
- * CACHING STRATEGY (2-tier):
- * 1. In-memory cache by URI (fast, avoids re-renders triggering API calls)
- * 2. DB cache by image hash (persistent, shared across sessions/users)
+ * CACHING STRATEGY:
+ * 
+ * TIER 0 (Memory): In-memory cache by URI
+ *   - Fast micro-optimization for re-renders
+ *   - NOT the source of truth (same URI can point to different bytes)
+ *   - Just a "nice to have" to avoid redundant work within a session
+ * 
+ * TIER 1 (DB): Cache by composite key (user_id, image_hash, prompt_version, model_version)
+ *   - THE source of truth
+ *   - Automatic invalidation: bump prompt_version or model_version
+ *   - Hash computed from resized/normalized bytes (same bytes sent to API)
+ *   - UPSERT handles race conditions (last write wins, same payload anyway)
+ *
+ * FLOW:
+ *   Resize → compute SHA256 from final bytes → DB lookup → return or call API → UPSERT
  *
  * @param localImageUri - Local file:// URI of the image
  * @returns StyleSignalsResponse with the generated signals
@@ -284,12 +328,15 @@ export async function generateScanStyleSignalsDirect(
     // Clean expired entries periodically
     cleanExpiredCache();
 
-    // TIER 1: Check in-memory cache first (avoid repeated base64 + API calls on re-renders)
+    // TIER 0: Memory cache (micro-optimization, NOT source of truth)
+    // Same URI can sometimes point to different bytes, so this is just "nice to have"
     const memoryCached = directSignalsCache.get(localImageUri);
     const now = Date.now();
     
     if (memoryCached && memoryCached.expiresAt > now) {
-      // Memory cache hit - skip everything
+      if (__DEV__) {
+        console.log('[StyleSignals] Memory cache hit (Tier 0)');
+      }
       return { ok: true, data: memoryCached.signals, cached: true };
     }
 
@@ -298,17 +345,19 @@ export async function generateScanStyleSignalsDirect(
       directSignalsCache.delete(localImageUri);
     }
 
+    // Get auth session (need user_id for cache key)
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData?.session?.access_token;
+    const userId = sessionData?.session?.user?.id;
 
-    if (!token) {
+    if (!token || !userId) {
       return {
         ok: false,
         error: { kind: 'unauthorized', message: 'Not authenticated' },
       };
     }
 
-    // Resize and compress image before converting to base64
+    // Step 1: Resize and normalize image (deterministic output)
     const imageDataUrl = await resizeAndCompressImage(localImageUri);
     const sizeKB = Math.round(imageDataUrl.length / 1024);
 
@@ -321,14 +370,15 @@ export async function generateScanStyleSignalsDirect(
       };
     }
 
-    // Extract base64 data for hashing (strip data URL prefix)
+    // Step 2: Compute SHA256 from the final resized bytes (same bytes we'd send to API)
     const base64Data = imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
     const imageSha256 = await sha256Hex(base64Data);
 
-    // TIER 2: Check DB cache by image hash (persistent, cross-session)
-    const dbCached = await getStyleSignalsFromCache(imageSha256);
+    // Step 3: TIER 1 - DB cache lookup by composite key
+    // Key: (user_id, image_sha256, prompt_version, model_version)
+    const dbCached = await getStyleSignalsFromCache(userId, imageSha256);
     if (dbCached) {
-      // DB cache hit - store in memory cache too for faster subsequent lookups
+      // DB cache hit - also store in memory cache for faster re-renders
       directSignalsCache.set(localImageUri, {
         signals: dbCached,
         expiresAt: Date.now() + CACHE_TTL_MS,
@@ -336,9 +386,9 @@ export async function generateScanStyleSignalsDirect(
       return { ok: true, data: dbCached, cached: true };
     }
 
-    // Cache miss - call API
+    // Step 4: Cache miss - call API
     if (__DEV__) {
-      console.log(`[StyleSignals] Cache miss for hash ${imageSha256.slice(0, 8)}, compressed to ${sizeKB}KB, calling API...`);
+      console.log(`[StyleSignals] Calling API (${sizeKB}KB, hash ${imageSha256.slice(0, 8)})...`);
     }
 
     const response = await fetch(getStyleSignalsUrl(), {
@@ -355,9 +405,9 @@ export async function generateScanStyleSignalsDirect(
 
     const result = await response.json();
     
-    // Cache successful results
+    // Step 5: Cache successful results
     if (result.ok && result.data) {
-      // Store in memory cache (fast re-renders)
+      // Memory cache (Tier 0) - fast re-renders
       directSignalsCache.set(localImageUri, {
         signals: result.data,
         expiresAt: Date.now() + CACHE_TTL_MS,
@@ -369,8 +419,8 @@ export async function generateScanStyleSignalsDirect(
         if (firstKey) directSignalsCache.delete(firstKey);
       }
 
-      // Store in DB cache (persistent, fire-and-forget)
-      setStyleSignalsInCache(imageSha256, result.data);
+      // DB cache (Tier 1) - UPSERT handles races (last write wins)
+      setStyleSignalsInCache(userId, imageSha256, result.data);
     }
 
     return result as StyleSignalsResponse;
