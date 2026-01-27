@@ -23,8 +23,12 @@ export const ANALYSIS_CACHE_VERSION = 'v1';
 /**
  * Prompt version - bump when prompt/schema changes
  * Format: YYYY-MM-DD or semantic version
+ * 
+ * History:
+ * - 2026-01-05: Initial version
+ * - 2026-01-25: Combined analysis + style signals in single API call
  */
-export const PROMPT_VERSION = '2026-01-05';
+export const PROMPT_VERSION = '2026-01-25';
 
 /**
  * Model used for analysis

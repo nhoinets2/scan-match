@@ -104,6 +104,10 @@ export interface AnalysisTelemetryEvent {
   style_tags_count?: number;
   colors_count?: number;
   
+  // Style signals (combined analysis optimization)
+  inline_style_signals_present?: boolean; // True if styleSignals included in response
+  style_signals_fallback_reason?: 'none' | 'missing' | 'invalid' | 'truncated';
+  
   // Timestamps
   timestamp: string;
 }
@@ -151,6 +155,8 @@ export function logAnalysisTelemetry(event: Omit<AnalysisTelemetryEvent, 'timest
       image_mp: ((fullEvent.image_width * fullEvent.image_height) / 1_000_000).toFixed(2),
       category: fullEvent.detected_category,
       source: fullEvent.image_source,
+      inline_style_signals_present: fullEvent.inline_style_signals_present,
+      style_signals_fallback_reason: fullEvent.style_signals_fallback_reason,
     }));
   }
   
@@ -310,6 +316,9 @@ export interface CreateTelemetryParams {
   isFashionItem?: boolean;
   isNonFashionFallbackUsed?: boolean;
   descriptiveLabel?: string;
+  // Style signals (combined analysis)
+  inlineStyleSignalsPresent?: boolean;
+  styleSignalsFallbackReason?: 'none' | 'missing' | 'invalid' | 'truncated';
 }
 
 export function createAnalysisTelemetryEvent(params: CreateTelemetryParams): Omit<AnalysisTelemetryEvent, 'timestamp'> {
@@ -332,6 +341,9 @@ export function createAnalysisTelemetryEvent(params: CreateTelemetryParams): Omi
     is_fashion_item: params.isFashionItem,
     is_non_fashion_fallback_used: params.isNonFashionFallbackUsed,
     descriptive_label: params.descriptiveLabel,
+    // Style signals (combined analysis)
+    inline_style_signals_present: params.inlineStyleSignalsPresent,
+    style_signals_fallback_reason: params.styleSignalsFallbackReason,
   };
 }
 

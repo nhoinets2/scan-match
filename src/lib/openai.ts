@@ -316,6 +316,8 @@ async function getImageDataUrl(imageUri: string): Promise<string> {
   }
 }
 
+import type { StyleSignalsV1 } from './trust-filter/types';
+
 export interface ClothingAnalysisResult {
   category: Category;
   descriptiveLabel: string;
@@ -326,6 +328,8 @@ export interface ClothingAnalysisResult {
   contextSufficient: boolean;
   confidenceSignals?: ConfidenceSignals;
   isFashionItem: boolean;
+  /** Style signals for Trust Filter (combined in single API call) */
+  styleSignals?: StyleSignalsV1;
 }
 
 export interface ItemSignalsResult {
@@ -431,7 +435,13 @@ export async function analyzeClothingImage(
   }
 
   // Helper to log telemetry
-  const logTelemetry = (result: ClothingAnalysisResult, cacheHit: boolean, cacheKeyPrefix?: string, fallbackUsed?: boolean) => {
+  const logTelemetry = (
+    result: ClothingAnalysisResult, 
+    cacheHit: boolean, 
+    cacheKeyPrefix?: string, 
+    fallbackUsed?: boolean,
+    styleSignalsFallbackReason?: 'none' | 'missing' | 'invalid' | 'truncated'
+  ) => {
     const event = createAnalysisTelemetryEvent({
       scanSessionId: telemetryCtx?.scan_session_id,
       userId: telemetryCtx?.user_id,
@@ -449,6 +459,9 @@ export async function analyzeClothingImage(
       isFashionItem: result.isFashionItem,
       isNonFashionFallbackUsed: fallbackUsed,
       descriptiveLabel: result.isFashionItem === false ? result.descriptiveLabel : undefined,
+      // Style signals (combined analysis)
+      inlineStyleSignalsPresent: !!result.styleSignals,
+      styleSignalsFallbackReason: styleSignalsFallbackReason ?? (result.styleSignals ? 'none' : 'missing'),
     });
     logAnalysisTelemetry(event);
     updateLocalStats({ ...event, timestamp: new Date().toISOString() });
@@ -565,7 +578,9 @@ export async function analyzeClothingImage(
             };
           }
           
-          logTelemetry(cachedResult, true, imageSha256.slice(0, 8));
+          // For cache hits, report style signals based on what's in the cached result
+          const cacheStyleSignalsFallbackReason = cachedResult.styleSignals ? 'none' : 'missing';
+          logTelemetry(cachedResult, true, imageSha256.slice(0, 8), false, cacheStyleSignalsFallbackReason);
           clearTimeout(timeoutId);
           return { 
             ok: true, 
@@ -649,7 +664,7 @@ export async function analyzeClothingImage(
 
     // Parse and validate the analysis
     const analysis = responseData.data;
-    const { analysis: validatedAnalysis, nonFashionFallbackUsed } = validateAnalysis(analysis);
+    const { analysis: validatedAnalysis, nonFashionFallbackUsed, styleSignalsFallbackReason } = validateAnalysis(analysis);
 
     // Cache the result locally
     if (cacheKey) {
@@ -664,7 +679,7 @@ export async function analyzeClothingImage(
       });
     }
 
-    logTelemetry(validatedAnalysis, false, imageSha256?.slice(0, 8), nonFashionFallbackUsed);
+    logTelemetry(validatedAnalysis, false, imageSha256?.slice(0, 8), nonFashionFallbackUsed, styleSignalsFallbackReason);
 
     const totalDuration = Date.now() - startTime;
     console.log(`[Perf] ✅ Analysis complete: ${totalDuration}ms total (category: ${validatedAnalysis.category})`);
@@ -705,6 +720,7 @@ export async function analyzeClothingImage(
 interface ValidatedAnalysisResult {
   analysis: ClothingAnalysisResult;
   nonFashionFallbackUsed: boolean;
+  styleSignalsFallbackReason: 'none' | 'missing' | 'invalid' | 'truncated';
 }
 
 function validateAnalysis(analysis: ClothingAnalysisResult): ValidatedAnalysisResult {
@@ -746,6 +762,7 @@ function validateAnalysis(analysis: ClothingAnalysisResult): ValidatedAnalysisRe
         isFashionItem: false,
       },
       nonFashionFallbackUsed,
+      styleSignalsFallbackReason: 'missing' as const, // Non-fashion items don't have style signals
     };
   }
 
@@ -805,6 +822,9 @@ function validateAnalysis(analysis: ClothingAnalysisResult): ValidatedAnalysisRe
     fallbackUsed ? styleFamily : undefined
   );
 
+  // Validate and normalize style signals (if present)
+  const styleSignalsResult = validateStyleSignalsWithReason(analysis.styleSignals);
+
   return {
     analysis: {
       category,
@@ -816,8 +836,10 @@ function validateAnalysis(analysis: ClothingAnalysisResult): ValidatedAnalysisRe
       contextSufficient,
       confidenceSignals,
       isFashionItem: true,
+      styleSignals: styleSignalsResult.signals,
     },
     nonFashionFallbackUsed: false,
+    styleSignalsFallbackReason: styleSignalsResult.fallbackReason,
   };
 }
 
@@ -844,6 +866,149 @@ function validateItemSignals(
     ...signals,
     stylingRisk,
   };
+}
+
+// ============================================
+// STYLE SIGNALS VALIDATION
+// ============================================
+
+const VALID_ARCHETYPES = [
+  'minimalist', 'classic', 'workwear', 'romantic', 'boho', 'western',
+  'street', 'sporty', 'edgy', 'glam', 'preppy', 'outdoor_utility', 'unknown', 'none'
+];
+
+const VALID_FORMALITY_BANDS = [
+  'athleisure', 'casual', 'smart_casual', 'office', 'formal', 'evening', 'unknown'
+];
+
+const VALID_STATEMENT_LEVELS = ['low', 'medium', 'high', 'unknown'];
+const VALID_SEASON_WEIGHTS = ['light', 'mid', 'heavy', 'unknown'];
+const VALID_PATTERN_LEVELS = ['solid', 'subtle', 'bold', 'unknown'];
+const VALID_MATERIAL_FAMILIES = [
+  'denim', 'knit', 'leather', 'silk_satin', 'cotton', 'wool', 'synthetic_tech', 'other', 'unknown'
+];
+const VALID_PALETTE_COLORS = [
+  'black', 'white', 'cream', 'gray', 'brown', 'tan', 'beige',
+  'navy', 'denim_blue', 'blue', 'red', 'pink', 'green', 'olive',
+  'yellow', 'orange', 'purple', 'metallic', 'multicolor', 'unknown'
+];
+
+function clampConfidence(value: unknown): number {
+  if (typeof value !== 'number' || isNaN(value)) return 0;
+  return Math.max(0, Math.min(1, value));
+}
+
+function normalizeColors(colors: unknown): string[] {
+  if (!Array.isArray(colors)) return ['unknown'];
+  const valid = colors
+    .filter((c): c is string => typeof c === 'string' && VALID_PALETTE_COLORS.includes(c))
+    .slice(0, 4);
+  return valid.length > 0 ? valid : ['unknown'];
+}
+
+/**
+ * Result of style signals validation including reason for failure
+ */
+interface StyleSignalsValidationResult {
+  signals: StyleSignalsV1 | undefined;
+  fallbackReason: 'none' | 'missing' | 'invalid' | 'truncated';
+}
+
+/**
+ * Validate and normalize style signals from the combined analysis response.
+ * Returns undefined if signals are missing, invalid, or truncated.
+ * 
+ * Truncation detection: If we have a partial structure (e.g., aesthetic exists
+ * but material is missing), this indicates the JSON was truncated due to token limit.
+ */
+function validateStyleSignalsWithReason(raw: unknown): StyleSignalsValidationResult {
+  if (!raw || typeof raw !== 'object') {
+    return { signals: undefined, fallbackReason: 'missing' };
+  }
+
+  const signals = raw as Partial<StyleSignalsV1>;
+
+  // Check if we have the basic structure
+  if (!signals.aesthetic || !signals.formality || !signals.statement) {
+    // Check if it looks like truncated JSON (has some fields but not all required ones)
+    const hasAnyField = signals.aesthetic || signals.formality || signals.statement || 
+                        signals.season || signals.palette || signals.pattern || signals.material;
+    return { 
+      signals: undefined, 
+      fallbackReason: hasAnyField ? 'truncated' : 'missing' 
+    };
+  }
+
+  // Check for truncation: all main sections should be present for a complete response
+  const requiredSections = ['aesthetic', 'formality', 'statement', 'season', 'palette', 'pattern', 'material'];
+  const missingSections = requiredSections.filter(section => !(signals as Record<string, unknown>)[section]);
+  
+  if (missingSections.length > 0) {
+    if (__DEV__) {
+      console.log('[StyleSignals] Truncated response - missing sections:', missingSections);
+    }
+    return { signals: undefined, fallbackReason: 'truncated' };
+  }
+
+  const normalized: StyleSignalsV1 = {
+    version: 1,
+    aesthetic: {
+      primary: VALID_ARCHETYPES.includes(signals.aesthetic?.primary ?? '') 
+        ? signals.aesthetic.primary : 'unknown',
+      primary_confidence: clampConfidence(signals.aesthetic?.primary_confidence),
+      secondary: VALID_ARCHETYPES.includes(signals.aesthetic?.secondary ?? '')
+        ? signals.aesthetic.secondary : 'none',
+      secondary_confidence: clampConfidence(signals.aesthetic?.secondary_confidence),
+    },
+    formality: {
+      band: VALID_FORMALITY_BANDS.includes(signals.formality?.band ?? '')
+        ? signals.formality.band : 'unknown',
+      confidence: clampConfidence(signals.formality?.confidence),
+    },
+    statement: {
+      level: VALID_STATEMENT_LEVELS.includes(signals.statement?.level ?? '')
+        ? signals.statement.level : 'unknown',
+      confidence: clampConfidence(signals.statement?.confidence),
+    },
+    season: {
+      heaviness: VALID_SEASON_WEIGHTS.includes(signals.season?.heaviness ?? '')
+        ? signals.season.heaviness : 'unknown',
+      confidence: clampConfidence(signals.season?.confidence),
+    },
+    palette: {
+      colors: normalizeColors(signals.palette?.colors),
+      confidence: clampConfidence(signals.palette?.confidence),
+    },
+    pattern: {
+      level: VALID_PATTERN_LEVELS.includes(signals.pattern?.level ?? '')
+        ? signals.pattern.level : 'unknown',
+      confidence: clampConfidence(signals.pattern?.confidence),
+    },
+    material: {
+      family: VALID_MATERIAL_FAMILIES.includes(signals.material?.family ?? '')
+        ? signals.material.family : 'unknown',
+      confidence: clampConfidence(signals.material?.confidence),
+    },
+  };
+
+  // Apply secondary rules
+  if (normalized.aesthetic.secondary_confidence < 0.35) {
+    normalized.aesthetic.secondary = 'none';
+    normalized.aesthetic.secondary_confidence = 0;
+  }
+  if (normalized.aesthetic.secondary === normalized.aesthetic.primary) {
+    normalized.aesthetic.secondary = 'none';
+    normalized.aesthetic.secondary_confidence = 0;
+  }
+
+  return { signals: normalized, fallbackReason: 'none' };
+}
+
+/**
+ * Wrapper for backward compatibility - returns just the signals or undefined
+ */
+function validateStyleSignals(raw: unknown): StyleSignalsV1 | undefined {
+  return validateStyleSignalsWithReason(raw).signals;
 }
 
 function validateConfidenceSignals(

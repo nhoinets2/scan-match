@@ -285,45 +285,69 @@ export function useTrustFilter(
       setIsLoading(true);
 
       try {
-        // Fetch scan signals (from DB cache or generate)
+        // Fetch scan signals (from inline, DB cache, or generate)
         let fetchedScanSignals: StyleSignalsV1 | null = null;
 
-        // Get the scan's image URI
-        const scanImageUri = scannedItem?.imageUri || '';
-        const isLocalImage = scanImageUri.startsWith('file://');
+        // OPTIMIZATION: Check if style signals were included in the analysis result
+        // This saves a separate API call (combined analysis + signals in one call)
+        // Guard: Only use inline signals if they're valid (version check + has required fields)
+        const inlineSignals = scannedItem?.styleSignals;
+        const isValidInlineSignals = inlineSignals && 
+          inlineSignals.version === 1 &&
+          inlineSignals.aesthetic?.primary &&
+          inlineSignals.formality?.band &&
+          inlineSignals.statement?.level;
+        
+        if (isValidInlineSignals) {
+          fetchedScanSignals = inlineSignals;
+          if (__DEV__) {
+            console.log('[TF] Using inline style signals from combined analysis (v' + inlineSignals.version + ')');
+          }
+          // Persist to DB for instant reopen (fire-and-forget with retry)
+          if (scanId) {
+            persistScanSignalsToDb(scanId, fetchedScanSignals);
+          }
+        } else {
+          if (__DEV__ && inlineSignals) {
+            console.log('[TF] Inline style signals present but invalid, falling back to fetch');
+          }
+          // Fallback: fetch from DB or generate separately
+          const scanImageUri = scannedItem?.imageUri || '';
+          const isLocalImage = scanImageUri.startsWith('file://');
 
-        // DEBUG: Log image URI detection (key for diagnosing direct generation path)
-        if (__DEV__) {
-          console.log('[TF] Image:', isLocalImage ? 'LOCAL' : (scanImageUri ? 'CLOUD' : 'EMPTY'), 
-            scanImageUri ? `(${scanImageUri.substring(0, 40)}...)` : '');
-        }
+          // DEBUG: Log image URI detection (key for diagnosing direct generation path)
+          if (__DEV__) {
+            console.log('[TF] Image:', isLocalImage ? 'LOCAL' : (scanImageUri ? 'CLOUD' : 'EMPTY'), 
+              scanImageUri ? `(${scanImageUri.substring(0, 40)}...)` : '');
+          }
 
-        if (scanId) {
-          // Try to fetch from DB first
-          fetchedScanSignals = await fetchScanStyleSignals(scanId);
+          if (scanId) {
+            // Try to fetch from DB first
+            fetchedScanSignals = await fetchScanStyleSignals(scanId);
 
-          // If not cached and style signals are enabled, generate
-          if (!fetchedScanSignals && isStyleSignalsEnabled()) {
-            if (isLocalImage && scanImageUri) {
-              // For local images (unsaved scans), use direct generation with base64
-              const response = await generateScanStyleSignalsDirect(scanImageUri);
-              if (__DEV__) {
-                console.log('[TF] Direct generation:', response.ok ? 'SUCCESS' : `FAILED (${response.error?.kind})`);
-              }
-              if (response.ok && response.data) {
-                fetchedScanSignals = response.data;
-                // Persist to DB for instant reopen (fire-and-forget with retry)
-                // scanId is the checkId - row may not exist yet, so persist retries
-                persistScanSignalsToDb(scanId, response.data);
-              }
-            } else {
-              // For cloud images (saved scans), use server-side generation
-              const response = await generateScanStyleSignals(scanId);
-              if (__DEV__) {
-                console.log('[TF] Server generation:', response.ok ? 'SUCCESS' : `FAILED (${response.error?.kind})`);
-              }
-              if (response.ok && response.data) {
-                fetchedScanSignals = response.data;
+            // If not cached and style signals are enabled, generate
+            if (!fetchedScanSignals && isStyleSignalsEnabled()) {
+              if (isLocalImage && scanImageUri) {
+                // For local images (unsaved scans), use direct generation with base64
+                const response = await generateScanStyleSignalsDirect(scanImageUri);
+                if (__DEV__) {
+                  console.log('[TF] Direct generation:', response.ok ? 'SUCCESS' : `FAILED (${response.error?.kind})`);
+                }
+                if (response.ok && response.data) {
+                  fetchedScanSignals = response.data;
+                  // Persist to DB for instant reopen (fire-and-forget with retry)
+                  // scanId is the checkId - row may not exist yet, so persist retries
+                  persistScanSignalsToDb(scanId, response.data);
+                }
+              } else {
+                // For cloud images (saved scans), use server-side generation
+                const response = await generateScanStyleSignals(scanId);
+                if (__DEV__) {
+                  console.log('[TF] Server generation:', response.ok ? 'SUCCESS' : `FAILED (${response.error?.kind})`);
+                }
+                if (response.ok && response.data) {
+                  fetchedScanSignals = response.data;
+                }
               }
             }
           }
@@ -363,7 +387,7 @@ export function useTrustFilter(
     };
 
     fetchSignals();
-  }, [scanId, matchedItemIds, confidenceResult.matches.length, signalsFetched, scannedItem?.imageUri]);
+  }, [scanId, matchedItemIds, confidenceResult.matches.length, signalsFetched, scannedItem?.imageUri, scannedItem?.styleSignals]);
 
   // Reset when scan changes
   useEffect(() => {

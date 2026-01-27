@@ -247,10 +247,12 @@ function ResultsLoading({
   imageUri,
   insets,
   fromScan,
+  isReopen,
 }: {
   imageUri: string;
   insets: { top: number; bottom: number };
   fromScan?: boolean;
+  isReopen?: boolean;
 }) {
   // Screen dimensions for responsive sizing
   const { width: screenWidth } = useWindowDimensions();
@@ -395,7 +397,7 @@ function ResultsLoading({
             marginBottom: spacing.xs,
           }}
         >
-          Analyzing your item
+          {isReopen ? "Loading your matches" : "Analyzing your item"}
         </Text>
         
         {/* Subtitle */}
@@ -407,7 +409,7 @@ function ResultsLoading({
             marginBottom: spacing.sm,
           }}
         >
-          This usually takes a moment.
+          {isReopen ? "Just a moment..." : "This usually takes a moment."}
         </Text>
         
         {/* Status pill with animated dots */}
@@ -3343,12 +3345,16 @@ function ResultsSuccess({
   // ============================================
   // If Trust Filter + AI Safety haven't completed, keep showing loading screen.
   // This prevents "flicker" where bad matches appear briefly before being hidden.
+  // Use different messaging for reopens vs fresh scans.
   if (!trustFilterResult.isFullyReady) {
+    // It's a reopen if we're viewing a saved check and not from a fresh scan
+    const isReopeningCheck = isViewingSavedCheck && !fromScan;
     return (
       <ResultsLoading 
         imageUri={resolvedImageUri || ''} 
         insets={insets} 
-        fromScan={fromScan} 
+        fromScan={fromScan}
+        isReopen={isReopeningCheck}
       />
     );
   }
