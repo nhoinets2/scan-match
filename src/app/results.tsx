@@ -189,6 +189,7 @@ interface ResultsSuccessProps {
   // Mutations (stable references from parent)
   addRecentCheckMutation: UseMutationResult<{ id: string; imageUri: string }, Error, Omit<RecentCheck, "id" | "createdAt">, unknown>;
   updateRecentCheckOutcomeMutation: UseMutationResult<{ id: string; outcome: OutcomeState; imageUri: string | undefined }, Error, { id: string; outcome: OutcomeState; imageUri?: string }, unknown>;
+  updateFinalizedCountsMutation: UseMutationResult<{ id: string; finalHighCount: number; finalNearCount: number; finalizedFlags: { tf_enabled: boolean; ai_enabled: boolean; ai_dry_run: boolean } }, Error, { id: string; finalHighCount: number; finalNearCount: number; finalizedFlags: { tf_enabled: boolean; ai_enabled: boolean; ai_dry_run: boolean } }, unknown>;
 
   // Actions
   clearScan: () => void;
@@ -1860,6 +1861,7 @@ export default function ResultsScreen() {
       clearScan={clearScan}
       addRecentCheckMutation={addRecentCheckMutation}
       updateRecentCheckOutcomeMutation={updateRecentCheckOutcomeMutation}
+      updateFinalizedCountsMutation={updateFinalizedCountsMutation}
       insets={insets}
       user={user}
       fromScan={params.fromScan === "true"}
@@ -1892,6 +1894,7 @@ function ResultsSuccess({
   clearScan,
   addRecentCheckMutation,
   updateRecentCheckOutcomeMutation,
+  updateFinalizedCountsMutation,
   insets,
   user,
   fromScan,
