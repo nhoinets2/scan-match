@@ -64,6 +64,7 @@ import {
   AlertOctagon,
   AlertCircle,
 } from "lucide-react-native";
+import NetInfo from '@react-native-community/netinfo';
 import { ThumbnailPlaceholderImage, ThumbnailWithFallback } from "@/components/PlaceholderImage";
 
 import { useSnapToMatchStore } from "@/lib/store";
@@ -1779,6 +1780,10 @@ export default function ResultsScreen() {
   const isViewingSavedCheck = !!savedCheck;
 
   console.log("ResultsScreen mount, currentScan exists:", !!currentScan, "savedCheck:", !!savedCheck);
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/b141ec2f-e444-40a8-94fa-afc8a829a814',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'results.tsx:1779',message:'ResultsScreen mounted',data:{isViewingSavedCheck:isViewingSavedCheck,hasCurrentScan:!!currentScan,hasSavedCheck:!!savedCheck},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+  // #endregion
 
   // Get the ID of the current check (for Trust Filter signal fetching and saving)
   // Works for both fresh scans (imageUri flow) and saved checks (checkId flow)
@@ -2046,6 +2051,30 @@ function ResultsSuccess({
     imageUri: resolvedImageUri || scannedItem.imageUri || '',
   }), [scannedItem, resolvedImageUri]);
 
+  // Check if we're offline when reopening a saved scan
+  // If offline, show error immediately instead of loading forever
+  const [isOfflineError, setIsOfflineError] = useState(false);
+  
+  useEffect(() => {
+    // Only check for reopens (fresh scans need network for analysis anyway)
+    if (!isViewingSavedCheck) return;
+    
+    // Use NetInfo for proper offline detection
+    const checkNetwork = async () => {
+      try {
+        const netInfo = await NetInfo.fetch();
+        
+        if (!netInfo.isConnected || netInfo.isInternetReachable === false) {
+          setIsOfflineError(true);
+        }
+      } catch (error) {
+        console.error('[Results] NetInfo error:', error);
+      }
+    };
+    
+    checkNetwork();
+  }, [isViewingSavedCheck]);
+
   // Trust Filter - post-CE filtering of HIGH matches
   // Applies style-based guardrails to prevent trust-breaking matches
   // Also runs AI Safety Check in dry_run mode (when enabled)
@@ -2119,10 +2148,22 @@ function ResultsSuccess({
   // Loading timeout: If Trust Filter + AI Safety hang (likely connection issue),
   // show error alert and dismiss screen after 15 seconds
   useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/b141ec2f-e444-40a8-94fa-afc8a829a814',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'results.tsx:2121',message:'Timeout effect entry',data:{isFullyReady:trustFilterResult.isFullyReady,timeoutShown:timeoutShownRef.current,isMounted:isMountedRef.current},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
     if (trustFilterResult.isFullyReady) return;
     if (timeoutShownRef.current) return;
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/b141ec2f-e444-40a8-94fa-afc8a829a814',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'results.tsx:2125',message:'Scheduling timeout',data:{timeoutMs:LOADING_TIMEOUT_MS,isViewingSavedCheck:isViewingSavedCheck},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+
     const timeoutId = setTimeout(() => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/b141ec2f-e444-40a8-94fa-afc8a829a814',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'results.tsx:2126',message:'Timeout fired',data:{isMounted:isMountedRef.current,isReady:isReadyRef.current,timeoutShown:timeoutShownRef.current},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      
       // Double-check conditions (might have resolved during timeout delay)
       if (!isMountedRef.current) return;
       if (isReadyRef.current) return;
@@ -2138,10 +2179,19 @@ function ResultsSuccess({
       //   timeout_ms: LOADING_TIMEOUT_MS,
       // });
 
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/b141ec2f-e444-40a8-94fa-afc8a829a814',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'results.tsx:2141',message:'Setting modal state',data:{showLoadingTimeoutModal:true},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      
       setShowLoadingTimeoutModal(true);
     }, LOADING_TIMEOUT_MS);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/b141ec2f-e444-40a8-94fa-afc8a829a814',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'results.tsx:2144',message:'Effect cleanup',data:{timeoutId:!!timeoutId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+      clearTimeout(timeoutId);
+    };
   }, [trustFilterResult.isFullyReady, isViewingSavedCheck, router]);
 
   // ============================================
@@ -3746,6 +3796,28 @@ function ResultsSuccess({
   const explanationData = getContextAwareExplanation();
 
   // ============================================
+  // OFFLINE ERROR GATE
+  // ============================================
+  // If we detected offline when reopening, show error instead of loading forever
+  if (isOfflineError && isViewingSavedCheck) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl }}>
+        <WifiOff size={64} color={colors.text.secondary} strokeWidth={1.5} style={{ marginBottom: spacing.lg }} />
+        <Text style={{ ...typography.ui.heading, textAlign: 'center', marginBottom: spacing.sm }}>
+          You're offline
+        </Text>
+        <Text style={{ ...typography.ui.body, color: colors.text.secondary, textAlign: 'center', marginBottom: spacing.xl }}>
+          Connect to internet to see updated match results.
+        </Text>
+        <ButtonPrimary
+          label="Go Back"
+          onPress={() => router.replace('/(tabs)/')}
+        />
+      </View>
+    );
+  }
+
+  // ============================================
   // AI SAFETY LOADING GATE
   // ============================================
   // If Trust Filter + AI Safety haven't completed, keep showing loading screen.
@@ -3755,12 +3827,35 @@ function ResultsSuccess({
     // It's a reopen if we're viewing a saved check and not from a fresh scan
     const isReopeningCheck = isViewingSavedCheck && !fromScan;
     return (
-      <ResultsLoading 
-        imageUri={resolvedImageUri || ''} 
-        insets={insets} 
-        fromScan={fromScan}
-        isReopen={isReopeningCheck}
-      />
+      <View style={{ flex: 1 }}>
+        <ResultsLoading 
+          imageUri={resolvedImageUri || ''} 
+          insets={insets} 
+          fromScan={fromScan}
+          isReopen={isReopeningCheck}
+        />
+        {/* DEBUG UI - shows Trust Filter state on screen */}
+        {__DEV__ && (
+          <View style={{ 
+            position: 'absolute', 
+            bottom: 100, 
+            left: 10, 
+            right: 10, 
+            backgroundColor: 'rgba(0,0,0,0.9)', 
+            padding: 10,
+            borderRadius: 8,
+          }}>
+            <Text style={{ color: '#0f0', fontSize: 11, fontFamily: 'monospace' }}>
+              DEBUG TF STATE:{'\n'}
+              isFullyReady: {String(trustFilterResult.isFullyReady)}{'\n'}
+              isLoading: {String(trustFilterResult.isLoading)}{'\n'}
+              wasApplied: {String(trustFilterResult.wasApplied)}{'\n'}
+              hasScanSignals: {String(!!trustFilterResult.scanSignals)}{'\n'}
+              finalized: {String(!!trustFilterResult.finalized)}{'\n'}
+            </Text>
+          </View>
+        )}
+      </View>
     );
   }
 
@@ -5586,11 +5681,20 @@ function ResultsSuccess({
       </Modal>
 
       {/* Loading timeout modal (connection issue) */}
+      {showLoadingTimeoutModal && (() => {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/b141ec2f-e444-40a8-94fa-afc8a829a814',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'results.tsx:5608',message:'Modal rendering',data:{showLoadingTimeoutModal:showLoadingTimeoutModal},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        return null;
+      })()}
       <Modal
         visible={showLoadingTimeoutModal}
         transparent
         animationType="fade"
         onRequestClose={() => {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/b141ec2f-e444-40a8-94fa-afc8a829a814',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'results.tsx:5619',message:'Modal onRequestClose',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
           setShowLoadingTimeoutModal(false);
           router.replace(isViewingSavedCheck ? '/(tabs)/' : '/scan');
         }}
@@ -5663,6 +5767,9 @@ function ResultsSuccess({
               <ButtonPrimary
                 label="Got it"
                 onPress={() => {
+                  // #region agent log
+                  fetch('http://127.0.0.1:7242/ingest/b141ec2f-e444-40a8-94fa-afc8a829a814',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'results.tsx:5669',message:'Modal button pressed',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+                  // #endregion
                   setShowLoadingTimeoutModal(false);
                   router.replace(isViewingSavedCheck ? '/(tabs)/' : '/scan');
                 }}
