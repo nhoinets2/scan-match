@@ -89,6 +89,7 @@ interface SuggestionsRequest {
   intent: 'shopping' | 'own_item';
   cache_key: string;
   scan_id?: string;
+  has_pairings?: boolean;
 }
 
 interface SuggestionBullet {
@@ -162,6 +163,45 @@ STRICT RULES (must follow):
 Respond with ONLY the JSON object.`;
 }
 
+function buildSoloPrompt(
+  scanSignals: StyleSignalsV1,
+  wardrobeSummary: WardrobeSummary,
+  intent: 'shopping' | 'own_item'
+): string {
+  const scanSummary = `aesthetic:${scanSignals.aesthetic?.primary ?? 'unknown'}; formality:${scanSignals.formality?.band ?? 'unknown'}; statement:${scanSignals.statement?.level ?? 'unknown'}; season:${scanSignals.season?.heaviness ?? 'unknown'}; pattern:${scanSignals.pattern?.level ?? 'unknown'}; colors:${scanSignals.palette?.colors?.join('/') ?? 'unknown'}`;
+  const wardrobeOverview = `total:${wardrobeSummary.total}; categories:${Object.entries(wardrobeSummary.by_category).map(([k, v]) => `${k}:${v}`).join(',')}; aesthetics:${wardrobeSummary.dominant_aesthetics?.join('/') ?? 'varied'}`;
+
+  return `You are a personal stylist. Output ONLY JSON.
+
+CONTEXT:
+intent:${intent}
+scan:${scanSummary}
+wardrobe:${wardrobeOverview}
+matches:[] (solo mode - no pairings)
+
+OUTPUT FORMAT (strict JSON only):
+{
+  "why_it_works": [
+    { "text": "styling guidance without naming items", "mentions": [] },
+    { "text": "styling guidance without naming items", "mentions": [] }
+  ],
+  "to_elevate": [
+    { "text": "why this would help", "recommend": { "type": "consider_adding", "category": "CATEGORY", "attributes": ["attr1", "attr2"] } },
+    { "text": "why this would help", "recommend": { "type": "consider_adding", "category": "CATEGORY", "attributes": ["attr1", "attr2"] } }
+  ]
+}
+
+STRICT RULES (must follow):
+1. Do NOT imply the user owns any specific item
+2. Do NOT say "with your ..." or reference wardrobe item names
+3. "mentions" MUST be an empty array for all bullets
+4. "to_elevate" MUST use type: "consider_adding"
+5. "category" in to_elevate MUST be one of: ${ALLOWED_CATEGORIES.join(', ')}
+6. Keep "text" concise (aim for 60-80 characters, max 100)
+7. Focus on how to style this item, not what it pairs with
+Respond with ONLY the JSON object.`;
+}
+
 // ============================================
 // VALIDATION & REPAIR
 // ============================================
@@ -194,10 +234,15 @@ function smartTrim(text: string, maxLen: number): string {
 
 function validateAndRepairSuggestions(
   data: unknown,
-  validIds: string[]
+  validIds: string[],
+  isSoloMode: boolean
 ): { suggestions: PersonalizedSuggestions; wasRepaired: boolean } {
   const validIdSet = new Set(validIds);
   let wasRepaired = false;
+  const runtimeEnv = (Deno.env.get("SUPABASE_ENV") ?? Deno.env.get("DENO_ENV") ?? "").toLowerCase();
+  const isDev = runtimeEnv === "development" || runtimeEnv === "local";
+  const suspiciousWithYour = /\bwith your\b/i;
+  const suspiciousYourItem = /\byour\s+\w+/i;
   
   // Ensure object shape
   const raw = (typeof data === 'object' && data !== null) 
@@ -215,14 +260,26 @@ function validateAndRepairSuggestions(
         
         if (trimmedText !== originalText) wasRepaired = true;
         
-        // Strip invalid mentions (only keep IDs that exist in input)
         const originalMentions = Array.isArray(bullet?.mentions) ? bullet.mentions : [];
+
+        if (isSoloMode) {
+          if (originalMentions.length > 0) wasRepaired = true;
+          if (isDev && (suspiciousWithYour.test(trimmedText) || suspiciousYourItem.test(trimmedText))) {
+            console.warn("[personalized-suggestions] Solo suspicious phrase in why_it_works:", trimmedText);
+          }
+          return {
+            text: trimmedText,
+            mentions: [],
+          };
+        }
+
+        // Strip invalid mentions (only keep IDs that exist in input)
         const validMentions = originalMentions.filter((id: unknown) =>
           typeof id === 'string' && validIdSet.has(id)
         );
-        
+
         if (validMentions.length !== originalMentions.length) wasRepaired = true;
-        
+
         return {
           text: trimmedText,
           mentions: validMentions,
@@ -347,7 +404,8 @@ Deno.serve(async (req) => {
     // ============================================
     
     const body: SuggestionsRequest = await req.json();
-    const { scan_signals, top_matches, wardrobe_summary, intent, cache_key, scan_id } = body;
+    const { scan_signals, top_matches, wardrobe_summary, intent, cache_key, scan_id, has_pairings } = body;
+    void has_pairings;
     
     // Validate required fields
     if (!scan_signals || !top_matches || !cache_key) {
@@ -357,23 +415,24 @@ Deno.serve(async (req) => {
       );
     }
     
-    // Validate top_matches (max 5, valid structure)
-    if (!Array.isArray(top_matches) || top_matches.length === 0 || top_matches.length > 5) {
+    // Validate top_matches (0-5, valid structure)
+    if (!Array.isArray(top_matches) || top_matches.length > 5) {
       return new Response(
-        JSON.stringify({ ok: false, error: { kind: "bad_request", message: "top_matches must be 1-5 items" } }),
+        JSON.stringify({ ok: false, error: { kind: "bad_request", message: "top_matches must be 0-5 items" } }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    
+
     const validIds = top_matches.map(m => m.id).filter(id => typeof id === 'string' && id.length > 0);
-    if (validIds.length === 0) {
+    const isSoloMode = top_matches.length === 0;
+    if (!isSoloMode && validIds.length === 0) {
       return new Response(
         JSON.stringify({ ok: false, error: { kind: "bad_request", message: "No valid item IDs provided" } }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     
-    console.log(`[personalized-suggestions] Processing: user=${userId.slice(0, 8)}..., matches=${top_matches.length}, intent=${intent}`);
+    console.log(`[personalized-suggestions] Processing: user=${userId.slice(0, 8)}..., matches=${top_matches.length}, intent=${intent}, solo=${isSoloMode}`);
     
     // ============================================
     // 3. CALL OPENAI WITH TIMEOUT
@@ -388,7 +447,10 @@ Deno.serve(async (req) => {
       );
     }
     
-    const prompt = buildPrompt(scan_signals, top_matches, wardrobe_summary ?? { total: 0, by_category: {}, dominant_aesthetics: [], updated_at: '' }, intent ?? 'own_item');
+    const safeWardrobeSummary = wardrobe_summary ?? { total: 0, by_category: {}, dominant_aesthetics: [], updated_at: '' };
+    const prompt = isSoloMode
+      ? buildSoloPrompt(scan_signals, safeWardrobeSummary, intent ?? 'own_item')
+      : buildPrompt(scan_signals, top_matches, safeWardrobeSummary, intent ?? 'own_item');
     
     // Create abort controller for timeout
     const controller = new AbortController();
@@ -463,7 +525,7 @@ Deno.serve(async (req) => {
       }
       
       // Validate and repair
-      const result = validateAndRepairSuggestions(rawSuggestions, validIds);
+      const result = validateAndRepairSuggestions(rawSuggestions, validIds, isSoloMode);
       suggestions = result.suggestions;
       wasRepaired = result.wasRepaired;
       
