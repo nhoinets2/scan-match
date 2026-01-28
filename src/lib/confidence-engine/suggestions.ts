@@ -211,19 +211,27 @@ export function generateModeASuggestionsV2(
  *
  * Algorithm:
  * 1. Filter out excluded reasons (TEXTURE_CLASH)
- * 2. Sort by priority (REASON_PRIORITY), then by stable order (CAP_REASON_STABLE_ORDER) for ties
- * 3. Take top N reasons (max_bullets)
- * 4. For each reason, select first bullet from its template (deterministic)
- * 5. Resolve text based on vibe
- * 6. Track which reasons actually contributed bullets
- * 7. If empty, add generic fallback bullet
+ * 2. Filter out SHOES_CONFIDENCE_DAMPEN when scannedCategory is 'shoes'
+ * 3. Sort by priority (REASON_PRIORITY), then by stable order (CAP_REASON_STABLE_ORDER) for ties
+ * 4. Take top N reasons (max_bullets)
+ * 5. For each reason, select first bullet from its template (deterministic)
+ * 6. Resolve text based on vibe
+ * 7. Track which reasons actually contributed bullets
+ * 8. If empty, add generic fallback bullet
  */
 export function buildModeBBullets(
   capReasons: CapReason[],
-  vibe: StyleVibe
+  vibe: StyleVibe,
+  scannedCategory?: Category | null
 ): { bullets: ModeBBulletResolved[]; reasonsUsed: CapReason[] } {
   // Normalize excluded_reasons to Set for consistent lookup
   const excludedSet = new Set(MODE_B_CONFIG.excluded_reasons);
+
+  // Filter SHOES_CONFIDENCE_DAMPEN when shoes are scanned
+  // (advice about shoes is irrelevant when user already has shoes)
+  if (scannedCategory === 'shoes') {
+    excludedSet.add('SHOES_CONFIDENCE_DAMPEN');
+  }
 
   // Filter out excluded reasons
   const validReasons = capReasons.filter((reason) => !excludedSet.has(reason));
@@ -282,9 +290,10 @@ export function buildModeBBullets(
  */
 export function generateModeBSuggestionsV2(
   capReasons: CapReason[],
-  vibe: StyleVibe
+  vibe: StyleVibe,
+  scannedCategory?: Category | null
 ): ModeBSuggestion {
-  const { bullets, reasonsUsed } = buildModeBBullets(capReasons, vibe);
+  const { bullets, reasonsUsed } = buildModeBBullets(capReasons, vibe, scannedCategory);
 
   return {
     bullets,
@@ -319,11 +328,13 @@ function isType2bMatch(evalItem: PairEvaluation): boolean {
  * @param nearMatches - Near matches to generate suggestions from
  * @param vibe - Style vibe for copy generation
  * @param context - Optional context for debugging ('selected_outfit' | 'aggregate')
+ * @param scannedCategory - Category of scanned item (used to filter irrelevant bullets)
  */
 export function generateOutfitModeBSuggestionsV2(
   nearMatches: PairEvaluation[],
   vibe: StyleVibe,
-  context?: 'selected_outfit' | 'aggregate'
+  context?: 'selected_outfit' | 'aggregate',
+  scannedCategory?: Category | null
 ): ModeBSuggestion | null {
   if (nearMatches.length === 0) {
     return null;
@@ -350,7 +361,7 @@ export function generateOutfitModeBSuggestionsV2(
           bestScore: Number(bestMatch.raw_score.toFixed(3)),
         });
       }
-      return generateModeBSuggestionsV2(['MISSING_KEY_SIGNAL'], vibe);
+      return generateModeBSuggestionsV2(['MISSING_KEY_SIGNAL'], vibe, scannedCategory);
     }
 
     // Not Type 2b and no cap reasons → unexpected state, return null
@@ -363,7 +374,7 @@ export function generateOutfitModeBSuggestionsV2(
     return null;
   }
 
-  return generateModeBSuggestionsV2(aggregatedReasons, vibe);
+  return generateModeBSuggestionsV2(aggregatedReasons, vibe, scannedCategory);
 }
 
 // ============================================
@@ -395,11 +406,13 @@ interface SlotCandidateShape {
  * @param selectedOutfitCandidates - Candidates from a selected outfit (null = aggregate mode)
  * @param nearMatches - All NEAR matches (fallback when no selection)
  * @param vibe - Style vibe for copy generation
+ * @param scannedCategory - Category of scanned item (used to filter irrelevant bullets)
  */
 export function getModeBBullets(
   selectedOutfitCandidates: SlotCandidateShape[] | null,
   nearMatches: PairEvaluation[],
-  vibe: StyleVibe
+  vibe: StyleVibe,
+  scannedCategory?: Category | null
 ): ModeBSuggestion | null {
   // Determine context for debugging
   const context: 'selected_outfit' | 'aggregate' = 
@@ -419,13 +432,13 @@ export function getModeBBullets(
       if (__DEV__) {
         console.warn('[getModeBBullets] Selected outfit has no MEDIUM candidates, falling back to aggregate');
       }
-      return generateOutfitModeBSuggestionsV2(nearMatches, vibe, 'aggregate');
+      return generateOutfitModeBSuggestionsV2(nearMatches, vibe, 'aggregate', scannedCategory);
     }
 
     // Use only the MEDIUM evals from the selected outfit
-    return generateOutfitModeBSuggestionsV2(mediumEvals, vibe, context);
+    return generateOutfitModeBSuggestionsV2(mediumEvals, vibe, context, scannedCategory);
   }
 
   // No selection: aggregate across all nearMatches
-  return generateOutfitModeBSuggestionsV2(nearMatches, vibe, context);
+  return generateOutfitModeBSuggestionsV2(nearMatches, vibe, context, scannedCategory);
 }

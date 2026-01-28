@@ -11,7 +11,7 @@
 // Mock __DEV__ for test environment
 (global as unknown as { __DEV__: boolean }).__DEV__ = true;
 
-import { getModeBBullets } from '../suggestions';
+import { getModeBBullets, buildModeBBullets } from '../suggestions';
 import type { PairEvaluation } from '../types';
 
 // Helper to create a mock PairEvaluation
@@ -160,6 +160,58 @@ describe('getModeBBullets - PR 3 Tests', () => {
       expect(casualResult).not.toBeNull();
       expect(polishedResult).not.toBeNull();
       // The bullets should be style-aware (actual text may vary by vibe)
+    });
+  });
+
+  describe('scannedCategory filtering - SHOES_CONFIDENCE_DAMPEN', () => {
+    it('filters SHOES_CONFIDENCE_DAMPEN when scannedCategory is shoes', () => {
+      const { bullets, reasonsUsed } = buildModeBBullets(
+        ['SHOES_CONFIDENCE_DAMPEN'],
+        'minimal',
+        'shoes'
+      );
+      expect(bullets.map(b => b.key)).not.toContain('SHOES_CONFIDENCE_DAMPEN__SIMPLE_SHOES');
+      expect(reasonsUsed).not.toContain('SHOES_CONFIDENCE_DAMPEN');
+    });
+
+    it('keeps SHOES_CONFIDENCE_DAMPEN for non-shoes scans', () => {
+      const { bullets, reasonsUsed } = buildModeBBullets(
+        ['SHOES_CONFIDENCE_DAMPEN'],
+        'minimal',
+        'tops'
+      );
+      expect(bullets.map(b => b.key)).toContain('SHOES_CONFIDENCE_DAMPEN__SIMPLE_SHOES');
+      expect(reasonsUsed).toContain('SHOES_CONFIDENCE_DAMPEN');
+    });
+
+    it('filters only SHOES_CONFIDENCE_DAMPEN when multiple reasons present', () => {
+      const { bullets, reasonsUsed } = buildModeBBullets(
+        ['FORMALITY_TENSION', 'SHOES_CONFIDENCE_DAMPEN'],
+        'minimal',
+        'shoes'
+      );
+      expect(reasonsUsed).toContain('FORMALITY_TENSION');
+      expect(reasonsUsed).not.toContain('SHOES_CONFIDENCE_DAMPEN');
+      expect(bullets.some(b => b.key.startsWith('FORMALITY_TENSION'))).toBe(true);
+    });
+
+    it('keeps SHOES_CONFIDENCE_DAMPEN when scannedCategory is null', () => {
+      const { bullets, reasonsUsed } = buildModeBBullets(
+        ['SHOES_CONFIDENCE_DAMPEN'],
+        'minimal',
+        null
+      );
+      expect(bullets.map(b => b.key)).toContain('SHOES_CONFIDENCE_DAMPEN__SIMPLE_SHOES');
+      expect(reasonsUsed).toContain('SHOES_CONFIDENCE_DAMPEN');
+    });
+
+    it('keeps SHOES_CONFIDENCE_DAMPEN when scannedCategory is undefined', () => {
+      const { bullets, reasonsUsed } = buildModeBBullets(
+        ['SHOES_CONFIDENCE_DAMPEN'],
+        'minimal'
+      );
+      expect(bullets.map(b => b.key)).toContain('SHOES_CONFIDENCE_DAMPEN__SIMPLE_SHOES');
+      expect(reasonsUsed).toContain('SHOES_CONFIDENCE_DAMPEN');
     });
   });
 });
