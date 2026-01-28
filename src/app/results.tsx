@@ -2310,16 +2310,40 @@ function ResultsSuccess({
     // CRITICAL: Solo mode gating - only fetch when:
     // 1. Trust filter finalized + wardrobe summary ready
     // 2. Wardrobe has items (wardrobeCount > 0)
-    // 3. No HIGH matches AND no NEAR matches (0+0)
+    // 3. No CORE HIGH matches AND no CORE NEAR matches (0+0)
+    // NOTE: Add-on matches (outerwear, bags, accessories) don't count - they can't form complete outfits
+    const coreHighMatches = trustFilterResult.finalized.highFinal.filter(m =>
+      isCoreCategory(m.wardrobeItem.category as Category)
+    );
+    const coreNearMatches = trustFilterResult.finalized.nearFinal.filter(m =>
+      isCoreCategory(m.wardrobeItem.category as Category)
+    );
+    
     const canFetchSoloAi =
       trustFilterResult.isFullyReady &&
       wardrobeSummary?.updated_at &&
       wardrobeCount > 0 &&
-      trustFilterResult.finalized.highFinal.length === 0 &&
-      trustFilterResult.finalized.nearFinal.length === 0;
+      coreHighMatches.length === 0 &&
+      coreNearMatches.length === 0;
     
-    // Paired mode: need at least one high match
-    const canFetchPairedAi = trustFilterResult.finalized.highFinal.length > 0;
+    // Paired mode: need at least one CORE high match
+    const canFetchPairedAi = coreHighMatches.length > 0;
+    
+    // Debug: Log solo mode detection with core vs all matches
+    if (__DEV__ && trustFilterResult.isFullyReady) {
+      const totalHigh = trustFilterResult.finalized.highFinal.length;
+      const totalNear = trustFilterResult.finalized.nearFinal.length;
+      if (totalHigh !== coreHighMatches.length || totalNear !== coreNearMatches.length) {
+        console.log('[Solo Mode] Core filtering:', {
+          totalHigh,
+          coreHigh: coreHighMatches.length,
+          totalNear,
+          coreNear: coreNearMatches.length,
+          isSoloMode: canFetchSoloAi,
+          addOnMatches: totalHigh - coreHighMatches.length,
+        });
+      }
+    }
     
     // Exit if neither mode is eligible
     if (!canFetchSoloAi && !canFetchPairedAi) {
@@ -2343,10 +2367,11 @@ function ResultsSuccess({
 
     // Fetch suggestions (async, fail-open)
     // For solo mode: pass empty highFinal array
+    // For paired mode: pass CORE matches only (AI should reason about outfit-forming pieces)
     fetchPersonalizedSuggestions({
       scanId: currentCheckId,
       scanSignals: trustFilterResult.scanSignals,
-      highFinal: isSoloMode ? [] : trustFilterResult.finalized.highFinal,
+      highFinal: isSoloMode ? [] : coreHighMatches,
       wardrobeSummary,
       intent,
       scanCategory: scannedItem?.category ?? null,
@@ -2367,8 +2392,8 @@ function ResultsSuccess({
       });
   }, [
     trustFilterResult.isFullyReady,
-    trustFilterResult.finalized.highFinal.length,
-    trustFilterResult.finalized.nearFinal.length,
+    trustFilterResult.finalized.highFinal, // Core filtering happens inside effect
+    trustFilterResult.finalized.nearFinal, // Core filtering happens inside effect
     trustFilterResult.scanSignals,
     currentCheckId,
     wardrobeSummary?.updated_at,
@@ -2839,13 +2864,21 @@ function ResultsSuccess({
   };
 
   // CRITICAL: Derive solo mode from gating conditions
-  // Solo mode: 0 HIGH + 0 NEAR matches but wardrobe > 0
+  // Solo mode: 0 CORE HIGH + 0 CORE NEAR matches but wardrobe > 0
+  // Add-on matches (outerwear, bags, accessories) don't count - they can't form complete outfits
+  const coreHighMatches = trustFilterResult.finalized.highFinal.filter(m =>
+    isCoreCategory(m.wardrobeItem.category as Category)
+  );
+  const coreNearMatches = trustFilterResult.finalized.nearFinal.filter(m =>
+    isCoreCategory(m.wardrobeItem.category as Category)
+  );
+  
   const isSoloMode =
     trustFilterResult.isFullyReady &&
     wardrobeSummary?.updated_at &&
     wardrobeCount > 0 &&
-    trustFilterResult.finalized.highFinal.length === 0 &&
-    trustFilterResult.finalized.nearFinal.length === 0;
+    coreHighMatches.length === 0 &&
+    coreNearMatches.length === 0;
 
   // Build styling suggestion rows - tab-aware (Mode A for HIGH, Mode B for NEAR)
   const helpfulAdditionRows: GuidanceRowModel[] = useMemo(() => {

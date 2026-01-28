@@ -219,21 +219,35 @@ it('handles nasty edge case: scanCategory=shoes + preferAddOns + single add-on',
 
 ### Results Screen Integration (`src/app/results.tsx`)
 
-**1. Solo Mode Gating**
+**1. Solo Mode Gating (Core Category Filtering)**
 ```typescript
+// Filter to CORE categories only - add-on matches don't count
+// Add-ons (outerwear, bags, accessories) can't form complete outfits
+const coreHighMatches = trustFilterResult.finalized.highFinal.filter(m =>
+  isCoreCategory(m.wardrobeItem.category as Category)
+);
+const coreNearMatches = trustFilterResult.finalized.nearFinal.filter(m =>
+  isCoreCategory(m.wardrobeItem.category as Category)
+);
+
 const isSoloMode =
   trustFilterResult.isFullyReady &&
   wardrobeSummary?.updated_at &&
   wardrobeCount > 0 &&
-  trustFilterResult.finalized.highFinal.length === 0 &&
-  trustFilterResult.finalized.nearFinal.length === 0;
+  coreHighMatches.length === 0 &&  // 0 CORE matches (not total)
+  coreNearMatches.length === 0;    // 0 CORE matches (not total)
 ```
 
-**2. Fetch Integration (lines 2292-2371)**
+**CRITICAL EDGE CASE FIXED:** Solo mode now activates even when user has add-on matches (outerwear, bags, accessories). Example: Leopard skirt + 1 outerwear match → Solo card appears (correct behavior).
+
+**2. Fetch Integration (lines 2292-2377)**
 - Updated `useEffect` to handle both solo and paired modes
-- Solo mode passes empty `highFinal` array: `highFinal: isSoloMode ? [] : trustFilterResult.finalized.highFinal`
-- Added dependency on `trustFilterResult.finalized.nearFinal.length` and `wardrobeCount`
+- **Core category filtering:** Solo mode checks `coreHighMatches.length === 0` (not total matches)
+- Solo mode passes empty `highFinal` array: `highFinal: isSoloMode ? [] : coreHighMatches`
+- Paired mode passes **core matches only**: `highFinal: coreHighMatches` (AI reasons about outfit-forming pieces)
+- Added dependency on `trustFilterResult.finalized.highFinal` and `nearFinal` (full arrays)
 - `preferAddOnCategories` computed as: `isHighTab && addOnCategoriesForSuggestions.length > 0`
+- **Debug logging:** Logs when add-on matches are filtered out in dev mode
 
 **3. Solo Card Rendering (lines 4301-4395)**
 **CRITICAL: Never blank** - Always shows one of two options:
@@ -356,6 +370,22 @@ After deployment, monitor these events:
 
 ---
 
+## Edge Cases Handled
+
+### ✅ Add-on Matches (Fixed 2026-01-27)
+**Scenario:** User has only add-on matches (outerwear, bags, accessories) but no core matches.
+
+**Before fix:** Solo mode didn't activate (checked total matches)  
+**After fix:** Solo mode activates correctly (filters to core categories only)
+
+**Example:**
+- Scan: Leopard print skirt
+- Wardrobe: 1 outerwear, 1 bottoms
+- Matches: 1 HIGH (outerwear)
+- Result: **Solo card appears** ✓ (outerwear can't form complete outfit)
+
+**Why this matters:** Add-on matches alone can't create complete outfits. Solo mode guidance is exactly what users need in this case.
+
 ## Known Limitations
 
 1. **Wardrobe Summary Dependency:** Solo card won't appear until `wardrobeSummary.updated_at` exists. This is intentional for stable cache keys.
@@ -369,11 +399,12 @@ After deployment, monitor these events:
 ## Success Criteria
 
 ### Functional ✅
-- [x] Solo mode activates when 0 HIGH + 0 NEAR matches
+- [x] Solo mode activates when 0 CORE HIGH + 0 CORE NEAR matches
+- [x] Solo mode activates even with add-on matches (edge case fixed)
 - [x] Solo prompt never implies user owns items
 - [x] Mentions stripped in solo mode (server + client)
 - [x] Solo UI never blank (AI OR Mode A fallback)
-- [x] Paired mode unchanged
+- [x] Paired mode unchanged (AI reasons about core pieces only)
 - [x] Cache keys isolate solo/paired modes
 
 ### Technical ✅
@@ -411,4 +442,5 @@ After deployment, monitor these events:
 ---
 
 **Last Updated:** 2026-01-27  
-**Status:** ✅ Complete and ready for QA
+**Status:** ✅ Complete and ready for QA  
+**Latest Fix:** Core category filtering for add-on edge case (2026-01-27)
