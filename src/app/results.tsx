@@ -2884,12 +2884,17 @@ function ResultsSuccess({
   const helpfulAdditionRows: GuidanceRowModel[] = useMemo(() => {
     const iconProps = { size: 20, color: colors.text.secondary, strokeWidth: 1.75 };
 
-    // HIGH tab: If AI suggestions are loading or present, suppress Mode A
+    // HIGH tab OR SOLO mode: If AI suggestions are loading or present, suppress Mode A
     // Mode A becomes the fallback only when AI suggestions fail/timeout
     // SOLO MODE: Mode A shown only when AI fails (never blank)
-    if (isHighTab && (suggestionsLoading || (suggestionsResult?.ok && suggestionsResult.data))) {
+    const shouldSuppressModeA = 
+      (isHighTab || isSoloMode) && 
+      (suggestionsLoading || (suggestionsResult?.ok && suggestionsResult.data));
+    
+    if (shouldSuppressModeA) {
       if (__DEV__) {
-        console.log('[helpfulAdditionRows] AI suggestions loading/present on HIGH → suppressing Mode A');
+        const reason = isSoloMode ? 'SOLO mode' : 'HIGH tab';
+        console.log(`[helpfulAdditionRows] AI suggestions loading/present on ${reason} → suppressing Mode A`);
       }
       return []; // AI suggestions are the "premium stylist layer"
     }
@@ -3029,7 +3034,7 @@ function ResultsSuccess({
     // Note: Using selectedNearOutfit?.id instead of full object to avoid extra renders
     // when the object reference changes but the selection is the same outfit
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHighTab, tabsState.nearTab.nearMatches, selectedNearOutfit?.id, selectedNearOutfit?.candidates, confidenceResult.uiVibeForCopy, confidenceResult.modeASuggestions, wardrobeCount, suggestionsResult, suggestionsLoading]);
+  }, [isHighTab, isSoloMode, tabsState.nearTab.nearMatches, selectedNearOutfit?.id, selectedNearOutfit?.candidates, confidenceResult.uiVibeForCopy, confidenceResult.modeASuggestions, wardrobeCount, suggestionsResult, suggestionsLoading]);
 
   // DEBUG: Log helpfulAdditionRows result
   if (__DEV__ && confidenceResult.evaluated) {
