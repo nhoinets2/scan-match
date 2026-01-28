@@ -217,6 +217,8 @@ it('handles nasty edge case: scanCategory=shoes + preferAddOns + single add-on',
 
 **Lines modified:** 25-29 (props), 213-223 (logic), 230-249 (rendering)
 
+**Note:** Component already handled empty mentions correctly - no additional changes needed.
+
 ### Results Screen Integration (`src/app/results.tsx`)
 
 **1. Solo Mode Gating (Core Category Filtering)**
@@ -249,7 +251,14 @@ const isSoloMode =
 - `preferAddOnCategories` computed as: `isHighTab && addOnCategoriesForSuggestions.length > 0`
 - **Debug logging:** Logs when add-on matches are filtered out in dev mode
 
-**3. Solo Card Rendering (lines 4301-4395)**
+**3. Mode A Suppression (lines 2884-2900, 3037)**
+- **Fixed:** Mode A suppression now accounts for solo mode
+- Previous: Only suppressed on HIGH tab (`if (isHighTab && suggestionsLoading)`)
+- Current: Suppresses on HIGH tab OR solo mode (`if ((isHighTab || isSoloMode) && suggestionsLoading)`)
+- Added `isSoloMode` to `useMemo` dependencies for `helpfulAdditionRows`
+- **Debug logging:** Shows whether suppressing for "HIGH tab" or "SOLO mode"
+
+**4. Solo Card Rendering (lines 4301-4395)**
 **CRITICAL: Never blank** - Always shows one of two options:
 ```tsx
 {isSoloMode && (
@@ -269,7 +278,7 @@ const isSoloMode =
 
 **Placement:** Solo card renders after Item Summary Card (verdict), before Matches section
 
-**4. Type Safety**
+**5. Type Safety**
 - Added `AddOnCategory` type import to fix TypeScript compilation
 
 ---
@@ -386,6 +395,31 @@ After deployment, monitor these events:
 
 **Why this matters:** Add-on matches alone can't create complete outfits. Solo mode guidance is exactly what users need in this case.
 
+### ✅ Mode A Suppression in Solo Mode (Fixed 2026-01-27)
+**Scenario:** Solo mode activates and shows solo AI card, but Mode A bullets also appear in "Make it work" section.
+
+**Before fix:** Mode A suppression only checked `isHighTab` (solo mode users are on NEAR tab)  
+**After fix:** Mode A suppression checks `isHighTab OR isSoloMode`
+
+**Root cause:** When no tabs are visible (0 matches scenario), user is on NEAR tab by default. Previous logic:
+```typescript
+if (isHighTab && suggestionsLoading) { suppress Mode A }
+// isHighTab = false in solo mode → Mode A not suppressed!
+```
+
+**Fixed logic:**
+```typescript
+const shouldSuppressModeA = 
+  (isHighTab || isSoloMode) && 
+  (suggestionsLoading || suggestionsResult?.ok);
+// Now suppresses Mode A in solo mode ✓
+```
+
+**Result:**
+- Solo mode: Shows solo AI card only (Mode A suppressed) ✓
+- Solo mode failure: Shows Mode A bullets as fallback (never blank) ✓
+- Paired mode: Unchanged (Mode A suppressed on HIGH tab) ✓
+
 ## Known Limitations
 
 1. **Wardrobe Summary Dependency:** Solo card won't appear until `wardrobeSummary.updated_at` exists. This is intentional for stable cache keys.
@@ -443,4 +477,6 @@ After deployment, monitor these events:
 
 **Last Updated:** 2026-01-27  
 **Status:** ✅ Complete and ready for QA  
-**Latest Fix:** Core category filtering for add-on edge case (2026-01-27)
+**Latest Fixes:** 
+- Core category filtering for add-on edge case (2026-01-27)
+- Mode A suppression in solo mode (2026-01-27)
