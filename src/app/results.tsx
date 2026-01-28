@@ -94,6 +94,7 @@ import {
   RecentCheck,
   isAddOnCategory,
   type AddOnItem,
+  type AddOnCategory,
 } from "@/lib/types";
 import { colors, spacing, typography, borderRadius, shadows, cards, button, components } from "@/lib/design-tokens";
 import { getTextStyle } from "@/lib/typography-helpers";
@@ -2289,7 +2290,7 @@ function ResultsSuccess({
     return categories;
   }, [isHighTab, confidenceResult.evaluated, confidenceResult.showMatchesSection, confidenceResult.matches]);
 
-  // Fetch suggestions when trust filter is ready and we have matches
+  // Fetch suggestions when trust filter is ready and we have matches (paired mode) or solo mode conditions are met
   useEffect(() => {
     // Wait for trust filter to be fully ready (TF + AI Safety complete)
     if (!trustFilterResult.isFullyReady) {
@@ -2301,17 +2302,34 @@ function ResultsSuccess({
       return;
     }
     
-    // Need at least one high match
-    if (trustFilterResult.finalized.highFinal.length === 0) {
+    // Need wardrobe summary (required for stable cache key)
+    if (!wardrobeSummary?.updated_at) {
+      return;
+    }
+    
+    // CRITICAL: Solo mode gating - only fetch when:
+    // 1. Trust filter finalized + wardrobe summary ready
+    // 2. Wardrobe has items (wardrobeCount > 0)
+    // 3. No HIGH matches AND no NEAR matches (0+0)
+    const canFetchSoloAi =
+      trustFilterResult.isFullyReady &&
+      wardrobeSummary?.updated_at &&
+      wardrobeCount > 0 &&
+      trustFilterResult.finalized.highFinal.length === 0 &&
+      trustFilterResult.finalized.nearFinal.length === 0;
+    
+    // Paired mode: need at least one high match
+    const canFetchPairedAi = trustFilterResult.finalized.highFinal.length > 0;
+    
+    // Exit if neither mode is eligible
+    if (!canFetchSoloAi && !canFetchPairedAi) {
       setSuggestionsResult(null);
       setSuggestionsLoading(false);
       return;
     }
     
-    // Need wardrobe summary
-    if (!wardrobeSummary) {
-      return;
-    }
+    // Derive mode for passing to components (used later in render logic)
+    const isSoloMode = canFetchSoloAi;
     
     // Determine intent based on scan context
     const intent: "shopping" | "own_item" = fromScan ? "own_item" : "shopping";
@@ -2319,14 +2337,16 @@ function ResultsSuccess({
     // Start loading
     setSuggestionsLoading(true);
     
+    // CRITICAL: preferAddOnCategories only true if strip actually exists AND has categories
     const preferAddOnCategories =
       isHighTab && addOnCategoriesForSuggestions.length > 0;
 
     // Fetch suggestions (async, fail-open)
+    // For solo mode: pass empty highFinal array
     fetchPersonalizedSuggestions({
       scanId: currentCheckId,
       scanSignals: trustFilterResult.scanSignals,
-      highFinal: trustFilterResult.finalized.highFinal,
+      highFinal: isSoloMode ? [] : trustFilterResult.finalized.highFinal,
       wardrobeSummary,
       intent,
       scanCategory: scannedItem?.category ?? null,
@@ -2348,9 +2368,11 @@ function ResultsSuccess({
   }, [
     trustFilterResult.isFullyReady,
     trustFilterResult.finalized.highFinal.length,
+    trustFilterResult.finalized.nearFinal.length,
     trustFilterResult.scanSignals,
     currentCheckId,
-    wardrobeSummary,
+    wardrobeSummary?.updated_at,
+    wardrobeCount,
     fromScan,
     scannedItem?.category,
     isHighTab,
@@ -2816,12 +2838,22 @@ function ResultsSuccess({
     );
   };
 
+  // CRITICAL: Derive solo mode from gating conditions
+  // Solo mode: 0 HIGH + 0 NEAR matches but wardrobe > 0
+  const isSoloMode =
+    trustFilterResult.isFullyReady &&
+    wardrobeSummary?.updated_at &&
+    wardrobeCount > 0 &&
+    trustFilterResult.finalized.highFinal.length === 0 &&
+    trustFilterResult.finalized.nearFinal.length === 0;
+
   // Build styling suggestion rows - tab-aware (Mode A for HIGH, Mode B for NEAR)
   const helpfulAdditionRows: GuidanceRowModel[] = useMemo(() => {
     const iconProps = { size: 20, color: colors.text.secondary, strokeWidth: 1.75 };
 
     // HIGH tab: If AI suggestions are loading or present, suppress Mode A
     // Mode A becomes the fallback only when AI suggestions fail/timeout
+    // SOLO MODE: Mode A shown only when AI fails (never blank)
     if (isHighTab && (suggestionsLoading || (suggestionsResult?.ok && suggestionsResult.data))) {
       if (__DEV__) {
         console.log('[helpfulAdditionRows] AI suggestions loading/present on HIGH → suppressing Mode A');
@@ -4262,6 +4294,104 @@ function ResultsSuccess({
               )}
             </Pressable>
           </Animated.View>
+
+          {/* Solo AI Card OR Mode A Fallback - CRITICAL: never blank */}
+          {/* Solo mode: 0 HIGH + 0 NEAR matches but wardrobe > 0 */}
+          {/* Show AI card (loading/ok) OR Mode A fallback when AI fails */}
+          {isSoloMode && (
+            <>
+              {/* Show AI card while loading or on success */}
+              {(suggestionsLoading || suggestionsResult?.ok) && (
+                <Animated.View entering={FadeIn.delay(400)} style={{ marginBottom: spacing.md }}>
+                  <PersonalizedSuggestionsCard
+                    suggestions={suggestionsResult?.ok ? suggestionsResult.data : null}
+                    isLoading={suggestionsLoading}
+                    wardrobeItemsById={wardrobeItemsById}
+                    isSoloMode={true}
+                  />
+                </Animated.View>
+              )}
+              
+              {/* Mode A fallback when AI failed/timed out (not loading, not ok) */}
+              {!suggestionsLoading && !suggestionsResult?.ok && helpfulAdditionRows.length > 0 && (
+                <Animated.View entering={FadeInDown.delay(350)} style={{ marginBottom: spacing.md }}>
+                  <Text
+                    style={{
+                      ...typography.ui.sectionTitle,
+                      color: colors.text.primary,
+                      marginBottom: spacing.lg,
+                      paddingHorizontal: spacing.xs,
+                    }}
+                  >
+                    {RESULTS_COPY.sections.whatToAddFirst}
+                  </Text>
+                  <View
+                    style={{
+                      backgroundColor: cards.standard.backgroundColor,
+                      borderWidth: cards.standard.borderWidth,
+                      borderColor: cards.standard.borderColor,
+                      borderRadius: cards.standard.borderRadius,
+                      overflow: "hidden",
+                    }}
+                  >
+                    {helpfulAdditionRows.map((row, index) => {
+                      const hasTipSheet = !!row.bulletKey;
+                      const tipSheetMode = row.id.startsWith('mode-b-') ? 'B' : 'A';
+
+                      return (
+                        <Pressable
+                          key={row.id}
+                          onPress={() => {
+                            if (hasTipSheet && row.bulletKey) {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              setSelectedTipSheet({
+                                bulletKey: row.bulletKey,
+                                mode: tipSheetMode,
+                                title: row.title,
+                                targetCategory: row.targetCategory,
+                              });
+                            }
+                          }}
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            paddingVertical: 14,
+                            paddingHorizontal: spacing.md,
+                            borderBottomWidth: index < helpfulAdditionRows.length - 1 ? 1 : 0,
+                            borderBottomColor: colors.border.hairline,
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: spacing.xl - 4,
+                              height: spacing.xl - 4,
+                              borderRadius: borderRadius.image,
+                              backgroundColor: colors.accent.terracottaLight,
+                              alignItems: "center",
+                              justifyContent: "center",
+                              marginRight: spacing.sm,
+                            }}
+                          >
+                            {row.leadingIcon}
+                          </View>
+                          <Text
+                            style={{
+                              flex: 1,
+                              ...typography.ui.bodyMedium,
+                              color: colors.text.primary,
+                            }}
+                          >
+                            {row.title}
+                          </Text>
+                          <ChevronRight size={18} color={colors.text.tertiary} />
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </Animated.View>
+              )}
+            </>
+          )}
 
           {/* Matches section - tab-aware: HIGH matches on HIGH tab, NEAR matches on NEAR tab */}
           {/* For HIGH tab: show if showMatchesSection (from render model) */}
