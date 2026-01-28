@@ -30,6 +30,14 @@ export type Category =
   | "skirts"
   | "unknown"; // Non-fashion items
 
+/** Add-on categories only - subset of Category for optional items */
+export type AddOnCategory = "outerwear" | "bags" | "accessories";
+
+/** Type guard for add-on categories - DEFINE HERE ONLY, import elsewhere */
+export function isAddOnCategory(cat: string): cat is AddOnCategory {
+  return cat === "outerwear" || cat === "bags" || cat === "accessories";
+}
+
 export type FitPreference = "oversized" | "regular" | "slim";
 
 // ============================================
@@ -225,6 +233,15 @@ export type ItemSignals =
 export interface ColorInfo {
   hex: string;
   name: string;
+}
+
+export interface AddOnItem {
+  id: string;
+  imageUri?: string;
+  category: AddOnCategory;
+  colors?: ColorInfo[];
+  detectedLabel?: string;
+  userStyleTags?: StyleVibe[];
 }
 
 // Auto-analyzed attributes from image analysis
