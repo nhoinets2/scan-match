@@ -3834,27 +3834,6 @@ function ResultsSuccess({
           fromScan={fromScan}
           isReopen={isReopeningCheck}
         />
-        {/* DEBUG UI - shows Trust Filter state on screen */}
-        {__DEV__ && (
-          <View style={{ 
-            position: 'absolute', 
-            bottom: 100, 
-            left: 10, 
-            right: 10, 
-            backgroundColor: 'rgba(0,0,0,0.9)', 
-            padding: 10,
-            borderRadius: 8,
-          }}>
-            <Text style={{ color: '#0f0', fontSize: 11, fontFamily: 'monospace' }}>
-              DEBUG TF STATE:{'\n'}
-              isFullyReady: {String(trustFilterResult.isFullyReady)}{'\n'}
-              isLoading: {String(trustFilterResult.isLoading)}{'\n'}
-              wasApplied: {String(trustFilterResult.wasApplied)}{'\n'}
-              hasScanSignals: {String(!!trustFilterResult.scanSignals)}{'\n'}
-              finalized: {String(!!trustFilterResult.finalized)}{'\n'}
-            </Text>
-          </View>
-        )}
       </View>
     );
   }
