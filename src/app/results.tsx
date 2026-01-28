@@ -1962,6 +1962,7 @@ function ResultsSuccess({
   const [showScanSavedToast, setShowScanSavedToast] = useState(false);
   const [showScanUnsavedToast, setShowScanUnsavedToast] = useState(false);
   const [saveError, setSaveError] = useState<'network' | 'other' | null>(null);
+  const [showLoadingTimeoutModal, setShowLoadingTimeoutModal] = useState(false);
   const { data: storePreference } = useStorePreference();
   const updateStorePreference = useUpdateStorePreference();
   const { data: tailorCardSeen } = useTailorCardSeen();
@@ -2022,6 +2023,12 @@ function ResultsSuccess({
   const hasTrackedScan = useRef(false);
   const hasTrackedFirstMatch = useRef(false);
   const hasTrackedNoMatch = useRef(false);
+
+  // Loading timeout refs (for connection issue detection)
+  const LOADING_TIMEOUT_MS = 15000;
+  const timeoutShownRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const isReadyRef = useRef(false);
 
   // Reset image error state when image URI changes
   useEffect(() => {
@@ -2096,6 +2103,46 @@ function ResultsSuccess({
       });
     }
   }, [confidenceResult, trustFilterResult]);
+
+  // Keep isReadyRef in sync with Trust Filter ready state
+  useEffect(() => {
+    isReadyRef.current = trustFilterResult.isFullyReady;
+  }, [trustFilterResult.isFullyReady]);
+
+  // Track component mount state to prevent post-unmount errors
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Loading timeout: If Trust Filter + AI Safety hang (likely connection issue),
+  // show error alert and dismiss screen after 15 seconds
+  useEffect(() => {
+    if (trustFilterResult.isFullyReady) return;
+    if (timeoutShownRef.current) return;
+
+    const timeoutId = setTimeout(() => {
+      // Double-check conditions (might have resolved during timeout delay)
+      if (!isMountedRef.current) return;
+      if (isReadyRef.current) return;
+      if (timeoutShownRef.current) return;
+
+      timeoutShownRef.current = true;
+
+      console.warn('[Results] Loading timeout after 15s - connection issue suspected');
+
+      // TODO: Add telemetry event when analytics system supports it
+      // trackEvent('results_loading_timeout', {
+      //   from: isViewingSavedCheck ? 'history' : 'fresh_scan',
+      //   timeout_ms: LOADING_TIMEOUT_MS,
+      // });
+
+      setShowLoadingTimeoutModal(true);
+    }, LOADING_TIMEOUT_MS);
+
+    return () => clearTimeout(timeoutId);
+  }, [trustFilterResult.isFullyReady, isViewingSavedCheck, router]);
 
   // ============================================
   // SAVE FINALIZED MATCH COUNTS
@@ -5532,6 +5579,93 @@ function ResultsSuccess({
               <ButtonTertiary
                 label="Close"
                 onPress={() => setSaveError(null)}
+              />
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Loading timeout modal (connection issue) */}
+      <Modal
+        visible={showLoadingTimeoutModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowLoadingTimeoutModal(false);
+          router.replace(isViewingSavedCheck ? '/(tabs)/' : '/scan');
+        }}
+      >
+        <Pressable 
+          style={{ 
+            flex: 1, 
+            backgroundColor: colors.overlay.dark, 
+            justifyContent: "center", 
+            alignItems: "center",
+            padding: spacing.lg,
+          }}
+          onPress={() => {
+            setShowLoadingTimeoutModal(false);
+            router.replace(isViewingSavedCheck ? '/(tabs)/' : '/scan');
+          }}
+        >
+          <Pressable 
+            onPress={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: cards.elevated.backgroundColor,
+              borderRadius: cards.elevated.borderRadius,
+              padding: spacing.lg,
+              width: "100%",
+              maxWidth: 340,
+              alignItems: "center",
+              ...shadows.lg,
+            }}
+          >
+            {/* Icon */}
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: colors.verdict.okay.bg,
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: spacing.md,
+              }}
+            >
+              <WifiOff size={28} color={colors.verdict.okay.text} strokeWidth={2} />
+            </View>
+
+            {/* Title */}
+            <Text
+              style={{
+                ...typography.ui.cardTitle,
+                textAlign: "center",
+                marginBottom: spacing.sm,
+              }}
+            >
+              Connection unavailable
+            </Text>
+
+            {/* Subtitle */}
+            <Text
+              style={{
+                ...typography.ui.body,
+                color: colors.text.secondary,
+                textAlign: "center",
+                marginBottom: spacing.xl,
+              }}
+            >
+              Please check your internet and try again.
+            </Text>
+
+            {/* Button */}
+            <View style={{ width: "100%" }}>
+              <ButtonPrimary
+                label="Got it"
+                onPress={() => {
+                  setShowLoadingTimeoutModal(false);
+                  router.replace(isViewingSavedCheck ? '/(tabs)/' : '/scan');
+                }}
               />
             </View>
           </Pressable>

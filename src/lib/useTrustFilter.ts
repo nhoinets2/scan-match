@@ -307,6 +307,7 @@ export function useTrustFilter(
             if (isLocalImage && scanImageUri) {
               // For local images (unsaved scans), use direct generation with base64
               const response = await generateScanStyleSignalsDirect(scanImageUri);
+              
               if (__DEV__) {
                 console.log('[TF] Direct generation:', response.ok ? 'SUCCESS' : `FAILED (${response.error?.kind})`);
               }
@@ -518,8 +519,17 @@ export function useTrustFilter(
     // If still loading OR signals haven't been fetched yet, return loading state
     // This prevents showing "kept by insufficient_info" results before signals are available
     // The signalsFetched flag ensures we wait for the fetch attempt to complete
-    const needsSignals = !signalsFetched && matches.length > 0;
-    if (isLoading || needsSignals) {
+    // 
+    // SAFETY: Check signalsFetchTimeout to prevent infinite loading on connection loss
+    // In normal flow (online), signalsFetchTimeout is always false, so:
+    //   - effectivelyLoading = isLoading && true = isLoading (unchanged)
+    //   - needsSignals = !signalsFetched && true && matches > 0 (unchanged)
+    // Only when timeout fires (offline 10s+), signalsFetchTimeout = true, which:
+    //   - effectivelyLoading = isLoading && false = false (stops waiting)
+    //   - needsSignals = !signalsFetched && false && matches > 0 = false (stops waiting)
+    const effectivelyLoading = isLoading && !signalsFetchTimeout;
+    const needsSignals = !signalsFetched && !signalsFetchTimeout && matches.length > 0;
+    if (effectivelyLoading || needsSignals) {
       const nearFromCE = convertCeNearMatches();
       const finalized = buildEarlyFinalized(matches, nearFromCE, false, true, null);
       return {
