@@ -110,6 +110,9 @@ import type { AssembledCombo } from "@/lib/combo-assembler";
 import { useResultsTabs, type ResultsTab } from "@/lib/useResultsTabs";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { MissingPiecesCard } from "@/components/MissingPiecesCard";
+import { PersonalizedSuggestionsCard } from "@/components/PersonalizedSuggestionsCard";
+import { fetchPersonalizedSuggestions, type SuggestionsResult } from "@/lib/personalized-suggestions-service";
+import type { PersonalizedSuggestions, WardrobeSummary } from "@/lib/types";
 import {
   buildResultsRenderModel,
   shouldUseLegacyEngine,
@@ -1119,6 +1122,9 @@ function MatchesBottomSheet({
   onItemPress,
   demotedItemIds,
   trustFilterApplied,
+  suggestionsResult,
+  suggestionsLoading,
+  wardrobeItemsById,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -1132,6 +1138,12 @@ function MatchesBottomSheet({
   demotedItemIds?: Set<string>;
   /** Whether Trust Filter was applied (for debug UI) */
   trustFilterApplied?: boolean;
+  /** Personalized suggestions result (shared state) */
+  suggestionsResult?: SuggestionsResult | null;
+  /** Loading state for suggestions */
+  suggestionsLoading?: boolean;
+  /** Map of wardrobe items by ID for efficient lookup */
+  wardrobeItemsById?: Map<string, WardrobeItem>;
 }) {
   const insets = useSafeAreaInsets();
   // Internal state for viewing images - no external modal needed
@@ -1441,6 +1453,17 @@ function MatchesBottomSheet({
                       </Pressable>
                     );
                   })}
+                  
+                  {/* Personalized Suggestions in bottom sheet (if available) */}
+                  {(suggestionsLoading || (suggestionsResult?.ok && suggestionsResult.data)) && matchType === "high" && (
+                    <View style={{ paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.sm }}>
+                      <PersonalizedSuggestionsCard
+                        suggestions={suggestionsResult?.ok ? suggestionsResult.data : null}
+                        isLoading={suggestionsLoading ?? false}
+                        wardrobeItemsById={wardrobeItemsById ?? new Map()}
+                      />
+                    </View>
+                  )}
                 </ScrollView>
               </View>
             </View>
@@ -1956,6 +1979,10 @@ function ResultsSuccess({
   const [photoViewerUri, setPhotoViewerUri] = useState<string | null>(null);
   const [photoViewerSource, setPhotoViewerSource] = useState<'main' | 'bottomSheet' | null>(null);
 
+  // Personalized suggestions state (shared between main view + bottom sheet)
+  const [suggestionsResult, setSuggestionsResult] = useState<SuggestionsResult | null>(null);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+
   // Control bottom sheet rendering to prevent animation artifacts
   useEffect(() => {
     if (showMatchesSheet) {
@@ -2147,6 +2174,132 @@ function ResultsSuccess({
   const demotedItemIds = useMemo(() => {
     return new Set(trustFilterResult.demotedMatches.map(m => m.wardrobeItem.id));
   }, [trustFilterResult.demotedMatches]);
+
+  // ============================================
+  // PERSONALIZED SUGGESTIONS
+  // ============================================
+  // Fetch AI-generated suggestions (why_it_works + to_elevate bullets)
+  // Uses cache-first strategy, fails open (no UI if timeout/error)
+  
+  // Build wardrobe summary for suggestions context
+  const wardrobeSummary = useMemo<WardrobeSummary | null>(() => {
+    if (!wardrobe || wardrobe.length === 0) return null;
+    
+    // Count by category
+    const by_category: Record<Category, number> = {
+      tops: 0,
+      bottoms: 0,
+      shoes: 0,
+      outerwear: 0,
+      dresses: 0,
+      accessories: 0,
+      bags: 0,
+      skirts: 0,
+      unknown: 0,
+    };
+    
+    wardrobe.forEach((item) => {
+      const cat = item.category as Category;
+      if (cat in by_category) {
+        by_category[cat]++;
+      }
+    });
+    
+    // Extract dominant aesthetics from wardrobe (top 2-3)
+    const aestheticCounts = new Map<string, number>();
+    wardrobe.forEach((item) => {
+      const aesthetic = item.style_signals_v1?.aesthetic?.primary;
+      if (aesthetic) {
+        aestheticCounts.set(aesthetic, (aestheticCounts.get(aesthetic) || 0) + 1);
+      }
+    });
+    
+    const dominant_aesthetics = Array.from(aestheticCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([aesthetic]) => aesthetic as any);
+    
+    // Use most recent wardrobe item's updated timestamp as wardrobe updated_at
+    // This ensures cache invalidates when wardrobe changes
+    const mostRecent = wardrobe.reduce((latest, item) => 
+      item.createdAt > latest ? item.createdAt : latest, 0
+    );
+    
+    return {
+      total: wardrobe.length,
+      by_category,
+      dominant_aesthetics,
+      updated_at: new Date(mostRecent).toISOString(),
+    };
+  }, [wardrobe]);
+  
+  // Create wardrobeItemsById map for efficient lookup in UI
+  const wardrobeItemsById = useMemo(() => {
+    const map = new Map<string, WardrobeItem>();
+    wardrobe?.forEach((item) => {
+      map.set(item.id, item);
+    });
+    return map;
+  }, [wardrobe]);
+  
+  // Fetch suggestions when trust filter is ready and we have matches
+  useEffect(() => {
+    // Wait for trust filter to be fully ready (TF + AI Safety complete)
+    if (!trustFilterResult.isFullyReady) {
+      return;
+    }
+    
+    // Need valid scan ID and signals from Trust Filter
+    if (!currentCheckId || !trustFilterResult.scanSignals) {
+      return;
+    }
+    
+    // Need at least one high match
+    if (trustFilterResult.finalized.highFinal.length === 0) {
+      setSuggestionsResult(null);
+      setSuggestionsLoading(false);
+      return;
+    }
+    
+    // Need wardrobe summary
+    if (!wardrobeSummary) {
+      return;
+    }
+    
+    // Determine intent based on scan context
+    const intent: "shopping" | "own_item" = fromScan ? "own_item" : "shopping";
+    
+    // Start loading
+    setSuggestionsLoading(true);
+    
+    // Fetch suggestions (async, fail-open)
+    fetchPersonalizedSuggestions({
+      scanId: currentCheckId,
+      scanSignals: trustFilterResult.scanSignals,
+      highFinal: trustFilterResult.finalized.highFinal,
+      wardrobeSummary,
+      intent,
+    })
+      .then((result) => {
+        setSuggestionsResult(result);
+        setSuggestionsLoading(false);
+      })
+      .catch((err) => {
+        // Fail-open: log error but don't show error UI
+        if (__DEV__) {
+          console.log('[Suggestions] Fetch failed:', err);
+        }
+        setSuggestionsResult(null);
+        setSuggestionsLoading(false);
+      });
+  }, [
+    trustFilterResult.isFullyReady,
+    trustFilterResult.finalized.highFinal.length,
+    trustFilterResult.scanSignals,
+    currentCheckId,
+    wardrobeSummary,
+    fromScan,
+  ]);
 
   // ComboAssembler: Generate outfit combos from finalized matches
   // IMPORTANT: Uses trustFilterResult.finalized to respect TF + AI Safety decisions
@@ -2635,6 +2788,15 @@ function ResultsSuccess({
   const helpfulAdditionRows: GuidanceRowModel[] = useMemo(() => {
     const iconProps = { size: 20, color: colors.text.secondary, strokeWidth: 1.75 };
 
+    // HIGH tab: If AI suggestions are present, suppress Mode A (premium layer wins)
+    // Mode A becomes the fallback when AI suggestions fail/timeout
+    if (isHighTab && suggestionsResult?.ok && suggestionsResult.data) {
+      if (__DEV__) {
+        console.log('[helpfulAdditionRows] AI suggestions present on HIGH → suppressing Mode A');
+      }
+      return []; // AI suggestions are the "premium stylist layer"
+    }
+
     // NEAR tab with actual NEAR content: Compute Mode B dynamically
     // Guard: Only use Mode B if we have NEAR matches OR selected outfit candidates
     // (covers future UI changes where selection might exist without nearMatches)
@@ -2652,7 +2814,8 @@ function ResultsSuccess({
       const modeBResult = getModeBBullets(
         selectedNearOutfit?.candidates ?? null,
         nearMatchEvals,
-        confidenceResult.uiVibeForCopy
+        confidenceResult.uiVibeForCopy,
+        itemSummary.category as Category
       );
 
       if (modeBResult && modeBResult.bullets.length > 0) {
@@ -2769,7 +2932,7 @@ function ResultsSuccess({
     // Note: Using selectedNearOutfit?.id instead of full object to avoid extra renders
     // when the object reference changes but the selection is the same outfit
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHighTab, tabsState.nearTab.nearMatches, selectedNearOutfit?.id, selectedNearOutfit?.candidates, confidenceResult.uiVibeForCopy, confidenceResult.modeASuggestions, wardrobeCount]);
+  }, [isHighTab, tabsState.nearTab.nearMatches, selectedNearOutfit?.id, selectedNearOutfit?.candidates, confidenceResult.uiVibeForCopy, confidenceResult.modeASuggestions, wardrobeCount, suggestionsResult]);
 
   // DEBUG: Log helpfulAdditionRows result
   if (__DEV__ && confidenceResult.evaluated) {
@@ -4759,6 +4922,17 @@ function ResultsSuccess({
               </Animated.View>
             )}
 
+            {/* Personalized Suggestions Card - AI stylist insights */}
+            {(suggestionsLoading || (suggestionsResult?.ok && suggestionsResult.data)) && isHighTab && (
+              <Animated.View entering={FadeIn.delay(400)} style={{ marginBottom: spacing.md, marginTop: spacing.xs }}>
+                <PersonalizedSuggestionsCard
+                  suggestions={suggestionsResult?.ok ? suggestionsResult.data : null}
+                  isLoading={suggestionsLoading}
+                  wardrobeItemsById={wardrobeItemsById}
+                />
+              </Animated.View>
+            )}
+
             {/* Tailor Suggestions Card - Store picks coming soon */}
             <Animated.View entering={FadeIn.delay(450)} style={{ marginBottom: spacing.md, marginTop: spacing.xs }}>
               <TailorSuggestionsCard
@@ -5258,6 +5432,9 @@ function ResultsSuccess({
         }}
         demotedItemIds={demotedItemIds}
         trustFilterApplied={trustFilterResult.wasApplied}
+        suggestionsResult={suggestionsResult}
+        suggestionsLoading={suggestionsLoading}
+        wardrobeItemsById={wardrobeItemsById}
       />
       )}
     </View>
