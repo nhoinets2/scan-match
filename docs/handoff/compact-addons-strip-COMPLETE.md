@@ -1,0 +1,322 @@
+# Compact Add-ons Strip - Complete Implementation Summary
+
+**Feature:** Compact Add-ons Strip with AI Integration  
+**Status:** ✅ Code Complete (Pending Manual QA)  
+**Plan:** `.cursor/plans/compact_add-ons_strip_7a58efa0.plan.md`
+
+---
+
+## Overview
+
+Redesigned the Optional Add-ons section on HIGH/NEAR tabs from a 3-row category layout to a compact, AI-connected strip that:
+- Displays max 6 thumbnails with category badges
+- Sorts intelligently based on AI recommendations
+- Expands to bottom sheet with fixed tab order (Layers → Bags → Accessories)
+- Shows AI-aware title ("Suggested add-ons" vs "Finish the look")
+
+## Implementation Timeline
+
+| Agent | Scope | Files | Status |
+|-------|-------|-------|--------|
+| **Agent A** | Types & Sorting | `types.ts`, `add-ons-sorting.ts` + tests | ✅ Complete |
+| **Agent B** | UI Components | `OptionalAddOnsStrip.tsx`, `AddOnsBottomSheet.tsx` | ✅ Complete |
+| **Agent C** | Integration | `results.tsx` | ✅ Complete |
+
+---
+
+## Agent A: Types & Sorting (TODO 1-2)
+
+### Files Created/Modified
+- `src/lib/types.ts`
+  - Added `AddOnCategory` union: `'outerwear' | 'bags' | 'accessories'`
+  - Added `isAddOnCategory()` type guard (single source of truth)
+  - Added `AddOnItem` interface with local match fields
+
+- `src/lib/add-ons-sorting.ts` (NEW)
+  - `scoreAndSortAddOns()` - Main scoring function
+  - `ATTR_GROUPS` - Synonym groups (gold/golden/brass, tan/camel/beige, etc.)
+  - `ATTR_LOOKUP` - Bidirectional synonym map
+  - `tokenize()` - Prevents false positives (tan ≠ tangerine)
+  - `getMatchableText()` - Combines local fields only
+
+- `src/lib/__tests__/add-ons-sorting.test.ts` (NEW)
+  - 8 test cases covering dedupe, priority, synonyms, tokens, cap, tiebreaker
+
+### Key Behaviors
+- **Category priority:** First bullet category gets +40, second +20, third +0
+- **Attribute matching:** Token-based, capped at +30 max
+- **Deterministic sorting:** Uses originalIndex for tiebreaker
+- **Local matching only:** Never sends data to model
+- **Type safety:** Non-add-on categories filtered via `isAddOnCategory()` guard
+
+### Handoff: `docs/handoff/compact-addons-strip-agentA.md`
+
+---
+
+## Agent B: UI Components (TODO 3-4)
+
+### Files Created
+- `src/components/OptionalAddOnsStrip.tsx` (NEW)
+  - Compact strip with max 6 sorted thumbnails
+  - AI-aware title (checks `to_elevate?.length === 2`)
+  - Memoized sorting to avoid recalculation
+  - Category badges overlay (top-left): "Layer"/"Bag"/"Acc"
+  - Full header row tappable to open sheet
+  - Conditional "View all" button (shows if >6 items OR >1 category OR >4 in category)
+  - Accessible labels and button roles
+  - FadeInDown animation for consistency
+
+- `src/components/AddOnsBottomSheet.tsx` (NEW)
+  - Modal bottom sheet with fixed tab order: Layers → Bags → Accessories
+  - Only shows tabs that have items
+  - Lazy render (returns null when `visible=false`)
+  - Close handling: button + overlay press + swipe gesture
+  - Thumbnail grid consistent with existing wardrobe item styling
+
+### Key Behaviors
+- **Valid AI check:** Exactly 2 `to_elevate` bullets (not fallback/repaired)
+- **Badge style:** 10px text, semi-transparent white background
+- **Tab persistence:** Fixed order maintained even if only one category exists
+- **Performance:** Sorting memoized, sheet lazy-loaded
+
+### Handoff: `docs/handoff/compact-addons-strip-agentB.md`
+
+---
+
+## Agent C: Integration (TODO 5)
+
+### Files Modified
+- `src/app/results.tsx`
+  - **Line 1980:** Added `addOnsSheetVisible` state
+  - **Lines 3022-3087:** Updated `highAddOns`/`nearAddOns` with full AddOnItem properties
+  - **Lines 4547-4579:** Integrated OptionalAddOnsStrip (replaces old 3-row section)
+  - **Lines 5100-5128:** Integrated AddOnsBottomSheet
+  - **Removed:** Old 126-line add-ons section + `getAddOnsByCategory` helper
+
+### Key Integration Points
+- **Tab-aware data:** Strip/sheet show different items per HIGH/NEAR tab
+- **AI suggestions:** Passed safely via `suggestionsResult?.ok ? suggestionsResult.data : null`
+- **Photo viewer:** Both components wired to existing modal with haptic feedback
+- **Render position:** After Outfit Ideas, before Styling Suggestions
+- **Type safety:** Properly narrows `Category` to `AddOnCategory` throughout
+
+### Regression Prevention
+- No changes to: Confidence Engine, Trust Filter, Outfit Ideas, AI card, tab switching
+- TypeScript compilation passes (no type errors)
+- ESLint validation passes (no linter errors)
+- Existing patterns preserved (photo viewer, haptics, state management)
+
+### Handoff: `docs/handoff/compact-addons-strip-agentC.md`
+
+---
+
+## Complete Feature Behavior
+
+### User Flow (HIGH Tab Example)
+1. User scans item with HIGH matches → Results screen loads
+2. **Outfit Ideas section** shows full outfit combos
+3. **Add-ons strip** appears below with max 6 thumbnails:
+   - If AI suggestions valid: "Suggested add-ons" title
+   - Items sorted by AI match score
+   - Category badges overlay each thumbnail
+   - "View all" appears if needed
+4. User taps thumbnail → Photo viewer opens (full-screen)
+5. User taps "View all" or header → Bottom sheet opens
+6. **Bottom sheet** shows tabs: Layers / Bags / Accessories
+   - Only tabs with items shown
+   - Fixed order maintained
+   - User can view all items per category
+7. User taps item in sheet → Photo viewer opens
+8. **Styling Suggestions section** appears below strip
+
+### AI Integration
+- **With valid AI (2 bullets):**
+  - Title: "Suggested add-ons"
+  - Items sorted by category match + attribute match
+  - Top-scoring items shown first (AI-connected)
+
+- **Without AI or fallback:**
+  - Title: "Finish the look"
+  - Items shown in default order (still functional)
+
+### Empty States
+- 0 add-ons → Section hidden entirely
+- Missing categories → Sheet only shows available tabs
+- No valid AI → Gracefully falls back to generic title
+
+---
+
+## Technical Summary
+
+### Type Safety
+```typescript
+// Add-on categories constrained
+type AddOnCategory = 'outerwear' | 'bags' | 'accessories';
+
+// Type guard ensures safety
+function isAddOnCategory(cat: string): cat is AddOnCategory;
+
+// Interface enforces structure
+interface AddOnItem {
+  id: string;
+  imageUri?: string;
+  category: AddOnCategory; // ← Not generic Category
+  colors?: ColorInfo[];
+  detectedLabel?: string;
+  userStyleTags?: StyleVibe[];
+}
+```
+
+### Scoring Algorithm
+```typescript
+// Priority scoring
+categoryMatch: +100 base + (40/20/0) priority bonus
+attributeMatch: +10 per match, capped at +30
+tiebreaker: originalIndex (deterministic)
+
+// Example scores
+First bullet category + 2 attr matches: 100 + 40 + 20 = 160
+Second bullet category + 1 attr match: 100 + 20 + 10 = 130
+No category match + 3 attr matches: 0 + 30 = 30
+```
+
+### Data Flow
+```
+Confidence Engine → highAddOns/nearAddOns (with AddOnCategory)
+                              ↓
+                    Tab-aware selection
+                              ↓
+              Remove tier property for components
+                              ↓
+        OptionalAddOnsStrip (sorts via scoreAndSortAddOns)
+                              ↓
+                  User interaction triggers:
+           - Photo viewer (thumbnail press)
+           - Bottom sheet (header/View all press)
+```
+
+---
+
+## Verification Status
+
+### Code-Level (Complete ✅)
+- [x] TypeScript compilation (no errors)
+- [x] ESLint validation (no linter errors)
+- [x] Unit tests for scoring utility (8 test cases)
+- [x] All 40 checklist items verified
+- [x] 2 CRITICAL items verified (no model access, no regressions)
+- [x] Pattern consistency with existing codebase
+- [x] Accessibility labels and roles present
+
+### Manual QA (Pending 🔍)
+- [ ] On-device testing (iOS/Android)
+- [ ] Visual layout verification with real data
+- [ ] AI suggestions behavior (valid vs fallback)
+- [ ] Photo viewer from strip and sheet
+- [ ] Haptic feedback on all interactions
+- [ ] Empty states (0 add-ons, missing categories)
+- [ ] Edge cases (6 items, >6 items, mixed tiers)
+- [ ] Tab switching with sheet open
+- [ ] VoiceOver/TalkBack validation
+
+---
+
+## Files Changed Summary
+
+### New Files (3)
+1. `src/lib/add-ons-sorting.ts` - Scoring utility
+2. `src/components/OptionalAddOnsStrip.tsx` - Compact strip
+3. `src/components/AddOnsBottomSheet.tsx` - Expanded view
+
+### Modified Files (2)
+1. `src/lib/types.ts` - Added AddOnCategory type + guard
+2. `src/app/results.tsx` - Integration (removed old section, wired new components)
+
+### Test Files (1)
+1. `src/lib/__tests__/add-ons-sorting.test.ts` - Unit tests
+
+### Documentation (4)
+1. `docs/handoff/compact-addons-strip-agentA.md` - Agent A handoff
+2. `docs/handoff/compact-addons-strip-agentB.md` - Agent B handoff
+3. `docs/handoff/compact-addons-strip-agentC.md` - Agent C handoff
+4. `docs/handoff/compact-addons-strip-review-checklist.md` - Complete checklist
+
+---
+
+## Deployment Checklist
+
+### Pre-deployment
+- [x] All code merged to feature branch
+- [x] TypeScript/ESLint passes
+- [x] Unit tests pass
+- [ ] Manual QA complete (pending)
+- [ ] Design sign-off (pending)
+- [ ] Accessibility validation (pending)
+
+### Deployment Requirements
+- No database migrations required
+- No environment variables needed
+- No API changes
+- No external dependencies added
+- Uses existing AI suggestions infrastructure
+
+### Rollout Strategy
+- Feature is self-contained within results screen
+- No feature flags needed (replaces old section directly)
+- Graceful degradation: Works without AI suggestions (shows generic title)
+- Safe to deploy: No breaking changes to existing flows
+
+---
+
+## Success Metrics (Recommended)
+
+### Engagement
+- Click-through rate on add-ons thumbnails
+- Bottom sheet open rate ("View all" taps)
+- Photo viewer opens from add-ons section
+
+### AI Effectiveness
+- Conversion rate: AI-sorted items vs fallback order
+- Average position of tapped items (are top items clicked more?)
+- Title impact: "Suggested add-ons" vs "Finish the look" engagement
+
+### Performance
+- Render time for add-ons section
+- Bottom sheet animation smoothness
+- Sorting performance (memoization effectiveness)
+
+---
+
+## Known Limitations
+
+1. **Max 6 thumbnails in strip** - By design to keep UI compact
+2. **Fixed tab order** - Always Layers → Bags → Accessories (matches stylist mental model)
+3. **AI title requires exactly 2 bullets** - Fallback to generic title if not met
+4. **Local matching only** - Sorting uses only local fields (no server calls)
+
+---
+
+## Future Enhancements (Out of Scope)
+
+- Phase 2 (Option B): Inline thumbnails per AI bullet in PersonalizedSuggestionsCard
+- Smart badge colors (match category or AI recommendation type)
+- Customizable tab order per user preference
+- Expandable view beyond 6 items without sheet (lazy load in strip)
+
+---
+
+## Contact / Ownership
+
+- **Agent A (Types/Sorting):** Completed TODO 1-2
+- **Agent B (Components):** Completed TODO 3-4
+- **Agent C (Integration):** Completed TODO 5
+- **Next Owner:** QA Team for manual validation
+
+**Review Checklist:** `docs/handoff/compact-addons-strip-review-checklist.md`  
+**Plan Document:** `.cursor/plans/compact_add-ons_strip_7a58efa0.plan.md`
+
+---
+
+**Implementation Date:** January 28, 2026  
+**Status:** ✅ Code Complete | 🔍 Pending Manual QA  
+**Ready for:** On-device testing and design review

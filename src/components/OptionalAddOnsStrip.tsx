@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { View, Text, ScrollView, Pressable } from "react-native";
 import { Image } from "expo-image";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { Package } from "lucide-react-native";
+import { Package, ChevronRight } from "lucide-react-native";
 import { colors, typography, spacing, borderRadius, components } from "@/lib/design-tokens";
 import { scoreAndSortAddOns } from "@/lib/add-ons-sorting";
 import type { AddOnCategory, AddOnItem, PersonalizedSuggestions } from "@/lib/types";
@@ -38,17 +38,18 @@ function CategoryBadge({ category }: { category: AddOnCategory }) {
         position: "absolute",
         top: 4,
         left: 4,
-        backgroundColor: "rgba(255, 255, 255, 0.85)",
-        paddingHorizontal: 5,
-        paddingVertical: 2,
-        borderRadius: 4,
+        backgroundColor: "rgba(0, 0, 0, 0.35)",
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 6,
       }}
     >
       <Text
         style={{
           fontFamily: typography.fontFamily.medium,
-          fontSize: 10,
-          color: colors.text.primary,
+          fontSize: 9,
+          color: "rgba(255, 255, 255, 0.95)",
+          letterSpacing: 0.3,
         }}
       >
         {getCategoryLabel(category)}
@@ -97,25 +98,57 @@ export function OptionalAddOnsStrip({
       entering={FadeInDown.delay(325)}
       style={{ marginBottom: spacing.lg, marginTop: spacing.xs / 2 }}
     >
-      <Pressable
-        onPress={showViewAll ? onOpenViewAll : undefined}
-        disabled={!showViewAll}
-        accessibilityRole={showViewAll ? "button" : undefined}
-        accessibilityLabel={showViewAll ? "View all add-ons" : undefined}
-        accessibilityHint={showViewAll ? "Opens the full add-ons list" : undefined}
-        style={{ paddingHorizontal: spacing.xs, marginBottom: spacing.xs }}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          marginBottom: spacing.sm,
+          paddingHorizontal: spacing.xs,
+        }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <Text style={{ ...typography.ui.sectionTitle, color: colors.text.primary, flex: 1 }}>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              ...typography.ui.sectionTitle,
+              color: colors.text.primary,
+            }}
+          >
             {title}
           </Text>
-          {showViewAll && (
-            <Text style={{ ...typography.ui.label, color: colors.accent.terracotta }}>
-              View all →
-            </Text>
-          )}
+          <Text
+            style={{
+              ...typography.ui.caption,
+              color: colors.text.secondary,
+              marginTop: spacing.xs / 2,
+            }}
+          >
+            From your wardrobe
+          </Text>
         </View>
-      </Pressable>
+        {showViewAll && (
+          <Pressable
+            onPress={onOpenViewAll}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing.xs,
+              marginTop: spacing.xs / 2,
+            }}
+          >
+            <Text
+              style={{
+                ...typography.ui.label,
+                color: colors.text.tertiary,
+              }}
+            >
+              View all ({addOns.length})
+            </Text>
+            <ChevronRight size={14} color={colors.text.tertiary} strokeWidth={1.5} />
+          </Pressable>
+        )}
+      </View>
 
       <ScrollView
         horizontal

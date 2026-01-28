@@ -92,6 +92,8 @@ import {
   VerdictUIState,
   OkayReasonCode,
   RecentCheck,
+  isAddOnCategory,
+  type AddOnItem,
 } from "@/lib/types";
 import { colors, spacing, typography, borderRadius, shadows, cards, button, components } from "@/lib/design-tokens";
 import { getTextStyle } from "@/lib/typography-helpers";
@@ -135,6 +137,8 @@ import { SectionContainer } from "@/components/SectionContainer";
 import { GuidanceRowModel } from "@/components/GuidanceRow";
 import { PhotoViewerModal } from "@/components/PhotoViewerModal";
 import { OutfitIdeasSection } from "@/components/OutfitIdeasSection";
+import { OptionalAddOnsStrip } from "@/components/OptionalAddOnsStrip";
+import { AddOnsBottomSheet } from "@/components/AddOnsBottomSheet";
 import { TipSheetModal } from "@/components/TipSheetModal";
 import { TailorSuggestionsCard } from "@/components/TailorSuggestionsCard";
 import { FavoriteStoresModal } from "@/components/FavoriteStoresModal";
@@ -1972,6 +1976,9 @@ function ResultsSuccess({
   // Track if bottom sheet should be rendered (delayed after close to prevent animation artifacts)
   const [shouldRenderMatchesSheet, setShouldRenderMatchesSheet] = useState(false);
 
+  // Bottom sheet for add-ons (Compact Add-ons Strip)
+  const [addOnsSheetVisible, setAddOnsSheetVisible] = useState(false);
+
   // Scroll ref for scrolling to top on tab switch
   const mainScrollRef = useRef<ScrollView>(null);
 
@@ -3012,7 +3019,7 @@ function ResultsSuccess({
   }
 
   // HIGH add-ons (for Wear now tab) - only HIGH tier optional items
-  const highAddOns = useMemo((): AddOnItem[] => {
+  const highAddOns = useMemo(() => {
     if (!confidenceResult.evaluated || !confidenceResult.showMatchesSection) {
       return [];
     }
@@ -3021,30 +3028,39 @@ function ResultsSuccess({
       .map(m => ({
         id: m.wardrobeItem.id,
         imageUri: m.wardrobeItem.imageUri,
-        category: m.wardrobeItem.category as Category,
+        // Type assertion safe: isOptionalCategory guarantees it's outerwear|bags|accessories
+        category: m.wardrobeItem.category as AddOnCategory,
+        colors: m.wardrobeItem.colors,
+        detectedLabel: m.wardrobeItem.detectedLabel,
+        userStyleTags: m.wardrobeItem.userStyleTags,
         tier: 'HIGH' as const,
       }));
   }, [confidenceResult.evaluated, confidenceResult.showMatchesSection, confidenceResult.matches]);
 
   // NEAR add-ons (for Worth trying tab) - HIGH + MEDIUM tier optional items
-  const nearAddOns = useMemo((): AddOnItem[] => {
+  const nearAddOns = useMemo(() => {
     if (nearMatches.length === 0 && (!confidenceResult.evaluated || !confidenceResult.showMatchesSection)) {
       return [];
     }
     
-    const result: AddOnItem[] = [];
+    const result = [];
     const seenIds = new Set<string>();
     
     // Add HIGH tier optional items (no badge needed)
     if (confidenceResult.evaluated && confidenceResult.showMatchesSection) {
       for (const m of confidenceResult.matches) {
-        if (isOptionalCategory(m.wardrobeItem.category as Category)) {
+        const cat = m.wardrobeItem.category as Category;
+        if (isOptionalCategory(cat)) {
           if (!seenIds.has(m.wardrobeItem.id)) {
             seenIds.add(m.wardrobeItem.id);
+            // Type assertion safe: isOptionalCategory guarantees it's outerwear|bags|accessories
             result.push({
               id: m.wardrobeItem.id,
               imageUri: m.wardrobeItem.imageUri,
-              category: m.wardrobeItem.category as Category,
+              category: cat as AddOnCategory,
+              colors: m.wardrobeItem.colors,
+              detectedLabel: m.wardrobeItem.detectedLabel,
+              userStyleTags: m.wardrobeItem.userStyleTags,
               tier: 'HIGH',
             });
           }
@@ -3054,13 +3070,18 @@ function ResultsSuccess({
     
     // Add MEDIUM tier optional items (will show "Needs tweak" badge)
     for (const m of nearMatches) {
-      if (isOptionalCategory(m.wardrobeItem.category as Category)) {
+      const cat = m.wardrobeItem.category as Category;
+      if (isOptionalCategory(cat)) {
         if (!seenIds.has(m.wardrobeItem.id)) {
           seenIds.add(m.wardrobeItem.id);
+          // Type assertion safe: isOptionalCategory guarantees it's outerwear|bags|accessories
           result.push({
             id: m.wardrobeItem.id,
             imageUri: m.wardrobeItem.imageUri,
-            category: m.wardrobeItem.category as Category,
+            category: cat as AddOnCategory,
+            colors: m.wardrobeItem.colors,
+            detectedLabel: m.wardrobeItem.detectedLabel,
+            userStyleTags: m.wardrobeItem.userStyleTags,
             tier: 'MEDIUM',
           });
         }
@@ -3070,18 +3091,6 @@ function ResultsSuccess({
     return result;
   }, [nearMatches, confidenceResult.evaluated, confidenceResult.showMatchesSection, confidenceResult.matches]);
 
-  // Group add-ons by category for rendering rows
-  // Sorted: HIGH first (no badge), then MEDIUM (with "Needs tweak") for optimistic feel
-  const getAddOnsByCategory = useCallback((addOns: AddOnItem[], category: Category): AddOnItem[] => {
-    return addOns
-      .filter(a => a.category === category)
-      .sort((a, b) => {
-        // HIGH comes before MEDIUM
-        if (a.tier === 'HIGH' && b.tier === 'MEDIUM') return -1;
-        if (a.tier === 'MEDIUM' && b.tier === 'HIGH') return 1;
-        return 0;
-      });
-  }, []);
 
   // Suggestions visibility is driven by helpfulAdditionRows.length > 0
   // Titles are tab-aware: "Complete the look" (HIGH) / "Make it work" (NEAR)
@@ -4535,131 +4544,37 @@ function ResultsSuccess({
             return null;
           })()}
 
-          {/* Optional add-ons section - Layer, Bag, Accessories */}
+          {/* Optional add-ons section - Compact Strip with AI Integration */}
           {(() => {
-            const addOns = isHighTab ? highAddOns : nearAddOns;
-            
-            // Group by category
-            const layerItems = getAddOnsByCategory(addOns, 'outerwear');
-            const bagItems = getAddOnsByCategory(addOns, 'bags');
-            const accessoryItems = getAddOnsByCategory(addOns, 'accessories');
-            
-            // Check if any rows have content
-            const hasContent = layerItems.length > 0 || bagItems.length > 0 || accessoryItems.length > 0;
-            
-            if (!hasContent) {
-              return null;
-            }
-            
-            const rows: { label: string; items: typeof addOns }[] = [];
-            if (layerItems.length > 0) rows.push({ label: 'Layer', items: layerItems });
-            if (bagItems.length > 0) rows.push({ label: 'Bag', items: bagItems });
-            if (accessoryItems.length > 0) rows.push({ label: 'Accessories', items: accessoryItems });
+            const addOnsWithTier = isHighTab ? highAddOns : nearAddOns;
+            // Remove tier property (components don't need it)
+            const addOns = addOnsWithTier.map(item => ({
+              id: item.id,
+              imageUri: item.imageUri,
+              category: item.category,
+              colors: item.colors,
+              detectedLabel: item.detectedLabel,
+              userStyleTags: item.userStyleTags,
+            }));
+            // Get suggestions data if result is successful
+            const suggestions = suggestionsResult?.ok ? suggestionsResult.data : null;
             
             return (
-              <Animated.View
-                entering={FadeInDown.delay(325)}
-                style={{ marginBottom: spacing.lg, marginTop: spacing.xs / 2 }}
-              >
-                {/* Section header */}
-                <Text
-                  style={{
-                    ...typography.ui.sectionTitle,
-                    color: colors.text.primary,
-                    marginBottom: spacing.xs / 2,
-                    paddingHorizontal: spacing.xs,
-                  }}
-                >
-                  {RESULTS_COPY.sections.optionalAddOns}
-                </Text>
-                <Text
-                  style={{
-                    ...typography.ui.caption,
-                    color: colors.text.secondary,
-                    marginBottom: spacing.md - spacing.xs / 2,
-                    paddingHorizontal: spacing.xs,
-                  }}
-                >
-                  {RESULTS_COPY.subtitles.fromWardrobe}
-                </Text>
-                
-                {/* Category rows */}
-                {rows.map((row, rowIndex) => (
-                  <View key={row.label} style={{ marginBottom: rowIndex < rows.length - 1 ? 20 : 0 }}>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ paddingHorizontal: spacing.xs, gap: spacing.sm + spacing.xs / 2, paddingBottom: 0 }}
-                      decelerationRate="fast"
-                    >
-                      {row.items.slice(0, 4).map((item) => (
-                        <View 
-                          key={item.id}
-                          style={{ alignItems: 'center' }}
-                        >
-                          <Pressable
-                            onPress={() => {
-                              if (item.imageUri) {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                setPhotoViewerSource('main');
-                                setPhotoViewerUri(item.imageUri);
-                              }
-                            }}
-                            style={{
-                              width: components.wardrobeItem.imageSize,
-                              height: components.wardrobeItem.imageSize,
-                              borderRadius: components.wardrobeItem.imageBorderRadius,
-                              borderWidth: 1,
-                              borderColor: colors.border.hairline,
-                              backgroundColor: colors.bg.tertiary,
-                              overflow: 'hidden',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            {item.imageUri ? (
-                              <Image
-                                source={{ uri: item.imageUri }}
-                                style={{ 
-                                  width: '100%', 
-                                  height: '100%',
-                                }}
-                                contentFit="cover"
-                              />
-                            ) : (
-                              <Package size={24} color={colors.text.tertiary} />
-                            )}
-                          </Pressable>
-                          
-                          {/* "Needs tweak" badge for MEDIUM items - tucked under tile */}
-                          {!isHighTab && item.tier === 'MEDIUM' && (
-                            <View
-                              style={{
-                                marginTop: -4,
-                                backgroundColor: colors.accent.brass,
-                                paddingHorizontal: 6,
-                                paddingVertical: 2,
-                                borderRadius: borderRadius.pill,
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  fontFamily: 'Inter_500Medium',
-                                  fontSize: 7,
-                                  color: colors.text.primary,
-                                  textAlign: 'center',
-                                }}
-                              >
-                                Needs tweak
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      ))}
-                    </ScrollView>
-                  </View>
-                ))}
-              </Animated.View>
+              <OptionalAddOnsStrip
+                addOns={addOns}
+                suggestions={suggestions}
+                onOpenViewAll={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setAddOnsSheetVisible(true);
+                }}
+                onPressItem={(item) => {
+                  if (item.imageUri) {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setPhotoViewerSource('main');
+                    setPhotoViewerUri(item.imageUri);
+                  }
+                }}
+              />
             );
           })()}
 
@@ -5181,6 +5096,28 @@ function ResultsSuccess({
           setPhotoViewerSource(null);
         }}
       />
+
+      {/* Add-ons bottom sheet - Compact Add-ons Strip expansion */}
+      {(() => {
+        const addOnsWithTier = isHighTab ? highAddOns : nearAddOns;
+        // Remove tier property (components don't need it)
+        const addOns = addOnsWithTier.map(item => ({
+          id: item.id,
+          imageUri: item.imageUri,
+          category: item.category,
+          colors: item.colors,
+          detectedLabel: item.detectedLabel,
+          userStyleTags: item.userStyleTags,
+        }));
+        
+        return (
+          <AddOnsBottomSheet
+            visible={addOnsSheetVisible}
+            onClose={() => setAddOnsSheetVisible(false)}
+            addOns={addOns}
+          />
+        );
+      })()}
 
       {/* Tip sheet modal for "What to add first" section */}
       <TipSheetModal
