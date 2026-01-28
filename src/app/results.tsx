@@ -2249,6 +2249,46 @@ function ResultsSuccess({
     return map;
   }, [wardrobe]);
   
+  // ComboAssembler: Generate outfit combos from finalized matches
+  // IMPORTANT: Uses trustFilterResult.finalized to respect TF + AI Safety decisions
+  const comboAssemblerResult = useComboAssembler(
+    scannedItem,
+    wardrobe,
+    trustFilterResult.finalized.highFinal,
+    trustFilterResult.finalized.nearFinal
+  );
+
+  // Results Tabs: Manages "Wear now" vs "Worth trying" tab state
+  // IMPORTANT: Uses finalized matches to ensure tabs reflect all filtering decisions
+  const tabsState = useResultsTabs(
+    scannedItem?.id ?? null,
+    trustFilterResult.finalized.highFinal,
+    trustFilterResult.finalized.nearFinal,
+    comboAssemblerResult,
+    wardrobe,
+    scannedItem?.category ?? null // For diversity slot selection
+  );
+
+  // Tab helpers for cleaner conditional rendering
+  const isHighTab = tabsState.activeTab === 'high';
+  const tab = tabsState.activeTabContent;
+
+  const addOnCategoriesForSuggestions = useMemo(() => {
+    if (!isHighTab || !confidenceResult.evaluated || !confidenceResult.showMatchesSection) {
+      return [];
+    }
+    const seen = new Set<string>();
+    const categories: AddOnCategory[] = [];
+    for (const match of confidenceResult.matches) {
+      const category = match.wardrobeItem.category as Category;
+      if (isOptionalCategory(category) && !seen.has(category)) {
+        seen.add(category);
+        categories.push(category as AddOnCategory);
+      }
+    }
+    return categories;
+  }, [isHighTab, confidenceResult.evaluated, confidenceResult.showMatchesSection, confidenceResult.matches]);
+
   // Fetch suggestions when trust filter is ready and we have matches
   useEffect(() => {
     // Wait for trust filter to be fully ready (TF + AI Safety complete)
@@ -2279,6 +2319,9 @@ function ResultsSuccess({
     // Start loading
     setSuggestionsLoading(true);
     
+    const preferAddOnCategories =
+      isHighTab && addOnCategoriesForSuggestions.length > 0;
+
     // Fetch suggestions (async, fail-open)
     fetchPersonalizedSuggestions({
       scanId: currentCheckId,
@@ -2286,6 +2329,9 @@ function ResultsSuccess({
       highFinal: trustFilterResult.finalized.highFinal,
       wardrobeSummary,
       intent,
+      scanCategory: scannedItem?.category ?? null,
+      preferAddOnCategories,
+      addOnCategories: addOnCategoriesForSuggestions,
     })
       .then((result) => {
         setSuggestionsResult(result);
@@ -2306,31 +2352,10 @@ function ResultsSuccess({
     currentCheckId,
     wardrobeSummary,
     fromScan,
+    scannedItem?.category,
+    isHighTab,
+    addOnCategoriesForSuggestions,
   ]);
-
-  // ComboAssembler: Generate outfit combos from finalized matches
-  // IMPORTANT: Uses trustFilterResult.finalized to respect TF + AI Safety decisions
-  const comboAssemblerResult = useComboAssembler(
-    scannedItem,
-    wardrobe,
-    trustFilterResult.finalized.highFinal,
-    trustFilterResult.finalized.nearFinal
-  );
-
-  // Results Tabs: Manages "Wear now" vs "Worth trying" tab state
-  // IMPORTANT: Uses finalized matches to ensure tabs reflect all filtering decisions
-  const tabsState = useResultsTabs(
-    scannedItem?.id ?? null,
-    trustFilterResult.finalized.highFinal,
-    trustFilterResult.finalized.nearFinal,
-    comboAssemblerResult,
-    wardrobe,
-    scannedItem?.category ?? null // For diversity slot selection
-  );
-
-  // Tab helpers for cleaner conditional rendering
-  const isHighTab = tabsState.activeTab === 'high';
-  const tab = tabsState.activeTabContent;
 
   // Selected outfit state for NEAR tab (drives precise Mode B bullets)
   const [selectedNearOutfit, setSelectedNearOutfit] = useState<AssembledCombo | null>(null);
@@ -2795,11 +2820,11 @@ function ResultsSuccess({
   const helpfulAdditionRows: GuidanceRowModel[] = useMemo(() => {
     const iconProps = { size: 20, color: colors.text.secondary, strokeWidth: 1.75 };
 
-    // HIGH tab: If AI suggestions are present, suppress Mode A (premium layer wins)
-    // Mode A becomes the fallback when AI suggestions fail/timeout
-    if (isHighTab && suggestionsResult?.ok && suggestionsResult.data) {
+    // HIGH tab: If AI suggestions are loading or present, suppress Mode A
+    // Mode A becomes the fallback only when AI suggestions fail/timeout
+    if (isHighTab && (suggestionsLoading || (suggestionsResult?.ok && suggestionsResult.data))) {
       if (__DEV__) {
-        console.log('[helpfulAdditionRows] AI suggestions present on HIGH → suppressing Mode A');
+        console.log('[helpfulAdditionRows] AI suggestions loading/present on HIGH → suppressing Mode A');
       }
       return []; // AI suggestions are the "premium stylist layer"
     }
@@ -2939,7 +2964,7 @@ function ResultsSuccess({
     // Note: Using selectedNearOutfit?.id instead of full object to avoid extra renders
     // when the object reference changes but the selection is the same outfit
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHighTab, tabsState.nearTab.nearMatches, selectedNearOutfit?.id, selectedNearOutfit?.candidates, confidenceResult.uiVibeForCopy, confidenceResult.modeASuggestions, wardrobeCount, suggestionsResult]);
+  }, [isHighTab, tabsState.nearTab.nearMatches, selectedNearOutfit?.id, selectedNearOutfit?.candidates, confidenceResult.uiVibeForCopy, confidenceResult.modeASuggestions, wardrobeCount, suggestionsResult, suggestionsLoading]);
 
   // DEBUG: Log helpfulAdditionRows result
   if (__DEV__ && confidenceResult.evaluated) {
@@ -4559,10 +4584,18 @@ function ResultsSuccess({
             // Get suggestions data if result is successful
             const suggestions = suggestionsResult?.ok ? suggestionsResult.data : null;
             
+            // Determine eligibility for AI-aware sorting (stable, doesn't flicker)
+            // HIGH tab + has matches + has add-ons = eligible for "Suggested add-ons" title
+            const isEligibleForAiSorting = 
+              isHighTab && 
+              trustFilterResult.finalized.highFinal.length > 0 && 
+              addOns.length > 0;
+            
             return (
               <OptionalAddOnsStrip
                 addOns={addOns}
                 suggestions={suggestions}
+                isEligibleForAiSorting={isEligibleForAiSorting}
                 onOpenViewAll={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setAddOnsSheetVisible(true);

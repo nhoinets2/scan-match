@@ -10,6 +10,8 @@ import type { AddOnCategory, AddOnItem, PersonalizedSuggestions } from "@/lib/ty
 export interface OptionalAddOnsStripProps {
   addOns: AddOnItem[];
   suggestions?: PersonalizedSuggestions | null;
+  /** Whether this scan is eligible for AI-aware sorting (HIGH tab + has matches) */
+  isEligibleForAiSorting: boolean;
   onOpenViewAll: () => void;
   onPressItem: (item: AddOnItem) => void;
 }
@@ -61,6 +63,7 @@ function CategoryBadge({ category }: { category: AddOnCategory }) {
 export function OptionalAddOnsStrip({
   addOns,
   suggestions,
+  isEligibleForAiSorting,
   onOpenViewAll,
   onPressItem,
 }: OptionalAddOnsStripProps) {
@@ -69,8 +72,10 @@ export function OptionalAddOnsStrip({
     [addOns, suggestions?.to_elevate]
   );
 
-  const hasValidAi = suggestions?.to_elevate?.length === 2;
-  const title = hasValidAi ? "Suggested add-ons" : "Finish the look";
+  // Title is stable based on eligibility, not AI readiness
+  // On HIGH tab with matches: show "Suggested add-ons" (AI will improve sorting when ready)
+  // Otherwise: show "Finish the look"
+  const title = isEligibleForAiSorting ? "Suggested add-ons" : "Finish the look";
 
   const showViewAll = useMemo(() => {
     if (addOns.length === 0) return false;

@@ -58,7 +58,7 @@ Redesigned the Optional Add-ons section on HIGH/NEAR tabs from a 3-row category 
 ### Files Created
 - `src/components/OptionalAddOnsStrip.tsx` (NEW)
   - Compact strip with max 6 sorted thumbnails
-  - AI-aware title (checks `to_elevate?.length === 2`)
+  - Stable title based on eligibility (HIGH tab + has matches), not AI readiness
   - Memoized sorting to avoid recalculation
   - Category badges overlay (top-left): "Layer"/"Bag"/"Acc"
   - Full header row tappable to open sheet
@@ -74,8 +74,8 @@ Redesigned the Optional Add-ons section on HIGH/NEAR tabs from a 3-row category 
   - Thumbnail grid consistent with existing wardrobe item styling
 
 ### Key Behaviors
-- **Valid AI check:** Exactly 2 `to_elevate` bullets (not fallback/repaired)
-- **Badge style:** 10px text, semi-transparent white background
+- **Stable title:** Based on eligibility (HIGH tab + has matches), prevents flicker during AI loading
+- **Badge style:** 9px text, dark translucent overlay (subtle, iOS-style)
 - **Tab persistence:** Fixed order maintained even if only one category exists
 - **Performance:** Sorting memoized, sheet lazy-loaded
 
@@ -89,16 +89,20 @@ Redesigned the Optional Add-ons section on HIGH/NEAR tabs from a 3-row category 
 - `src/app/results.tsx`
   - **Line 1980:** Added `addOnsSheetVisible` state
   - **Lines 3022-3087:** Updated `highAddOns`/`nearAddOns` with full AddOnItem properties
-  - **Lines 4547-4579:** Integrated OptionalAddOnsStrip (replaces old 3-row section)
-  - **Lines 5100-5128:** Integrated AddOnsBottomSheet
-  - **Removed:** Old 126-line add-ons section + `getAddOnsByCategory` helper
+  - **Lines 4572-4604:** Integrated OptionalAddOnsStrip (replaces old 3-row section)
+    - Computes `isEligibleForAiSorting` (HIGH tab + has matches + has add-ons)
+    - Passes to component for stable title logic
+  - **Lines 5100-5128:** Integrated AddOnsBottomSheet with internal photo viewer
+  - **Removed:** Old 126-line add-ons section + `getAddOnsByCategory` helper + external photo viewer dependency
 
 ### Key Integration Points
 - **Tab-aware data:** Strip/sheet show different items per HIGH/NEAR tab
 - **AI suggestions:** Passed safely via `suggestionsResult?.ok ? suggestionsResult.data : null`
-- **Photo viewer:** Both components wired to existing modal with haptic feedback
+- **Eligibility:** Computed once per render, stable throughout session
+- **Photo viewer:** Strip uses external modal, sheet has internal viewer (prevents modal stacking)
 - **Render position:** After Outfit Ideas, before Styling Suggestions
 - **Type safety:** Properly narrows `Category` to `AddOnCategory` throughout
+- **Haptics:** Added to all interactions (thumbnails, chips, sheet close)
 
 ### Regression Prevention
 - No changes to: Confidence Engine, Trust Filter, Outfit Ideas, AI card, tab switching
@@ -116,28 +120,30 @@ Redesigned the Optional Add-ons section on HIGH/NEAR tabs from a 3-row category 
 1. User scans item with HIGH matches → Results screen loads
 2. **Outfit Ideas section** shows full outfit combos
 3. **Add-ons strip** appears below with max 6 thumbnails:
-   - If AI suggestions valid: "Suggested add-ons" title
-   - Items sorted by AI match score
+   - If eligible for AI (HIGH tab + has core matches): "Suggested add-ons" title (stable, no flicker)
+   - Otherwise: "Finish the look" title
+   - Items sorted by AI match score (silently improves when AI loads)
    - Category badges overlay each thumbnail
-   - "View all" appears if needed
-4. User taps thumbnail → Photo viewer opens (full-screen)
+   - "View all (N)" appears if needed
+4. User taps thumbnail → Photo viewer opens (full-screen, dark background)
 5. User taps "View all" or header → Bottom sheet opens
 6. **Bottom sheet** shows tabs: Layers / Bags / Accessories
    - Only tabs with items shown
    - Fixed order maintained
    - User can view all items per category
-7. User taps item in sheet → Photo viewer opens
-8. **Styling Suggestions section** appears below strip
+   - Tapping thumbnail opens internal photo viewer (no modal stacking)
+7. **Styling Suggestions section** appears below strip
 
 ### AI Integration
-- **With valid AI (2 bullets):**
-  - Title: "Suggested add-ons"
-  - Items sorted by category match + attribute match
-  - Top-scoring items shown first (AI-connected)
-
-- **Without AI or fallback:**
-  - Title: "Finish the look"
-  - Items shown in default order (still functional)
+- **Title Logic (Stable):**
+  - HIGH tab + has core matches + has add-ons → "Suggested add-ons"
+  - Otherwise → "Finish the look"
+  - Title determined upfront, no flicker during AI loading
+  
+- **Sorting:**
+  - AI loading: items shown in default order
+  - AI ready (2 valid bullets): items sorted by category match + attribute match
+  - AI failure: gracefully stays in default order, title unchanged
 
 ### Empty States
 - 0 add-ons → Section hidden entirely
@@ -291,7 +297,7 @@ Confidence Engine → highAddOns/nearAddOns (with AddOnCategory)
 
 1. **Max 6 thumbnails in strip** - By design to keep UI compact
 2. **Fixed tab order** - Always Layers → Bags → Accessories (matches stylist mental model)
-3. **AI title requires exactly 2 bullets** - Fallback to generic title if not met
+3. **Title eligibility based on core matches** - Requires HIGH tab + core pieces (not just add-ons)
 4. **Local matching only** - Sorting uses only local fields (no server calls)
 
 ---
@@ -317,6 +323,31 @@ Confidence Engine → highAddOns/nearAddOns (with AddOnCategory)
 
 ---
 
+## Recent Updates (January 28, 2026)
+
+### Title Stability Fix
+**Problem:** Title flickered from "Finish the look" → "Suggested add-ons" when AI loaded, causing confusion.
+
+**Solution:** Title now based on **eligibility** (capability), not **readiness** (AI state):
+- `isEligibleForAiSorting = HIGH tab + has core matches + has add-ons`
+- Title determined upfront and stays stable
+- AI loading silently improves sorting without changing messaging
+
+**Benefits:**
+- No visible flicker
+- User sees consistent messaging throughout session
+- Graceful failure: if AI fails, title doesn't change, just stays in default order
+
+### UI Polish
+- Badge style updated: dark translucent overlay (subtle, less obtrusive)
+- Chip style aligned with Favorite Stores modal (pill shape, terracotta accent)
+- Bottom sheet design aligned with Matches section (elevated card, shadows, drag handle)
+- Photo viewer background consistent across all modals (dark translucent)
+- Haptic feedback added to all interactions
+
+---
+
 **Implementation Date:** January 28, 2026  
+**Last Updated:** January 28, 2026  
 **Status:** ✅ Code Complete | 🔍 Pending Manual QA  
 **Ready for:** On-device testing and design review
