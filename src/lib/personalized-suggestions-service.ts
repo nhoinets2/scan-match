@@ -7,13 +7,15 @@
 
 import * as Crypto from "expo-crypto";
 import { supabase } from "./supabase";
+import { trackEvent } from "./analytics";
 import type { StyleSignalsV1, AestheticArchetype } from "./trust-filter/types";
 import type { EnrichedMatch } from "./useConfidenceEngine";
-import { ALLOWED_ELEVATE_CATEGORIES } from "./types";
+import { ALLOWED_ELEVATE_CATEGORIES, isAddOnCategory } from "./types";
 import type {
   Category,
   StyleVibe,
   WardrobeItem,
+  AddOnCategory,
   PersonalizedSuggestions,
   SafeMatchInfo,
   WardrobeSummary,
@@ -26,8 +28,8 @@ import type {
 // ============================================
 
 const PROMPT_VERSION = 1;
-const SCHEMA_VERSION = 1;
-const TIMEOUT_MS = 1200;
+const SCHEMA_VERSION = 2;
+const TIMEOUT_MS = 7500; // Slightly less than Edge Function timeout (8000ms)
 
 // ============================================
 // TYPES
@@ -156,12 +158,18 @@ export async function fetchPersonalizedSuggestions({
   highFinal,
   wardrobeSummary,
   intent,
+  scanCategory,
+  preferAddOnCategories,
+  addOnCategories,
 }: {
   scanId: string;
   scanSignals: StyleSignalsV1;
   highFinal: EnrichedMatch[];
   wardrobeSummary: WardrobeSummary;
   intent: "shopping" | "own_item";
+  scanCategory?: Category | null;
+  preferAddOnCategories?: boolean;
+  addOnCategories?: AddOnCategory[];
 }): Promise<SuggestionsResult> {
   const { data: sessionData } = await supabase.auth.getSession();
   const session = sessionData?.session;
@@ -182,14 +190,82 @@ export async function fetchPersonalizedSuggestions({
   }));
 
   const topIds = topMatches.map(match => match.id).sort().join("|");
-  const rawKey = `${scanId}|${topIds}|${wardrobeSummary.updated_at}|${PROMPT_VERSION}|${SCHEMA_VERSION}`;
+  
+  // Derive mode from data (solo mode = no top matches)
+  const mode = topMatches.length === 0 ? "solo" : "paired";
+  
+  // Build cache key with all context that affects output
+  const rawKey = [
+    scanId,
+    topIds,  // empty string for solo mode
+    wardrobeSummary.updated_at,
+    PROMPT_VERSION,
+    SCHEMA_VERSION,
+    `mode:${mode}`,
+    `scanCat:${scanCategory ?? "null"}`,
+    `preferAddOns:${preferAddOnCategories ? 1 : 0}`,
+  ].join("|");
   const cacheKey = await sha256Hex(rawKey);
 
+  const startTime = Date.now();
+  
   const cached = await checkSuggestionsCache(cacheKey);
   if (cached) {
     void incrementCacheHit(cacheKey);
-    return { ok: true, data: cached, source: "cache_hit" };
+    
+    const { suggestions, wasRepaired, removedCategories } = validateAndRepairSuggestions(
+      cached,
+      topMatches.map(match => match.id),
+      scanCategory ?? null,
+      preferAddOnCategories,
+      addOnCategories,
+    );
+    const latencyMs = Date.now() - startTime;
+    if (__DEV__ && removedCategories.length > 0) {
+      console.log("[Suggestions] Repaired cached to_elevate categories", {
+        scanId,
+        scanCategory,
+        removedCategories,
+        source: "cache_hit",
+        wasRepaired,
+        promptVersion: PROMPT_VERSION,
+        schemaVersion: SCHEMA_VERSION,
+      });
+    }
+    
+    // Track cache hit event with age calculation
+    trackEvent("personalized_suggestions_cache_hit", {
+      scan_id: scanId,
+      cache_age_seconds: 0, // Age not available from cache metadata in v1
+    });
+    
+    // Track completion for cache hit
+    trackEvent("personalized_suggestions_completed", {
+      scan_id: scanId,
+      latency_ms: latencyMs,
+      source: "cache_hit",
+      prompt_version: PROMPT_VERSION,
+      schema_version: SCHEMA_VERSION,
+      was_repaired: wasRepaired,
+      is_solo_mode: mode === "solo",
+      removed_by_scan_category_count: removedCategories.length,
+      applied_add_on_preference: preferAddOnCategories ?? false,
+    });
+    
+    return { ok: true, data: suggestions, source: "cache_hit", wasRepaired };
   }
+
+  // Track started event (cache miss, about to call Edge Function)
+  trackEvent("personalized_suggestions_started", {
+    scan_id: scanId,
+    intent,
+    top_match_count: topMatches.length,
+    prompt_version: PROMPT_VERSION,
+    schema_version: SCHEMA_VERSION,
+    is_solo_mode: mode === "solo",
+    scan_category: scanCategory ?? null,
+    prefer_add_on_categories: preferAddOnCategories ?? false,
+  });
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -217,16 +293,53 @@ export async function fetchPersonalizedSuggestions({
     }
 
     const payload = await response.json();
-    const { suggestions, wasRepaired } = validateAndRepairSuggestions(
+    const { suggestions, wasRepaired, removedCategories } = validateAndRepairSuggestions(
       payload,
       topMatches.map(match => match.id),
+      scanCategory ?? null,
+      preferAddOnCategories,
+      addOnCategories,
     );
+    if (__DEV__ && removedCategories.length > 0) {
+      console.log("[Suggestions] Repaired ai to_elevate categories", {
+        scanId,
+        scanCategory,
+        removedCategories,
+        source: "ai_call",
+        wasRepaired,
+        promptVersion: PROMPT_VERSION,
+        schemaVersion: SCHEMA_VERSION,
+      });
+    }
+
+    const latencyMs = Date.now() - startTime;
+
+    // Track successful completion
+    trackEvent("personalized_suggestions_completed", {
+      scan_id: scanId,
+      latency_ms: latencyMs,
+      source: "ai_call",
+      prompt_version: PROMPT_VERSION,
+      schema_version: SCHEMA_VERSION,
+      was_repaired: wasRepaired,
+      is_solo_mode: mode === "solo",
+      removed_by_scan_category_count: removedCategories.length,
+      applied_add_on_preference: preferAddOnCategories ?? false,
+    });
 
     return { ok: true, data: suggestions, source: "ai_call", wasRepaired };
   } catch (error) {
     const err = error as Error;
     const isTimeout = err.name === "AbortError";
     const kind = isTimeout ? "timeout" : "network";
+
+    // Track failure with specific error kind
+    trackEvent("personalized_suggestions_failed", {
+      scan_id: scanId,
+      error_kind: kind,
+      prompt_version: PROMPT_VERSION,
+      schema_version: SCHEMA_VERSION,
+    });
 
     if (__DEV__) {
       console.log(`[Suggestions] ${kind}: ${err.message}`);
@@ -256,6 +369,23 @@ const FALLBACK_TO_ELEVATE: ElevateBullet = {
   },
 };
 
+const FALLBACK_ELEVATE_ORDER: Category[] = [
+  "accessories",
+  "bags",
+  "outerwear",
+  "shoes",
+  "tops",
+  "bottoms",
+  "skirts",
+  "dresses",
+];
+
+const FALLBACK_ELEVATE_ADD_ON_ORDER: Category[] = [
+  "accessories",
+  "bags",
+  "outerwear",
+];
+
 function smartTrim(text: string, maxLen: number): string {
   if (text.length <= maxLen) return text;
 
@@ -272,9 +402,18 @@ function smartTrim(text: string, maxLen: number): string {
 export function validateAndRepairSuggestions(
   data: unknown,
   validIds: string[],
-): { suggestions: PersonalizedSuggestions; wasRepaired: boolean } {
+  scanCategory?: Category | null,
+  preferAddOnCategories?: boolean,
+  addOnCategories?: AddOnCategory[],
+): {
+  suggestions: PersonalizedSuggestions;
+  wasRepaired: boolean;
+  removedCategories: Category[];
+} {
   const validIdSet = new Set(validIds);
+  const isSoloMode = validIds.length === 0;
   let wasRepaired = false;
+  const removedCategories: Category[] = [];
 
   const raw =
     typeof data === "object" && data !== null
@@ -296,10 +435,14 @@ export function validateAndRepairSuggestions(
       const originalMentions = Array.isArray(bullet?.mentions)
         ? bullet.mentions
         : [];
-      const validMentions = originalMentions.filter(
-        (id: unknown): id is string =>
-          typeof id === "string" && validIdSet.has(id),
-      );
+      
+      // Solo mode: force empty mentions (never reference owned items)
+      const validMentions = isSoloMode
+        ? []
+        : originalMentions.filter(
+            (id: unknown): id is string =>
+              typeof id === "string" && validIdSet.has(id),
+          );
 
       if (validMentions.length !== originalMentions.length) {
         wasRepaired = true;
@@ -358,8 +501,110 @@ export function validateAndRepairSuggestions(
     });
   }
 
+  if (scanCategory) {
+    const filtered = toElevate.filter(
+      bullet => bullet.recommend.category !== scanCategory,
+    );
+    const removed = toElevate
+      .filter(bullet => bullet.recommend.category === scanCategory)
+      .map(bullet => bullet.recommend.category);
+    if (filtered.length !== toElevate.length) {
+      wasRepaired = true;
+      removedCategories.push(...removed);
+    }
+    toElevate = filtered;
+  }
+
+  if (preferAddOnCategories) {
+    const hasAddOnBullet = toElevate.some(bullet =>
+      isAddOnCategory(bullet.recommend.category),
+    );
+    if (hasAddOnBullet && (addOnCategories?.length ?? 0) >= 2) {
+      const filtered = toElevate.filter(bullet =>
+        isAddOnCategory(bullet.recommend.category),
+      );
+      if (filtered.length !== toElevate.length) {
+        wasRepaired = true;
+      }
+      toElevate = filtered;
+    }
+  }
+
+  if (preferAddOnCategories && (addOnCategories?.length ?? 0) >= 2) {
+    const seen = new Set<Category>();
+    const filtered = toElevate.filter(bullet => {
+      if (seen.has(bullet.recommend.category)) return false;
+      seen.add(bullet.recommend.category);
+      return true;
+    });
+    if (filtered.length !== toElevate.length) {
+      wasRepaired = true;
+    }
+    toElevate = filtered;
+  }
+
+  const hasAddOnBullet = toElevate.some(bullet =>
+    isAddOnCategory(bullet.recommend.category),
+  );
+  const availableAddOns =
+    addOnCategories && addOnCategories.length > 0
+      ? addOnCategories
+      : FALLBACK_ELEVATE_ADD_ON_ORDER;
+  const addOnCount = addOnCategories?.length ?? 0;
+  const isSingleAddOnPreference =
+    preferAddOnCategories && hasAddOnBullet && addOnCount === 1;
+  const addOnOrder = FALLBACK_ELEVATE_ADD_ON_ORDER.filter(category =>
+    availableAddOns.includes(category as AddOnCategory),
+  );
+  const coreOrder = FALLBACK_ELEVATE_ORDER.filter(
+    category => !isAddOnCategory(category),
+  );
+  const coreElevateShortlist: Category[] = [
+    "shoes",
+    "tops",
+  ];
+  const coreShortlistOrder = coreElevateShortlist.filter(
+    category => category !== (scanCategory ?? null),
+  );
+  const fallbackOrder =
+    isSingleAddOnPreference
+      ? [...coreShortlistOrder, ...coreOrder]
+      : preferAddOnCategories && hasAddOnBullet
+        ? (availableAddOns.length >= 2
+            ? addOnOrder
+            : [...addOnOrder, ...coreOrder])
+        : FALLBACK_ELEVATE_ORDER;
+
+  const buildFallbackElevate = (
+    usedCategories: Set<Category>,
+    blockedCategory?: Category | null,
+  ): ElevateBullet => {
+    const fallbackCategory =
+      fallbackOrder.find(
+        category =>
+          category !== blockedCategory && !usedCategories.has(category),
+      ) ??
+      fallbackOrder.find(
+        category => category !== blockedCategory,
+      ) ??
+      "accessories";
+
+    return {
+      ...FALLBACK_TO_ELEVATE,
+      recommend: {
+        ...FALLBACK_TO_ELEVATE.recommend,
+        category: fallbackCategory,
+      },
+    };
+  };
+
+  const usedCategories = new Set(
+    toElevate.map(bullet => bullet.recommend.category),
+  );
   while (toElevate.length < 2) {
-    toElevate.push({ ...FALLBACK_TO_ELEVATE });
+    const fallback = buildFallbackElevate(usedCategories, scanCategory ?? null);
+    toElevate.push(fallback);
+    usedCategories.add(fallback.recommend.category);
     wasRepaired = true;
   }
 
@@ -370,5 +615,6 @@ export function validateAndRepairSuggestions(
       to_elevate: toElevate,
     },
     wasRepaired,
+    removedCategories,
   };
 }

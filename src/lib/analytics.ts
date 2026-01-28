@@ -45,6 +45,10 @@ const ANALYTICS_CONFIG = {
     style_signals_failed: 1,
     style_signals_started: 1,
     finalized_matches_invariant_violation: 1, // Always send - should be rare/never
+    personalized_suggestions_started: 1,
+    personalized_suggestions_completed: 1,
+    personalized_suggestions_failed: 1,
+    personalized_suggestions_cache_hit: 1,
     // Sample at 5% (high volume)
     trust_filter_pair_decision: 0.05,
     // Default for unlisted events
@@ -140,7 +144,12 @@ export type AnalyticsEvent =
   | StyleSignalsCompleted
   | StyleSignalsFailed
   // FinalizedMatches invariant events
-  | FinalizedMatchesInvariantViolation;
+  | FinalizedMatchesInvariantViolation
+  // Personalized Suggestions events
+  | PersonalizedSuggestionsStarted
+  | PersonalizedSuggestionsCompleted
+  | PersonalizedSuggestionsFailed
+  | PersonalizedSuggestionsCacheHit;
 
 // ============================================
 // TRUST FILTER EVENT TYPES
@@ -232,6 +241,57 @@ interface StyleSignalsFailed {
     item_id: string;
     error_type: string;
     error_message: string;
+  };
+}
+
+// ============================================
+// PERSONALIZED SUGGESTIONS EVENT TYPES
+// ============================================
+
+interface PersonalizedSuggestionsStarted {
+  name: "personalized_suggestions_started";
+  properties: {
+    scan_id: string;
+    intent: "shopping" | "own_item";
+    top_match_count: number;
+    prompt_version: number;
+    schema_version: number;
+    is_solo_mode: boolean;
+    scan_category: string | null;
+    prefer_add_on_categories: boolean;
+  };
+}
+
+interface PersonalizedSuggestionsCompleted {
+  name: "personalized_suggestions_completed";
+  properties: {
+    scan_id: string;
+    latency_ms: number;
+    source: "ai_call" | "cache_hit";
+    prompt_version: number;
+    schema_version: number;
+    was_repaired: boolean;
+    is_solo_mode: boolean;
+    removed_by_scan_category_count: number;
+    applied_add_on_preference: boolean;
+  };
+}
+
+interface PersonalizedSuggestionsFailed {
+  name: "personalized_suggestions_failed";
+  properties: {
+    scan_id: string;
+    error_kind: "timeout" | "network" | "unauthorized";
+    prompt_version: number;
+    schema_version: number;
+  };
+}
+
+interface PersonalizedSuggestionsCacheHit {
+  name: "personalized_suggestions_cache_hit";
+  properties: {
+    scan_id: string;
+    cache_age_seconds: number;
   };
 }
 

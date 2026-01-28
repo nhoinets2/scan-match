@@ -19,6 +19,11 @@ jest.mock('../supabase', () => ({
   },
 }));
 
+// Mock analytics
+jest.mock('../analytics', () => ({
+  trackEvent: jest.fn(),
+}));
+
 import { validateAndRepairSuggestions } from '../personalized-suggestions-service';
 import type { PersonalizedSuggestions } from '../types';
 
@@ -449,6 +454,186 @@ describe('validateAndRepairSuggestions', () => {
     });
   });
 
+  describe('scan category filtering', () => {
+    it('removes to_elevate that matches scanned category and backfills', () => {
+      const { suggestions, wasRepaired } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test', mentions: [] },
+            { text: 'Test', mentions: [] },
+          ],
+          to_elevate: [
+            { text: 'Add tailored bottoms', recommend: { type: 'consider_adding', category: 'bottoms', attributes: ['tailored'] } },
+            { text: 'Add shoes', recommend: { type: 'consider_adding', category: 'shoes', attributes: [] } },
+          ],
+        },
+        validIds,
+        'bottoms'
+      );
+
+      expect(suggestions.to_elevate).toHaveLength(2);
+      expect(suggestions.to_elevate.some(b => b.recommend.category === 'bottoms')).toBe(false);
+      expect(suggestions.to_elevate[0].recommend.category).toBe('shoes');
+      expect(suggestions.to_elevate[1].recommend.category).toBe('accessories');
+      expect(wasRepaired).toBe(true);
+    });
+
+    it('replaces both bullets when both match scanned category', () => {
+      const { suggestions } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test', mentions: [] },
+            { text: 'Test', mentions: [] },
+          ],
+          to_elevate: [
+            { text: 'Add bottoms', recommend: { type: 'consider_adding', category: 'bottoms', attributes: [] } },
+            { text: 'Add bottoms', recommend: { type: 'consider_adding', category: 'bottoms', attributes: [] } },
+          ],
+        },
+        validIds,
+        'bottoms'
+      );
+
+      expect(suggestions.to_elevate).toHaveLength(2);
+      expect(suggestions.to_elevate[0].recommend.category).toBe('accessories');
+      expect(suggestions.to_elevate[1].recommend.category).toBe('bags');
+    });
+
+    it('no-ops when scan category is null', () => {
+      const { suggestions, wasRepaired } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test', mentions: [] },
+            { text: 'Test', mentions: [] },
+          ],
+          to_elevate: [
+            { text: 'Add bottoms', recommend: { type: 'consider_adding', category: 'bottoms', attributes: [] } },
+            { text: 'Add shoes', recommend: { type: 'consider_adding', category: 'shoes', attributes: [] } },
+          ],
+        },
+        validIds,
+        null
+      );
+
+      expect(suggestions.to_elevate[0].recommend.category).toBe('bottoms');
+      expect(suggestions.to_elevate[1].recommend.category).toBe('shoes');
+      expect(wasRepaired).toBe(false);
+    });
+  });
+
+  describe('add-on preference', () => {
+    it('keeps only add-on categories when at least one exists', () => {
+      const { suggestions } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test', mentions: [] },
+            { text: 'Test', mentions: [] },
+          ],
+          to_elevate: [
+            { text: 'Add bags', recommend: { type: 'consider_adding', category: 'bags', attributes: [] } },
+            { text: 'Add shoes', recommend: { type: 'consider_adding', category: 'shoes', attributes: [] } },
+          ],
+        },
+        validIds,
+        null,
+        true,
+        ['bags', 'accessories']
+      );
+
+      expect(suggestions.to_elevate).toHaveLength(2);
+      expect(suggestions.to_elevate[0].recommend.category).toBe('bags');
+      expect(suggestions.to_elevate[1].recommend.category).toBe('accessories');
+    });
+
+    it('keeps core recommendations when no add-ons exist', () => {
+      const { suggestions } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test', mentions: [] },
+            { text: 'Test', mentions: [] },
+          ],
+          to_elevate: [
+            { text: 'Add tops', recommend: { type: 'consider_adding', category: 'tops', attributes: [] } },
+            { text: 'Add shoes', recommend: { type: 'consider_adding', category: 'shoes', attributes: [] } },
+          ],
+        },
+        validIds,
+        null,
+        true,
+        []
+      );
+
+      expect(suggestions.to_elevate[0].recommend.category).toBe('tops');
+      expect(suggestions.to_elevate[1].recommend.category).toBe('shoes');
+    });
+
+    it('falls back to core when only one add-on category exists', () => {
+      const { suggestions } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test', mentions: [] },
+            { text: 'Test', mentions: [] },
+          ],
+          to_elevate: [
+            { text: 'Add accessories', recommend: { type: 'consider_adding', category: 'accessories', attributes: [] } },
+          ],
+        },
+        validIds,
+        'tops',
+        true,
+        ['accessories']
+      );
+
+      expect(suggestions.to_elevate).toHaveLength(2);
+      expect(suggestions.to_elevate[0].recommend.category).toBe('accessories');
+      expect(suggestions.to_elevate[1].recommend.category).toBe('shoes');
+    });
+
+    it('keeps core shortlist away from outerwear', () => {
+      const { suggestions } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test', mentions: [] },
+            { text: 'Test', mentions: [] },
+          ],
+          to_elevate: [
+            { text: 'Add outerwear', recommend: { type: 'consider_adding', category: 'outerwear', attributes: [] } },
+          ],
+        },
+        validIds,
+        null,
+        true,
+        ['outerwear']
+      );
+
+      expect(suggestions.to_elevate).toHaveLength(2);
+      expect(suggestions.to_elevate[0].recommend.category).toBe('outerwear');
+      expect(suggestions.to_elevate[1].recommend.category).toBe('shoes');
+    });
+
+    it('skips shoes when scan category is shoes', () => {
+      const { suggestions } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test', mentions: [] },
+            { text: 'Test', mentions: [] },
+          ],
+          to_elevate: [
+            { text: 'Add outerwear', recommend: { type: 'consider_adding', category: 'outerwear', attributes: [] } },
+          ],
+        },
+        validIds,
+        'shoes',
+        true,
+        ['outerwear']
+      );
+
+      expect(suggestions.to_elevate).toHaveLength(2);
+      expect(suggestions.to_elevate[0].recommend.category).toBe('outerwear');
+      expect(suggestions.to_elevate[1].recommend.category).toBe('tops');
+    });
+  });
+
   describe('complete valid input (no repair needed)', () => {
     it('returns wasRepaired: false for perfect input', () => {
       const perfectInput: Partial<PersonalizedSuggestions> = {
@@ -491,6 +676,104 @@ describe('validateAndRepairSuggestions', () => {
       );
 
       expect(suggestions.version).toBe(1);
+    });
+  });
+
+  describe('solo mode (empty validIds)', () => {
+    it('forces empty mentions even if model returns them', () => {
+      const { suggestions, wasRepaired } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Great styling', mentions: ['item-1', 'item-2'] },
+            { text: 'Nice look', mentions: ['item-3'] },
+          ],
+          to_elevate: [
+            { text: 'Add tops', recommend: { type: 'consider_adding', category: 'tops', attributes: [] } },
+            { text: 'Add shoes', recommend: { type: 'consider_adding', category: 'shoes', attributes: [] } },
+          ],
+        },
+        [] // empty validIds = solo mode
+      );
+
+      // All mentions should be stripped
+      expect(suggestions.why_it_works[0].mentions).toEqual([]);
+      expect(suggestions.why_it_works[1].mentions).toEqual([]);
+      expect(wasRepaired).toBe(true);
+    });
+
+    it('handles solo mode with scan category filter', () => {
+      const { suggestions, removedCategories } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test', mentions: [] },
+            { text: 'Test', mentions: [] },
+          ],
+          to_elevate: [
+            { text: 'Add shoes', recommend: { type: 'consider_adding', category: 'shoes', attributes: ['casual'] } },
+            { text: 'Add tops', recommend: { type: 'consider_adding', category: 'tops', attributes: [] } },
+          ],
+        },
+        [], // solo mode
+        'shoes' // scanCategory
+      );
+
+      // shoes should be removed, backfilled with accessories
+      expect(suggestions.to_elevate).toHaveLength(2);
+      expect(suggestions.to_elevate.some(b => b.recommend.category === 'shoes')).toBe(false);
+      expect(removedCategories).toContain('shoes');
+    });
+
+    it('handles nasty edge case: scanCategory=shoes + preferAddOns + single add-on', () => {
+      const { suggestions } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test', mentions: [] },
+            { text: 'Test', mentions: [] },
+          ],
+          to_elevate: [
+            { text: 'Add shoes', recommend: { type: 'consider_adding', category: 'shoes', attributes: [] } },
+            { text: 'Add outerwear', recommend: { type: 'consider_adding', category: 'outerwear', attributes: [] } },
+          ],
+        },
+        [], // solo mode
+        'shoes', // scanCategory (removes shoes)
+        true, // preferAddOnCategories
+        ['outerwear'] // single add-on category
+      );
+
+      // Expected:
+      // 1. shoes removed (scan filter)
+      // 2. outerwear kept (add-on category)
+      // 3. If only one add-on category remains, bullet2 uses core-shortlist
+      //    → tops (since shoes is blocked by scanCategory)
+      // 4. Final: ['outerwear', 'tops'], no duplicates
+      expect(suggestions.to_elevate).toHaveLength(2);
+      expect(suggestions.to_elevate[0].recommend.category).toBe('outerwear');
+      expect(suggestions.to_elevate[1].recommend.category).toBe('tops');
+    });
+
+    it('solo mode with diversity filter works correctly', () => {
+      const { suggestions } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test', mentions: [] },
+            { text: 'Test', mentions: [] },
+          ],
+          to_elevate: [
+            { text: 'Add accessories', recommend: { type: 'consider_adding', category: 'accessories', attributes: [] } },
+            { text: 'Add outerwear', recommend: { type: 'consider_adding', category: 'outerwear', attributes: [] } },
+          ],
+        },
+        [], // solo mode
+        null, // no scan category filter
+        true, // preferAddOnCategories
+        ['accessories', 'outerwear'] // 2+ add-on categories
+      );
+
+      // Should keep both add-on categories, no duplicates
+      expect(suggestions.to_elevate).toHaveLength(2);
+      expect(suggestions.to_elevate[0].recommend.category).toBe('accessories');
+      expect(suggestions.to_elevate[1].recommend.category).toBe('outerwear');
     });
   });
 });
