@@ -572,6 +572,7 @@ export function validateAndRepairSuggestions(
       const attributes = Array.isArray(rec?.attributes)
         ? (rec?.attributes as unknown[])
             .filter((attr): attr is string => typeof attr === "string")
+            .map(a => a.replace(/_/g, ' ').trim())
             .slice(0, 4)
         : ["simple"];
 

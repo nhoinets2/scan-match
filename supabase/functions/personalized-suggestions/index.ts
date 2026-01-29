@@ -181,7 +181,8 @@ STRICT RULES (must follow):
 4. "to_elevate" MUST use type: "consider_adding" (never reference owned items)
 5. "category" in to_elevate MUST be one of: ${ALLOWED_CATEGORIES.join(', ')}
 6. Keep "text" concise (aim for 60-80 characters, max 100)
-7. Be specific to these actual items, not generic fashion advice
+7. "attributes" must be natural language (e.g., "solid color" not "solid_color", "fitted silhouette" not "fitted_silhouette")
+8. Be specific to these actual items, not generic fashion advice
 Respond with ONLY the JSON object.`;
 }
 
@@ -222,12 +223,13 @@ STRICT RULES (must follow):
 4. "to_elevate" MUST use type: "consider_adding"
 5. "category" in to_elevate MUST be one of: ${ALLOWED_CATEGORIES.join(', ')}
 6. Keep "text" concise (aim for 60-80 characters, max 100)
-7. Focus on how to style THIS ${scannedCategory}, not generic advice
-8. For "to_elevate": PRIORITIZE core outfit-forming pieces first:
+7. "attributes" must be natural language (e.g., "solid color" not "solid_color", "fitted silhouette" not "fitted_silhouette")
+8. Focus on how to style THIS ${scannedCategory}, not generic advice
+9. For "to_elevate": PRIORITIZE core outfit-forming pieces first:
    - If scanned item is outerwear/accessories: suggest tops, bottoms, shoes, dresses
    - If scanned item is tops/bottoms/shoes: suggest complementary core pieces to complete outfit
    - Only suggest accessories AFTER core pieces are covered
-9. "category" in to_elevate should be core pieces (tops, bottoms, shoes, dresses) NOT accessories/bags/outerwear
+10. "category" in to_elevate should be core pieces (tops, bottoms, shoes, dresses) NOT accessories/bags/outerwear
 Respond with ONLY the JSON object.`;
 }
 
@@ -285,7 +287,8 @@ STRICT RULES (must follow):
 4. "tip" must be specific styling advice to bridge the gap (e.g., "tuck in for cleaner silhouette")
 5. "tags" are optional keywords for the tip (e.g., ["proportion", "layering"])
 6. Keep "text" concise (aim for 60-80 characters, max 100)
-7. Focus on HOW to style these items to make them work, based on cap reasons
+7. Use natural language (e.g., "solid color" not "solid_color", "fitted silhouette" not "fitted_silhouette")
+8. Focus on HOW to style these items to make them work, based on cap reasons
 Respond with ONLY the JSON object.`;
 }
 
@@ -481,7 +484,10 @@ function validateAndRepairSuggestions(
           // Validate attributes
           const rawAttrs = rec?.attributes;
           const attributes = Array.isArray(rawAttrs)
-            ? rawAttrs.filter((a): a is string => typeof a === 'string').slice(0, 4)
+            ? rawAttrs
+                .filter((a): a is string => typeof a === 'string')
+                .map(a => a.replace(/_/g, ' ').trim())
+                .slice(0, 4)
             : ['simple'];
           
           // If we got consider_adding but expected styling_tip (near mode), repair to styling_tip
