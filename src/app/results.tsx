@@ -2413,9 +2413,9 @@ function ResultsSuccess({
     // CRITICAL: Solo mode gating - only fetch when:
     // 1. Trust filter finalized + wardrobe summary ready
     // 2. Wardrobe has items (wardrobeCount > 0)
-    // 3. No CORE HIGH matches AND no NEAR matches at all (even add-ons)
-    // NOTE: If there are ANY near matches, NEAR mode will show its own card
-    // NOTE: Add-on matches (outerwear, bags, accessories) don't count for paired mode
+    // 3. No CORE HIGH matches AND no CORE NEAR matches (0+0)
+    // NOTE: Add-on matches (outerwear, bags, accessories) don't count - they can't form complete outfits
+    // NOTE: If only add-on NEAR matches exist, SOLO mode still triggers (user needs core pieces)
     const coreHighMatches = trustFilterResult.finalized.highFinal.filter(m =>
       isCoreCategory(m.wardrobeItem.category as Category)
     );
@@ -2423,16 +2423,12 @@ function ResultsSuccess({
       isCoreCategory(m.wardrobeItem.category as Category)
     );
     
-    // SOLO mode should NOT trigger if there are ANY near matches (even add-ons)
-    // because NEAR tab will show its own AI card - showing both would be confusing
-    const hasAnyNearMatches = trustFilterResult.finalized.nearFinal.length > 0;
-    
     const canFetchSoloAi =
       trustFilterResult.isFullyReady &&
       wardrobeSummary?.updated_at &&
       wardrobeCount > 0 &&
       coreHighMatches.length === 0 &&
-      !hasAnyNearMatches; // Changed: Don't show SOLO if there are ANY near matches
+      coreNearMatches.length === 0; // Only check CORE near matches, ignore add-ons
     
     // Paired mode: need at least one CORE high match
     const canFetchPairedAi = coreHighMatches.length > 0;
@@ -2456,16 +2452,15 @@ function ResultsSuccess({
     if (__DEV__ && trustFilterResult.isFullyReady) {
       const totalHigh = trustFilterResult.finalized.highFinal.length;
       const totalNear = trustFilterResult.finalized.nearFinal.length;
-      if (totalHigh !== coreHighMatches.length || totalNear !== coreNearMatches.length || hasAnyNearMatches) {
+      if (totalHigh !== coreHighMatches.length || totalNear !== coreNearMatches.length) {
         console.log('[Solo Mode] Core filtering:', {
           totalHigh,
           coreHigh: coreHighMatches.length,
           totalNear,
           coreNear: coreNearMatches.length,
-          hasAnyNearMatches,
           isSoloMode: canFetchSoloAi,
-          addOnMatches: totalHigh - coreHighMatches.length,
-          reason: hasAnyNearMatches ? 'NEAR matches exist - using NEAR mode instead' : 'No matches',
+          addOnHighMatches: totalHigh - coreHighMatches.length,
+          addOnNearMatches: totalNear - coreNearMatches.length,
         });
       }
     }
@@ -2582,11 +2577,20 @@ function ResultsSuccess({
       return;
     }
 
-    // Only fetch for NEAR tab when we have NEAR matches
+    // Only fetch for NEAR tab when we have CORE NEAR matches
+    // Add-on-only NEAR matches don't warrant an AI card (SOLO mode handles that case)
     const nearFinal = trustFilterResult.finalized.nearFinal;
-    if (nearFinal.length === 0) {
+    const coreNearMatches = nearFinal.filter(m =>
+      isCoreCategory(m.wardrobeItem.category as Category)
+    );
+    
+    if (coreNearMatches.length === 0) {
+      // No core NEAR matches - skip NEAR AI (SOLO will handle it if needed)
       setNearSuggestionsResult(null);
       setNearSuggestionsLoading(false);
+      if (__DEV__ && nearFinal.length > 0) {
+        console.log('[NEAR AI Suggestions] Skipping - only add-on NEAR matches, SOLO mode will handle');
+      }
       return;
     }
 
@@ -2597,6 +2601,7 @@ function ResultsSuccess({
         isFullyReady: trustFilterResult.isFullyReady,
         hasWardrobeSummary: !!wardrobeSummary?.updated_at,
         nearMatchCount: nearFinal.length,
+        coreNearMatchCount: coreNearMatches.length,
         nearIds: nearFinalIdsKey,
       });
     }
