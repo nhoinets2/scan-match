@@ -51,12 +51,20 @@ type AestheticArchetype = typeof ALLOWED_AESTHETICS[number];
 // TYPES
 // ============================================
 
+// Derived mode (server-side, never trust client)
+type SuggestionsMode = 'paired' | 'solo' | 'near';
+
 interface SafeMatchInfo {
   id: string;
   category: Category;
   dominant_color: string;
   aesthetic: AestheticArchetype;
   label?: string;
+}
+
+// NEAR match includes cap reasons (why it's close but not HIGH)
+interface SafeNearMatchInfo extends SafeMatchInfo {
+  cap_reasons?: string[];  // e.g., ['formality_mismatch', 'season_mismatch']
 }
 
 interface WardrobeSummary {
@@ -85,11 +93,13 @@ interface StyleSignalsV1 {
 interface SuggestionsRequest {
   scan_signals: StyleSignalsV1;
   top_matches: SafeMatchInfo[];
+  near_matches?: SafeNearMatchInfo[];  // NEAR mode: MEDIUM tier items
   wardrobe_summary: WardrobeSummary;
   intent: 'shopping' | 'own_item';
   cache_key: string;
   scan_id?: string;
   has_pairings?: boolean;
+  mode?: SuggestionsMode;  // Client hint (telemetry only, NOT trusted)
 }
 
 interface SuggestionBullet {
@@ -97,13 +107,24 @@ interface SuggestionBullet {
   mentions: string[];
 }
 
+// Tagged union for recommend - allows mode-appropriate shapes
+type RecommendConsiderAdding = {
+  type: 'consider_adding';
+  category: Category;
+  attributes: string[];
+};
+
+type RecommendStylingTip = {
+  type: 'styling_tip';
+  tip: string;
+  tags?: string[];
+};
+
+type Recommend = RecommendConsiderAdding | RecommendStylingTip;
+
 interface ElevateBullet {
   text: string;
-  recommend: {
-    type: 'consider_adding';
-    category: Category;
-    attributes: string[];
-  };
+  recommend: Recommend;
 }
 
 interface PersonalizedSuggestions {
@@ -202,6 +223,64 @@ STRICT RULES (must follow):
 Respond with ONLY the JSON object.`;
 }
 
+/**
+ * Build NEAR mode prompt - focuses on "how to make it work"
+ * NEAR matches are MEDIUM tier items that are close but not HIGH
+ */
+function buildNearPrompt(
+  scanSignals: StyleSignalsV1,
+  nearMatches: SafeNearMatchInfo[],
+  wardrobeSummary: WardrobeSummary,
+  intent: 'shopping' | 'own_item'
+): string {
+  // Cap to top 3 near matches to keep prompt small
+  const topNearMatches = nearMatches.slice(0, 3);
+  const validIds = topNearMatches.map(m => m.id);
+  const validIdsList = validIds.join(', ');
+  
+  // Compact context
+  const scanSummary = `aesthetic:${scanSignals.aesthetic?.primary ?? 'unknown'}; formality:${scanSignals.formality?.band ?? 'unknown'}; statement:${scanSignals.statement?.level ?? 'unknown'}; season:${scanSignals.season?.heaviness ?? 'unknown'}; pattern:${scanSignals.pattern?.level ?? 'unknown'}; colors:${scanSignals.palette?.colors?.join('/') ?? 'unknown'}`;
+  
+  // Include cap reasons (top 2 per match) to explain why it's NEAR not HIGH
+  const matchesSummary = topNearMatches.map(m => {
+    const capReasons = (m.cap_reasons ?? []).slice(0, 2).join('+') || 'style_gap';
+    return `${m.id}|${m.category}|${m.dominant_color}|${m.aesthetic}|cap:${capReasons}`;
+  }).join(',');
+  
+  const wardrobeOverview = `total:${wardrobeSummary.total}; categories:${Object.entries(wardrobeSummary.by_category).map(([k, v]) => `${k}:${v}`).join(',')}; aesthetics:${wardrobeSummary.dominant_aesthetics?.join('/') ?? 'varied'}`;
+
+  return `You are a personal stylist. Output ONLY JSON.
+
+CONTEXT:
+intent:${intent}
+scan:${scanSummary}
+near_matches:${matchesSummary}
+wardrobe:${wardrobeOverview}
+note: These items are CLOSE matches but not perfect. Focus on HOW to make them work.
+
+OUTPUT FORMAT (strict JSON only):
+{
+  "why_it_works": [
+    { "text": "why this item is close to working", "mentions": ["ITEM_ID"] },
+    { "text": "why this item is close to working", "mentions": ["ITEM_ID"] }
+  ],
+  "to_elevate": [
+    { "text": "how to bridge the style gap", "recommend": { "type": "styling_tip", "tip": "specific styling advice", "tags": ["tag1"] } },
+    { "text": "how to bridge the style gap", "recommend": { "type": "styling_tip", "tip": "specific styling advice", "tags": ["tag1"] } }
+  ]
+}
+
+STRICT RULES (must follow):
+1. "mentions" array MUST ONLY contain IDs from: [${validIdsList}]
+2. NEVER write item names, labels, or descriptions in "text" - only put IDs in "mentions"
+3. "to_elevate" MUST use type: "styling_tip" (NOT "consider_adding" - focus on styling, not buying)
+4. "tip" must be specific styling advice to bridge the gap (e.g., "tuck in for cleaner silhouette")
+5. "tags" are optional keywords for the tip (e.g., ["proportion", "layering"])
+6. Keep "text" concise (aim for 60-80 characters, max 100)
+7. Focus on HOW to style these items to make them work, based on cap reasons
+Respond with ONLY the JSON object.`;
+}
+
 // ============================================
 // VALIDATION & REPAIR
 // ============================================
@@ -211,9 +290,14 @@ const FALLBACK_WHY_IT_WORKS: SuggestionBullet = {
   mentions: [],
 };
 
-const FALLBACK_TO_ELEVATE: ElevateBullet = {
+const FALLBACK_TO_ELEVATE_CONSIDER_ADDING: ElevateBullet = {
   text: "Could add visual interest",
   recommend: { type: 'consider_adding', category: 'accessories', attributes: ['simple', 'neutral'] },
+};
+
+const FALLBACK_TO_ELEVATE_STYLING_TIP: ElevateBullet = {
+  text: "Try adjusting proportions for better balance",
+  recommend: { type: 'styling_tip', tip: 'Experiment with tucking or layering to improve the silhouette', tags: ['proportion'] },
 };
 
 /**
@@ -232,17 +316,29 @@ function smartTrim(text: string, maxLen: number): string {
   return trimmed.slice(0, maxLen - 1) + '…';
 }
 
+/**
+ * Validate and repair AI suggestions
+ * 
+ * @param data - Raw AI response
+ * @param validIds - Valid item IDs for mentions (top_matches for paired, near_matches for near, empty for solo)
+ * @param mode - Derived mode: 'paired', 'solo', or 'near'
+ * @returns Validated/repaired suggestions + repair flag
+ */
 function validateAndRepairSuggestions(
   data: unknown,
   validIds: string[],
-  isSoloMode: boolean
-): { suggestions: PersonalizedSuggestions; wasRepaired: boolean } {
+  mode: SuggestionsMode
+): { suggestions: PersonalizedSuggestions; wasRepaired: boolean; mentionsStrippedCount: number } {
   const validIdSet = new Set(validIds);
   let wasRepaired = false;
+  let mentionsStrippedCount = 0;
   const runtimeEnv = (Deno.env.get("SUPABASE_ENV") ?? Deno.env.get("DENO_ENV") ?? "").toLowerCase();
   const isDev = runtimeEnv === "development" || runtimeEnv === "local";
   const suspiciousWithYour = /\bwith your\b/i;
   const suspiciousYourItem = /\byour\s+\w+/i;
+  
+  const isSoloMode = mode === 'solo';
+  const isNearMode = mode === 'near';
   
   // Ensure object shape
   const raw = (typeof data === 'object' && data !== null) 
@@ -262,8 +358,12 @@ function validateAndRepairSuggestions(
         
         const originalMentions = Array.isArray(bullet?.mentions) ? bullet.mentions : [];
 
+        // SOLO mode: force empty mentions
         if (isSoloMode) {
-          if (originalMentions.length > 0) wasRepaired = true;
+          if (originalMentions.length > 0) {
+            wasRepaired = true;
+            mentionsStrippedCount += originalMentions.length;
+          }
           if (isDev && (suspiciousWithYour.test(trimmedText) || suspiciousYourItem.test(trimmedText))) {
             console.warn("[personalized-suggestions] Solo suspicious phrase in why_it_works:", trimmedText);
           }
@@ -273,12 +373,19 @@ function validateAndRepairSuggestions(
           };
         }
 
-        // Strip invalid mentions (only keep IDs that exist in input)
+        // PAIRED or NEAR mode: strip invalid mentions (must be subset of validIds)
         const validMentions = originalMentions.filter((id: unknown) =>
           typeof id === 'string' && validIdSet.has(id)
         );
 
-        if (validMentions.length !== originalMentions.length) wasRepaired = true;
+        const strippedCount = originalMentions.length - validMentions.length;
+        if (strippedCount > 0) {
+          wasRepaired = true;
+          mentionsStrippedCount += strippedCount;
+          if (isDev) {
+            console.warn(`[personalized-suggestions] ${mode} mode: stripped ${strippedCount} invalid mentions`);
+          }
+        }
 
         return {
           text: trimmedText,
@@ -293,49 +400,115 @@ function validateAndRepairSuggestions(
     wasRepaired = true;
   }
   
-  // Process to_elevate
+  // Process to_elevate with recommend union validation
   let toElevate: ElevateBullet[] = [];
   if (Array.isArray(raw.to_elevate)) {
     toElevate = raw.to_elevate
       .slice(0, 2)
       .map(bullet => {
         const rec = bullet?.recommend as Record<string, unknown> | undefined;
-        const originalText = typeof bullet?.text === 'string' ? bullet.text : '';
-        const trimmedText = smartTrim(originalText || FALLBACK_TO_ELEVATE.text, 100);
+        const recType = rec?.type as string | undefined;
         
-        if (trimmedText !== originalText) wasRepaired = true;
+        // NEAR mode expects styling_tip; PAIRED/SOLO expect consider_adding
+        const expectedType = isNearMode ? 'styling_tip' : 'consider_adding';
         
-        // Validate category - clamp to allowed values
-        const rawCategory = rec?.category as string | undefined;
-        const category = (ALLOWED_CATEGORIES as readonly string[]).includes(rawCategory ?? '')
-          ? (rawCategory as Category)
-          : 'accessories';
-        
-        if (category !== rawCategory) wasRepaired = true;
-        
-        // Force type to 'consider_adding'
-        if (rec?.type !== 'consider_adding') wasRepaired = true;
-        
-        // Validate attributes
-        const rawAttrs = rec?.attributes;
-        const attributes = Array.isArray(rawAttrs)
-          ? rawAttrs.filter((a): a is string => typeof a === 'string').slice(0, 4)
-          : ['simple'];
-        
-        return {
-          text: trimmedText,
-          recommend: {
-            type: 'consider_adding' as const,
-            category,
-            attributes,
-          },
-        };
+        // Determine which type the model returned
+        if (recType === 'styling_tip') {
+          // Validate styling_tip type
+          const rawTip = rec?.tip;
+          const tip = typeof rawTip === 'string' && rawTip.trim() 
+            ? smartTrim(rawTip.trim(), 100)
+            : 'Experiment with layering or proportions';
+          
+          if (tip !== rawTip) wasRepaired = true;
+          
+          const rawTags = rec?.tags;
+          const tags = Array.isArray(rawTags)
+            ? rawTags.filter((t): t is string => typeof t === 'string').slice(0, 4)
+            : undefined;
+          
+          const originalText = typeof bullet?.text === 'string' ? bullet.text : '';
+          const trimmedText = smartTrim(originalText || FALLBACK_TO_ELEVATE_STYLING_TIP.text, 100);
+          if (trimmedText !== originalText) wasRepaired = true;
+          
+          // If we got styling_tip but expected consider_adding (paired/solo), repair to consider_adding
+          if (expectedType === 'consider_adding') {
+            wasRepaired = true;
+            return {
+              text: trimmedText,
+              recommend: {
+                type: 'consider_adding' as const,
+                category: 'accessories' as Category,
+                attributes: ['simple', 'complementary'],
+              },
+            };
+          }
+          
+          return {
+            text: trimmedText,
+            recommend: {
+              type: 'styling_tip' as const,
+              tip,
+              ...(tags && tags.length > 0 ? { tags } : {}),
+            },
+          };
+        } else {
+          // Validate consider_adding type (or unknown type → default to consider_adding for paired/solo)
+          const originalText = typeof bullet?.text === 'string' ? bullet.text : '';
+          const trimmedText = smartTrim(originalText || FALLBACK_TO_ELEVATE_CONSIDER_ADDING.text, 100);
+          
+          if (trimmedText !== originalText) wasRepaired = true;
+          
+          // Validate category - clamp to allowed values
+          const rawCategory = rec?.category as string | undefined;
+          const category = (ALLOWED_CATEGORIES as readonly string[]).includes(rawCategory ?? '')
+            ? (rawCategory as Category)
+            : 'accessories';
+          
+          if (category !== rawCategory) wasRepaired = true;
+          
+          // Check type mismatch
+          if (recType !== 'consider_adding') wasRepaired = true;
+          
+          // Validate attributes
+          const rawAttrs = rec?.attributes;
+          const attributes = Array.isArray(rawAttrs)
+            ? rawAttrs.filter((a): a is string => typeof a === 'string').slice(0, 4)
+            : ['simple'];
+          
+          // If we got consider_adding but expected styling_tip (near mode), repair to styling_tip
+          if (expectedType === 'styling_tip') {
+            wasRepaired = true;
+            // Convert category+attributes suggestion to a styling tip
+            const convertedTip = `Consider adding ${attributes.join(', ')} ${category} to complete the look`;
+            return {
+              text: trimmedText,
+              recommend: {
+                type: 'styling_tip' as const,
+                tip: smartTrim(convertedTip, 100),
+                tags: [category],
+              },
+            };
+          }
+          
+          return {
+            text: trimmedText,
+            recommend: {
+              type: 'consider_adding' as const,
+              category,
+              attributes,
+            },
+          };
+        }
       });
   }
   
-  // Pad to exactly 2 bullets
+  // Pad to exactly 2 bullets with mode-appropriate fallback
+  const fallbackToElevate = isNearMode 
+    ? FALLBACK_TO_ELEVATE_STYLING_TIP 
+    : FALLBACK_TO_ELEVATE_CONSIDER_ADDING;
   while (toElevate.length < 2) {
-    toElevate.push({ ...FALLBACK_TO_ELEVATE });
+    toElevate.push({ ...fallbackToElevate });
     wasRepaired = true;
   }
   
@@ -346,6 +519,7 @@ function validateAndRepairSuggestions(
       to_elevate: toElevate,
     },
     wasRepaired,
+    mentionsStrippedCount,
   };
 }
 
@@ -404,35 +578,59 @@ Deno.serve(async (req) => {
     // ============================================
     
     const body: SuggestionsRequest = await req.json();
-    const { scan_signals, top_matches, wardrobe_summary, intent, cache_key, scan_id, has_pairings } = body;
+    const { scan_signals, top_matches, near_matches, wardrobe_summary, intent, cache_key, scan_id, has_pairings } = body;
     void has_pairings;
     
-    // Validate required fields
-    if (!scan_signals || !top_matches || !cache_key) {
+    // Validate required fields (near_matches optional)
+    if (!scan_signals || !cache_key) {
       return new Response(
         JSON.stringify({ ok: false, error: { kind: "bad_request", message: "Missing required fields" } }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     
-    // Validate top_matches (0-5, valid structure)
-    if (!Array.isArray(top_matches) || top_matches.length > 5) {
+    // Ensure arrays exist (top_matches can be undefined for NEAR mode)
+    const safeTopMatches = Array.isArray(top_matches) ? top_matches : [];
+    const safeNearMatches = Array.isArray(near_matches) ? near_matches : [];
+    
+    // Validate array sizes
+    if (safeTopMatches.length > 5) {
       return new Response(
         JSON.stringify({ ok: false, error: { kind: "bad_request", message: "top_matches must be 0-5 items" } }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    if (safeNearMatches.length > 5) {
+      return new Response(
+        JSON.stringify({ ok: false, error: { kind: "bad_request", message: "near_matches must be 0-5 items" } }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    const validIds = top_matches.map(m => m.id).filter(id => typeof id === 'string' && id.length > 0);
-    const isSoloMode = top_matches.length === 0;
-    if (!isSoloMode && validIds.length === 0) {
+    // ============================================
+    // MODE DERIVATION (server-side, never trust client)
+    // ============================================
+    // Priority: near_matches > top_matches > solo
+    const derivedMode: SuggestionsMode = safeNearMatches.length > 0 
+      ? 'near' 
+      : safeTopMatches.length === 0 
+        ? 'solo' 
+        : 'paired';
+    
+    // Get valid IDs based on mode
+    const validIds = derivedMode === 'near'
+      ? safeNearMatches.map(m => m.id).filter(id => typeof id === 'string' && id.length > 0)
+      : safeTopMatches.map(m => m.id).filter(id => typeof id === 'string' && id.length > 0);
+    
+    // For paired/near modes, require at least one valid ID
+    if (derivedMode !== 'solo' && validIds.length === 0) {
       return new Response(
         JSON.stringify({ ok: false, error: { kind: "bad_request", message: "No valid item IDs provided" } }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     
-    console.log(`[personalized-suggestions] Processing: user=${userId.slice(0, 8)}..., matches=${top_matches.length}, intent=${intent}, solo=${isSoloMode}`);
+    console.log(`[personalized-suggestions] Processing: user=${userId.slice(0, 8)}..., mode=${derivedMode}, top=${safeTopMatches.length}, near=${safeNearMatches.length}, intent=${intent}`);
     
     // ============================================
     // 3. CALL OPENAI WITH TIMEOUT
@@ -448,9 +646,21 @@ Deno.serve(async (req) => {
     }
     
     const safeWardrobeSummary = wardrobe_summary ?? { total: 0, by_category: {}, dominant_aesthetics: [], updated_at: '' };
-    const prompt = isSoloMode
-      ? buildSoloPrompt(scan_signals, safeWardrobeSummary, intent ?? 'own_item')
-      : buildPrompt(scan_signals, top_matches, safeWardrobeSummary, intent ?? 'own_item');
+    
+    // Build prompt based on derived mode
+    let prompt: string;
+    switch (derivedMode) {
+      case 'near':
+        prompt = buildNearPrompt(scan_signals, safeNearMatches, safeWardrobeSummary, intent ?? 'own_item');
+        break;
+      case 'solo':
+        prompt = buildSoloPrompt(scan_signals, safeWardrobeSummary, intent ?? 'own_item');
+        break;
+      case 'paired':
+      default:
+        prompt = buildPrompt(scan_signals, safeTopMatches, safeWardrobeSummary, intent ?? 'own_item');
+        break;
+    }
     
     // Create abort controller for timeout
     const controller = new AbortController();
@@ -525,11 +735,11 @@ Deno.serve(async (req) => {
       }
       
       // Validate and repair
-      const result = validateAndRepairSuggestions(rawSuggestions, validIds, isSoloMode);
+      const result = validateAndRepairSuggestions(rawSuggestions, validIds, derivedMode);
       suggestions = result.suggestions;
       wasRepaired = result.wasRepaired;
       
-      console.log(`[personalized-suggestions] OpenAI success in ${latencyMs}ms, repaired=${wasRepaired}`);
+      console.log(`[personalized-suggestions] OpenAI success in ${latencyMs}ms, mode=${derivedMode}, repaired=${wasRepaired}, mentionsStripped=${result.mentionsStrippedCount}`);
       
     } catch (error) {
       clearTimeout(timeoutId);
@@ -595,6 +805,7 @@ Deno.serve(async (req) => {
         data: suggestions,
         meta: {
           source: 'ai_call',
+          mode: derivedMode,
           latencyMs,
           wasRepaired,
           promptVersion: PROMPT_VERSION,
