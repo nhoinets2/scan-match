@@ -66,6 +66,15 @@ function formatItemList(items: WardrobeItem[]): string {
 }
 
 /**
+ * Capitalize the first letter of a string.
+ * Used to ensure bullet points start with uppercase.
+ */
+function capitalizeFirst(text: string): string {
+  if (!text || text.length === 0) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/**
  * Renders a why_it_works bullet with safe mention handling.
  * 
  * IMPORTANT: Don't do string replacement on bullet.text!
@@ -111,7 +120,7 @@ function WhyItWorksBullet({
             color: colors.text.primary,
           }}
         >
-          {bullet.text}
+          {capitalizeFirst(bullet.text)}
         </Text>
 
         {/* Owned item references (rendered separately, not string-replaced) */}
@@ -173,7 +182,7 @@ function ToElevateBullet({ bullet }: { bullet: ElevateBullet }) {
                 marginTop: spacing.xs / 2,
               }}
             >
-              {bullet.text}
+              {capitalizeFirst(bullet.text)}
             </Text>
           </>
         ) : (
@@ -185,7 +194,7 @@ function ToElevateBullet({ bullet }: { bullet: ElevateBullet }) {
                 color: colors.text.primary,
               }}
             >
-              {bullet.recommend.tip}
+              {capitalizeFirst(bullet.recommend.tip)}
             </Text>
             {bullet.text && (
               <Text
@@ -195,7 +204,7 @@ function ToElevateBullet({ bullet }: { bullet: ElevateBullet }) {
                   marginTop: spacing.xs / 2,
                 }}
               >
-                {bullet.text}
+                {capitalizeFirst(bullet.text)}
               </Text>
             )}
           </>
