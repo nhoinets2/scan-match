@@ -2628,6 +2628,7 @@ function ResultsSuccess({
         scanId: currentCheckId,
         hasSignals: !!trustFilterResult.scanSignals,
         nearMatchCount: nearFinal.length,
+        coreNearMatchCount: coreNearMatches.length,
       });
     }
 
@@ -2635,7 +2636,7 @@ function ResultsSuccess({
       scanId: currentCheckId,
       scanSignals: trustFilterResult.scanSignals,
       highFinal: [], // Empty for NEAR mode
-      nearFinal: nearFinal, // NEAR matches
+      nearFinal: coreNearMatches, // Only CORE near matches (no add-ons)
       wardrobeSummary,
       intent,
       scanCategory: scannedItem?.category ?? null,
