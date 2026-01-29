@@ -34,7 +34,8 @@ describe('validateAndRepairSuggestions', () => {
     it('pads empty arrays to 2+2 with fallbacks', () => {
       const { suggestions, wasRepaired } = validateAndRepairSuggestions(
         { why_it_works: [], to_elevate: [] },
-        validIds
+        validIds,
+        'paired'
       );
 
       expect(suggestions.why_it_works).toHaveLength(2);
@@ -43,7 +44,7 @@ describe('validateAndRepairSuggestions', () => {
       
       // Check fallback content
       expect(suggestions.why_it_works[0].text).toBe('The colors and styles complement each other well');
-      expect(suggestions.to_elevate[0].recommend.category).toBe('accessories');
+      expect((suggestions.to_elevate[0].recommend as any).category).toBe('accessories');
     });
 
     it('pads single bullet to 2', () => {
@@ -56,7 +57,8 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Add this', recommend: { type: 'consider_adding', category: 'tops', attributes: ['blue'] } }
           ],
         },
-        validIds
+        validIds,
+        'paired'
       );
 
       expect(suggestions.why_it_works).toHaveLength(2);
@@ -85,7 +87,8 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Add 3 (should be removed)', recommend: { type: 'consider_adding', category: 'bags', attributes: [] } },
           ],
         },
-        validIds
+        validIds,
+        'paired'
       );
 
       expect(suggestions.why_it_works).toHaveLength(2);
@@ -101,7 +104,8 @@ describe('validateAndRepairSuggestions', () => {
     it('handles missing fields in input object', () => {
       const { suggestions, wasRepaired } = validateAndRepairSuggestions(
         {},
-        validIds
+        validIds,
+        'paired'
       );
 
       expect(suggestions.why_it_works).toHaveLength(2);
@@ -110,10 +114,10 @@ describe('validateAndRepairSuggestions', () => {
     });
 
     it('handles null/undefined input', () => {
-      const { suggestions: nullResult } = validateAndRepairSuggestions(null, validIds);
+      const { suggestions: nullResult } = validateAndRepairSuggestions(null, validIds, 'paired');
       expect(nullResult.why_it_works).toHaveLength(2);
 
-      const { suggestions: undefinedResult } = validateAndRepairSuggestions(undefined, validIds);
+      const { suggestions: undefinedResult } = validateAndRepairSuggestions(undefined, validIds, 'paired');
       expect(undefinedResult.why_it_works).toHaveLength(2);
     });
   });
@@ -131,7 +135,8 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Add that', recommend: { type: 'consider_adding', category: 'shoes', attributes: [] } },
           ],
         },
-        validIds
+        validIds,
+        'paired'
       );
 
       expect(suggestions.why_it_works[0].mentions).toEqual(['item-1', 'item-2']);
@@ -151,7 +156,8 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Add', recommend: { type: 'consider_adding', category: 'tops', attributes: [] } },
           ],
         },
-        validIds
+        validIds,
+        'paired'
       );
 
       expect(suggestions.why_it_works[0].mentions).toEqual([]);
@@ -171,7 +177,8 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Add', recommend: { type: 'consider_adding', category: 'tops', attributes: [] } },
           ],
         },
-        validIds
+        validIds,
+        'paired'
       );
 
       expect(suggestions.why_it_works[0].mentions).toEqual([]);
@@ -190,7 +197,8 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Add', recommend: { type: 'consider_adding', category: 'tops', attributes: [] } },
           ],
         },
-        validIds
+        validIds,
+        'paired'
       );
 
       expect(suggestions.why_it_works[0].mentions).toEqual(['item-1', 'item-2']);
@@ -212,7 +220,8 @@ describe('validateAndRepairSuggestions', () => {
             { text: longText, recommend: { type: 'consider_adding', category: 'shoes', attributes: [] } },
           ],
         },
-        validIds
+        validIds,
+        'paired'
       );
 
       expect(suggestions.why_it_works[0].text.length).toBeLessThanOrEqual(100);
@@ -239,7 +248,8 @@ describe('validateAndRepairSuggestions', () => {
             { text: shortText, recommend: { type: 'consider_adding', category: 'tops', attributes: [] } },
           ],
         },
-        validIds
+        validIds,
+        'paired'
       );
 
       expect(suggestions.why_it_works[0].text).toBe(shortText);
@@ -259,7 +269,8 @@ describe('validateAndRepairSuggestions', () => {
             { text: null, recommend: { type: 'consider_adding', category: 'tops', attributes: [] } },
           ],
         },
-        validIds
+        validIds,
+        'paired'
       );
 
       // Should use fallback text when empty
@@ -284,11 +295,12 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Test', recommend: { type: 'consider_adding', category: 'unknown', attributes: [] } },
           ],
         },
-        validIds
+        validIds,
+        'paired'
       );
 
-      expect(suggestions.to_elevate[0].recommend.category).toBe('accessories');
-      expect(suggestions.to_elevate[1].recommend.category).toBe('accessories');
+      expect((suggestions.to_elevate[0].recommend as any).category).toBe('accessories');
+      expect((suggestions.to_elevate[1].recommend as any).category).toBe('accessories');
       expect(wasRepaired).toBe(true);
     });
 
@@ -308,11 +320,12 @@ describe('validateAndRepairSuggestions', () => {
           ],
           to_elevate: toElevate.slice(0, 2), // Only use first 2
         },
-        validIds
+        validIds,
+        'paired'
       );
 
-      expect(suggestions.to_elevate[0].recommend.category).toBe('tops');
-      expect(suggestions.to_elevate[1].recommend.category).toBe('bottoms');
+      expect((suggestions.to_elevate[0].recommend as any).category).toBe('tops');
+      expect((suggestions.to_elevate[1].recommend as any).category).toBe('bottoms');
       expect(wasRepaired).toBe(false);
     });
 
@@ -328,16 +341,17 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Test', recommend: { type: 'consider_adding', category: null, attributes: [] } },
           ],
         },
-        validIds
+        validIds,
+        'paired'
       );
 
-      expect(suggestions.to_elevate[0].recommend.category).toBe('accessories');
-      expect(suggestions.to_elevate[1].recommend.category).toBe('accessories');
+      expect((suggestions.to_elevate[0].recommend as any).category).toBe('accessories');
+      expect((suggestions.to_elevate[1].recommend as any).category).toBe('accessories');
     });
   });
 
   describe('type enforcement', () => {
-    it('forces type to consider_adding', () => {
+    it('forces invalid type to consider_adding in paired mode', () => {
       const { suggestions, wasRepaired } = validateAndRepairSuggestions(
         {
           why_it_works: [
@@ -349,7 +363,8 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Test', recommend: { type: 'shop_link', category: 'shoes', attributes: [] } },
           ],
         },
-        validIds
+        validIds,
+        'paired'
       );
 
       expect(suggestions.to_elevate[0].recommend.type).toBe('consider_adding');
@@ -369,7 +384,8 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Test', recommend: { type: 'consider_adding', category: 'shoes', attributes: [] } },
           ],
         },
-        validIds
+        validIds,
+        'paired'
       );
 
       expect(wasRepaired).toBe(false);
@@ -389,11 +405,12 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Test', recommend: { type: 'consider_adding', category: 'shoes', attributes: ['casual', 'comfortable'] } },
           ],
         },
-        validIds
+        validIds,
+        'paired'
       );
 
-      expect(suggestions.to_elevate[0].recommend.attributes).toEqual(['blue', 'structured']);
-      expect(suggestions.to_elevate[1].recommend.attributes).toEqual(['casual', 'comfortable']);
+      expect((suggestions.to_elevate[0].recommend as any).attributes).toEqual(['blue', 'structured']);
+      expect((suggestions.to_elevate[1].recommend as any).attributes).toEqual(['casual', 'comfortable']);
     });
 
     it('filters non-string attributes', () => {
@@ -408,10 +425,11 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Test', recommend: { type: 'consider_adding', category: 'shoes', attributes: [] } },
           ],
         },
-        validIds
+        validIds,
+        'paired'
       );
 
-      expect(suggestions.to_elevate[0].recommend.attributes).toEqual(['blue', 'structured']);
+      expect((suggestions.to_elevate[0].recommend as any).attributes).toEqual(['blue', 'structured']);
     });
 
     it('limits attributes to 4 items', () => {
@@ -426,11 +444,12 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Test', recommend: { type: 'consider_adding', category: 'shoes', attributes: [] } },
           ],
         },
-        validIds
+        validIds,
+        'paired'
       );
 
-      expect(suggestions.to_elevate[0].recommend.attributes).toHaveLength(4);
-      expect(suggestions.to_elevate[0].recommend.attributes).toEqual(['a', 'b', 'c', 'd']);
+      expect((suggestions.to_elevate[0].recommend as any).attributes).toHaveLength(4);
+      expect((suggestions.to_elevate[0].recommend as any).attributes).toEqual(['a', 'b', 'c', 'd']);
     });
 
     it('uses fallback ["simple"] when attributes is not an array', () => {
@@ -445,11 +464,12 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Test', recommend: { type: 'consider_adding', category: 'shoes' } }, // missing attributes
           ],
         },
-        validIds
+        validIds,
+        'paired'
       );
 
-      expect(suggestions.to_elevate[0].recommend.attributes).toEqual(['simple']);
-      expect(suggestions.to_elevate[1].recommend.attributes).toEqual(['simple']);
+      expect((suggestions.to_elevate[0].recommend as any).attributes).toEqual(['simple']);
+      expect((suggestions.to_elevate[1].recommend as any).attributes).toEqual(['simple']);
       expect(wasRepaired).toBe(true);
     });
   });
@@ -468,13 +488,14 @@ describe('validateAndRepairSuggestions', () => {
           ],
         },
         validIds,
+        'paired',
         'bottoms'
       );
 
       expect(suggestions.to_elevate).toHaveLength(2);
-      expect(suggestions.to_elevate.some(b => b.recommend.category === 'bottoms')).toBe(false);
-      expect(suggestions.to_elevate[0].recommend.category).toBe('shoes');
-      expect(suggestions.to_elevate[1].recommend.category).toBe('accessories');
+      expect(suggestions.to_elevate.some(b => (b.recommend as any).category === 'bottoms')).toBe(false);
+      expect((suggestions.to_elevate[0].recommend as any).category).toBe('shoes');
+      expect((suggestions.to_elevate[1].recommend as any).category).toBe('accessories');
       expect(wasRepaired).toBe(true);
     });
 
@@ -491,12 +512,13 @@ describe('validateAndRepairSuggestions', () => {
           ],
         },
         validIds,
+        'paired',
         'bottoms'
       );
 
       expect(suggestions.to_elevate).toHaveLength(2);
-      expect(suggestions.to_elevate[0].recommend.category).toBe('accessories');
-      expect(suggestions.to_elevate[1].recommend.category).toBe('bags');
+      expect((suggestions.to_elevate[0].recommend as any).category).toBe('accessories');
+      expect((suggestions.to_elevate[1].recommend as any).category).toBe('bags');
     });
 
     it('no-ops when scan category is null', () => {
@@ -512,11 +534,12 @@ describe('validateAndRepairSuggestions', () => {
           ],
         },
         validIds,
+        'paired',
         null
       );
 
-      expect(suggestions.to_elevate[0].recommend.category).toBe('bottoms');
-      expect(suggestions.to_elevate[1].recommend.category).toBe('shoes');
+      expect((suggestions.to_elevate[0].recommend as any).category).toBe('bottoms');
+      expect((suggestions.to_elevate[1].recommend as any).category).toBe('shoes');
       expect(wasRepaired).toBe(false);
     });
   });
@@ -535,14 +558,15 @@ describe('validateAndRepairSuggestions', () => {
           ],
         },
         validIds,
+        'paired',
         null,
         true,
         ['bags', 'accessories']
       );
 
       expect(suggestions.to_elevate).toHaveLength(2);
-      expect(suggestions.to_elevate[0].recommend.category).toBe('bags');
-      expect(suggestions.to_elevate[1].recommend.category).toBe('accessories');
+      expect((suggestions.to_elevate[0].recommend as any).category).toBe('bags');
+      expect((suggestions.to_elevate[1].recommend as any).category).toBe('accessories');
     });
 
     it('keeps core recommendations when no add-ons exist', () => {
@@ -558,13 +582,14 @@ describe('validateAndRepairSuggestions', () => {
           ],
         },
         validIds,
+        'paired',
         null,
         true,
         []
       );
 
-      expect(suggestions.to_elevate[0].recommend.category).toBe('tops');
-      expect(suggestions.to_elevate[1].recommend.category).toBe('shoes');
+      expect((suggestions.to_elevate[0].recommend as any).category).toBe('tops');
+      expect((suggestions.to_elevate[1].recommend as any).category).toBe('shoes');
     });
 
     it('falls back to core when only one add-on category exists', () => {
@@ -579,14 +604,15 @@ describe('validateAndRepairSuggestions', () => {
           ],
         },
         validIds,
+        'paired',
         'tops',
         true,
         ['accessories']
       );
 
       expect(suggestions.to_elevate).toHaveLength(2);
-      expect(suggestions.to_elevate[0].recommend.category).toBe('accessories');
-      expect(suggestions.to_elevate[1].recommend.category).toBe('shoes');
+      expect((suggestions.to_elevate[0].recommend as any).category).toBe('accessories');
+      expect((suggestions.to_elevate[1].recommend as any).category).toBe('shoes');
     });
 
     it('keeps core shortlist away from outerwear', () => {
@@ -601,14 +627,15 @@ describe('validateAndRepairSuggestions', () => {
           ],
         },
         validIds,
+        'paired',
         null,
         true,
         ['outerwear']
       );
 
       expect(suggestions.to_elevate).toHaveLength(2);
-      expect(suggestions.to_elevate[0].recommend.category).toBe('outerwear');
-      expect(suggestions.to_elevate[1].recommend.category).toBe('shoes');
+      expect((suggestions.to_elevate[0].recommend as any).category).toBe('outerwear');
+      expect((suggestions.to_elevate[1].recommend as any).category).toBe('shoes');
     });
 
     it('skips shoes when scan category is shoes', () => {
@@ -623,14 +650,15 @@ describe('validateAndRepairSuggestions', () => {
           ],
         },
         validIds,
+        'paired',
         'shoes',
         true,
         ['outerwear']
       );
 
       expect(suggestions.to_elevate).toHaveLength(2);
-      expect(suggestions.to_elevate[0].recommend.category).toBe('outerwear');
-      expect(suggestions.to_elevate[1].recommend.category).toBe('tops');
+      expect((suggestions.to_elevate[0].recommend as any).category).toBe('outerwear');
+      expect((suggestions.to_elevate[1].recommend as any).category).toBe('tops');
     });
   });
 
@@ -649,7 +677,8 @@ describe('validateAndRepairSuggestions', () => {
 
       const { suggestions, wasRepaired } = validateAndRepairSuggestions(
         perfectInput,
-        validIds
+        validIds,
+        'paired'
       );
 
       expect(wasRepaired).toBe(false);
@@ -672,7 +701,8 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Test', recommend: { type: 'consider_adding', category: 'tops', attributes: [] } },
           ],
         },
-        validIds
+        validIds,
+        'paired'
       );
 
       expect(suggestions.version).toBe(1);
@@ -681,7 +711,7 @@ describe('validateAndRepairSuggestions', () => {
 
   describe('solo mode (empty validIds)', () => {
     it('forces empty mentions even if model returns them', () => {
-      const { suggestions, wasRepaired } = validateAndRepairSuggestions(
+      const { suggestions, wasRepaired, mentionsStrippedCount } = validateAndRepairSuggestions(
         {
           why_it_works: [
             { text: 'Great styling', mentions: ['item-1', 'item-2'] },
@@ -692,13 +722,15 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Add shoes', recommend: { type: 'consider_adding', category: 'shoes', attributes: [] } },
           ],
         },
-        [] // empty validIds = solo mode
+        [], // empty validIds
+        'solo' // explicit solo mode
       );
 
       // All mentions should be stripped
       expect(suggestions.why_it_works[0].mentions).toEqual([]);
       expect(suggestions.why_it_works[1].mentions).toEqual([]);
       expect(wasRepaired).toBe(true);
+      expect(mentionsStrippedCount).toBe(3); // 2 + 1 stripped mentions
     });
 
     it('handles solo mode with scan category filter', () => {
@@ -713,13 +745,16 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Add tops', recommend: { type: 'consider_adding', category: 'tops', attributes: [] } },
           ],
         },
-        [], // solo mode
+        [], // empty validIds
+        'solo', // explicit solo mode
         'shoes' // scanCategory
       );
 
       // shoes should be removed, backfilled with accessories
       expect(suggestions.to_elevate).toHaveLength(2);
-      expect(suggestions.to_elevate.some(b => b.recommend.category === 'shoes')).toBe(false);
+      expect(suggestions.to_elevate.some(b => 
+        b.recommend.type === 'consider_adding' && b.recommend.category === 'shoes'
+      )).toBe(false);
       expect(removedCategories).toContain('shoes');
     });
 
@@ -735,7 +770,8 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Add outerwear', recommend: { type: 'consider_adding', category: 'outerwear', attributes: [] } },
           ],
         },
-        [], // solo mode
+        [], // empty validIds
+        'solo', // explicit solo mode
         'shoes', // scanCategory (removes shoes)
         true, // preferAddOnCategories
         ['outerwear'] // single add-on category
@@ -748,8 +784,10 @@ describe('validateAndRepairSuggestions', () => {
       //    → tops (since shoes is blocked by scanCategory)
       // 4. Final: ['outerwear', 'tops'], no duplicates
       expect(suggestions.to_elevate).toHaveLength(2);
-      expect(suggestions.to_elevate[0].recommend.category).toBe('outerwear');
-      expect(suggestions.to_elevate[1].recommend.category).toBe('tops');
+      expect(suggestions.to_elevate[0].recommend.type).toBe('consider_adding');
+      expect((suggestions.to_elevate[0].recommend as any).category).toBe('outerwear');
+      expect(suggestions.to_elevate[1].recommend.type).toBe('consider_adding');
+      expect((suggestions.to_elevate[1].recommend as any).category).toBe('tops');
     });
 
     it('solo mode with diversity filter works correctly', () => {
@@ -764,7 +802,8 @@ describe('validateAndRepairSuggestions', () => {
             { text: 'Add outerwear', recommend: { type: 'consider_adding', category: 'outerwear', attributes: [] } },
           ],
         },
-        [], // solo mode
+        [], // empty validIds
+        'solo', // explicit solo mode
         null, // no scan category filter
         true, // preferAddOnCategories
         ['accessories', 'outerwear'] // 2+ add-on categories
@@ -772,8 +811,229 @@ describe('validateAndRepairSuggestions', () => {
 
       // Should keep both add-on categories, no duplicates
       expect(suggestions.to_elevate).toHaveLength(2);
-      expect(suggestions.to_elevate[0].recommend.category).toBe('accessories');
-      expect(suggestions.to_elevate[1].recommend.category).toBe('outerwear');
+      expect((suggestions.to_elevate[0].recommend as any).category).toBe('accessories');
+      expect((suggestions.to_elevate[1].recommend as any).category).toBe('outerwear');
+    });
+  });
+
+  describe('NEAR mode', () => {
+    const nearValidIds = ['near-1', 'near-2', 'near-3'];
+
+    it('validates mentions against near_match_ids', () => {
+      const { suggestions, wasRepaired, mentionsStrippedCount } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Close match due to color', mentions: ['near-1', 'invalid-id'] },
+            { text: 'Similar style vibes', mentions: ['near-2', 'near-3'] },
+          ],
+          to_elevate: [
+            { text: 'Try cuffing', recommend: { type: 'styling_tip', tip: 'Cuff your jeans for a more relaxed look' } },
+            { text: 'Layer up', recommend: { type: 'styling_tip', tip: 'Add a layer to balance proportions' } },
+          ],
+        },
+        nearValidIds,
+        'near'
+      );
+
+      // Invalid mention should be stripped
+      expect(suggestions.why_it_works[0].mentions).toEqual(['near-1']);
+      expect(suggestions.why_it_works[1].mentions).toEqual(['near-2', 'near-3']);
+      expect(wasRepaired).toBe(true);
+      expect(mentionsStrippedCount).toBe(1); // 'invalid-id' stripped
+    });
+
+    it('strips all invalid mentions (returns empty when none valid)', () => {
+      const { suggestions, mentionsStrippedCount } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Close match', mentions: ['wrong-1', 'wrong-2'] },
+            { text: 'Similar vibes', mentions: [] },
+          ],
+          to_elevate: [
+            { text: 'Try layering', recommend: { type: 'styling_tip', tip: 'Add a cardigan' } },
+            { text: 'Roll sleeves', recommend: { type: 'styling_tip', tip: 'Roll the sleeves up' } },
+          ],
+        },
+        nearValidIds,
+        'near'
+      );
+
+      // All mentions stripped when none are valid
+      expect(suggestions.why_it_works[0].mentions).toEqual([]);
+      expect(mentionsStrippedCount).toBe(2);
+    });
+
+    it('validates styling_tip recommend type', () => {
+      const { suggestions, wasRepaired } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test', mentions: [] },
+            { text: 'Test', mentions: [] },
+          ],
+          to_elevate: [
+            { text: 'Try this', recommend: { type: 'styling_tip', tip: 'Cuff your jeans', tags: ['casual', 'relaxed'] } },
+            { text: 'Or this', recommend: { type: 'styling_tip', tip: 'Add a belt' } },
+          ],
+        },
+        nearValidIds,
+        'near'
+      );
+
+      expect(suggestions.to_elevate[0].recommend.type).toBe('styling_tip');
+      expect((suggestions.to_elevate[0].recommend as any).tip).toBe('Cuff your jeans');
+      expect((suggestions.to_elevate[0].recommend as any).tags).toEqual(['casual', 'relaxed']);
+      
+      expect(suggestions.to_elevate[1].recommend.type).toBe('styling_tip');
+      expect((suggestions.to_elevate[1].recommend as any).tip).toBe('Add a belt');
+      expect(wasRepaired).toBe(false);
+    });
+
+    it('provides fallback tip when styling_tip.tip is missing or empty', () => {
+      const { suggestions, wasRepaired } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test', mentions: [] },
+            { text: 'Test', mentions: [] },
+          ],
+          to_elevate: [
+            { text: 'Try this', recommend: { type: 'styling_tip', tip: '' } }, // empty tip
+            { text: 'Or this', recommend: { type: 'styling_tip' } }, // missing tip
+          ],
+        },
+        nearValidIds,
+        'near'
+      );
+
+      expect(suggestions.to_elevate[0].recommend.type).toBe('styling_tip');
+      expect((suggestions.to_elevate[0].recommend as any).tip).toBe('Try different styling approaches to make this work');
+      expect(suggestions.to_elevate[1].recommend.type).toBe('styling_tip');
+      expect((suggestions.to_elevate[1].recommend as any).tip).toBe('Try different styling approaches to make this work');
+      expect(wasRepaired).toBe(true);
+    });
+
+    it('converts consider_adding to consider_adding in NEAR mode (fallback behavior)', () => {
+      // When NEAR mode receives consider_adding instead of styling_tip, it should still work
+      const { suggestions, wasRepaired } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test', mentions: [] },
+            { text: 'Test', mentions: [] },
+          ],
+          to_elevate: [
+            { text: 'Add this', recommend: { type: 'consider_adding', category: 'tops', attributes: ['blue'] } },
+            { text: 'Add that', recommend: { type: 'consider_adding', category: 'shoes', attributes: ['casual'] } },
+          ],
+        },
+        nearValidIds,
+        'near'
+      );
+
+      // Falls back to consider_adding when that's what model returns
+      expect(suggestions.to_elevate[0].recommend.type).toBe('consider_adding');
+      expect(suggestions.to_elevate[1].recommend.type).toBe('consider_adding');
+    });
+
+    it('pads to 2 bullets with styling_tip fallbacks', () => {
+      const { suggestions, wasRepaired } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test', mentions: [] },
+            { text: 'Test', mentions: [] },
+          ],
+          to_elevate: [
+            { text: 'Only one', recommend: { type: 'styling_tip', tip: 'Roll the sleeves' } },
+          ],
+        },
+        nearValidIds,
+        'near'
+      );
+
+      expect(suggestions.to_elevate).toHaveLength(2);
+      expect(suggestions.to_elevate[0].recommend.type).toBe('styling_tip');
+      expect(suggestions.to_elevate[1].recommend.type).toBe('styling_tip');
+      expect(wasRepaired).toBe(true);
+    });
+
+    it('does not apply scan category filtering (styling tips have no category)', () => {
+      const { suggestions, removedCategories } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test', mentions: [] },
+            { text: 'Test', mentions: [] },
+          ],
+          to_elevate: [
+            { text: 'Try this', recommend: { type: 'styling_tip', tip: 'Cuff your jeans' } },
+            { text: 'Or this', recommend: { type: 'styling_tip', tip: 'Add a belt' } },
+          ],
+        },
+        nearValidIds,
+        'near',
+        'tops' // scan category - should NOT affect styling tips
+      );
+
+      // Both styling tips should be kept
+      expect(suggestions.to_elevate).toHaveLength(2);
+      expect(removedCategories).toEqual([]);
+    });
+
+    it('limits tags array to 3 items', () => {
+      const { suggestions } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test', mentions: [] },
+            { text: 'Test', mentions: [] },
+          ],
+          to_elevate: [
+            { text: 'Try this', recommend: { type: 'styling_tip', tip: 'Roll sleeves', tags: ['a', 'b', 'c', 'd', 'e'] } },
+            { text: 'Or this', recommend: { type: 'styling_tip', tip: 'Add belt' } },
+          ],
+        },
+        nearValidIds,
+        'near'
+      );
+
+      expect((suggestions.to_elevate[0].recommend as any).tags).toHaveLength(3);
+      expect((suggestions.to_elevate[0].recommend as any).tags).toEqual(['a', 'b', 'c']);
+    });
+  });
+
+  describe('mentionsStrippedCount tracking', () => {
+    it('counts all stripped mentions across bullets', () => {
+      const { mentionsStrippedCount } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test 1', mentions: ['item-1', 'bad-1', 'bad-2'] }, // 2 stripped
+            { text: 'Test 2', mentions: ['bad-3', 'item-2'] }, // 1 stripped
+          ],
+          to_elevate: [
+            { text: 'Add', recommend: { type: 'consider_adding', category: 'tops', attributes: [] } },
+            { text: 'Add', recommend: { type: 'consider_adding', category: 'shoes', attributes: [] } },
+          ],
+        },
+        validIds,
+        'paired'
+      );
+
+      expect(mentionsStrippedCount).toBe(3);
+    });
+
+    it('returns 0 when no mentions are stripped', () => {
+      const { mentionsStrippedCount } = validateAndRepairSuggestions(
+        {
+          why_it_works: [
+            { text: 'Test 1', mentions: ['item-1', 'item-2'] },
+            { text: 'Test 2', mentions: ['item-3'] },
+          ],
+          to_elevate: [
+            { text: 'Add', recommend: { type: 'consider_adding', category: 'tops', attributes: [] } },
+            { text: 'Add', recommend: { type: 'consider_adding', category: 'shoes', attributes: [] } },
+          ],
+        },
+        validIds,
+        'paired'
+      );
+
+      expect(mentionsStrippedCount).toBe(0);
     });
   });
 });

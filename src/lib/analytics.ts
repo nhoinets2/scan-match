@@ -254,9 +254,10 @@ interface PersonalizedSuggestionsStarted {
     scan_id: string;
     intent: "shopping" | "own_item";
     top_match_count: number;
+    near_match_count: number;
     prompt_version: number;
     schema_version: number;
-    is_solo_mode: boolean;
+    mode: "paired" | "solo" | "near";
     scan_category: string | null;
     prefer_add_on_categories: boolean;
   };
@@ -271,7 +272,8 @@ interface PersonalizedSuggestionsCompleted {
     prompt_version: number;
     schema_version: number;
     was_repaired: boolean;
-    is_solo_mode: boolean;
+    mode: "paired" | "solo" | "near";
+    mentions_stripped_count: number;
     removed_by_scan_category_count: number;
     applied_add_on_preference: boolean;
   };

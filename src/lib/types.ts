@@ -53,16 +53,35 @@ export interface PersonalizedSuggestions {
 
 export interface SuggestionBullet {
   text: string; // Model writes explanation WITHOUT mentioning item names/IDs
-  mentions: string[]; // item IDs from highFinal (validated against input)
+  mentions: string[]; // item IDs from highFinal/nearFinal (validated against input)
+}
+
+/**
+ * Tagged union for to_elevate recommendations.
+ * Allows mode-appropriate shapes without forcing fake categories for styling tips.
+ * 
+ * - consider_adding: Used for paired/solo modes - recommends adding a new item
+ * - styling_tip: Used for near mode - provides actionable styling advice
+ */
+export type Recommend =
+  | RecommendConsiderAdding
+  | RecommendStylingTip;
+
+export interface RecommendConsiderAdding {
+  type: "consider_adding";
+  category: Category;
+  attributes: string[]; // e.g., ["tan", "structured"]
+}
+
+export interface RecommendStylingTip {
+  type: "styling_tip";
+  tip: string; // Actionable styling advice (e.g., "Try cuffing the sleeves for a more relaxed look")
+  tags?: string[]; // Optional tags for categorization
 }
 
 export interface ElevateBullet {
   text: string;
-  recommend: {
-    type: "consider_adding"; // enforced - never reference owned items
-    category: Category;
-    attributes: string[]; // e.g., ["tan", "structured"]
-  };
+  recommend: Recommend;
 }
 
 /**
@@ -76,6 +95,14 @@ export interface SafeMatchInfo {
   dominant_color: string;
   aesthetic: AestheticArchetype; // From wardrobeItem.style_signals_v1.aesthetic.primary
   label?: string; // Optional: detected label like "navy blazer"
+}
+
+/**
+ * Safe subset of NEAR match data sent to model (MEDIUM tier items).
+ * Includes cap_reasons explaining why the match is "near" (not "high").
+ */
+export interface SafeNearMatchInfo extends SafeMatchInfo {
+  cap_reasons: string[]; // Why this match is near (e.g., "formality mismatch")
 }
 
 export interface WardrobeSummary {

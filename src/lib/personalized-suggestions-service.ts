@@ -18,9 +18,13 @@ import type {
   AddOnCategory,
   PersonalizedSuggestions,
   SafeMatchInfo,
+  SafeNearMatchInfo,
   WardrobeSummary,
   SuggestionBullet,
   ElevateBullet,
+  Recommend,
+  RecommendConsiderAdding,
+  RecommendStylingTip,
 } from "./types";
 
 // ============================================
@@ -152,10 +156,14 @@ function getWardrobeItemAesthetic(
 // MAIN SERVICE
 // ============================================
 
+/** Mode type for personalized suggestions */
+export type SuggestionsMode = "paired" | "solo" | "near";
+
 export async function fetchPersonalizedSuggestions({
   scanId,
   scanSignals,
   highFinal,
+  nearFinal,
   wardrobeSummary,
   intent,
   scanCategory,
@@ -165,6 +173,7 @@ export async function fetchPersonalizedSuggestions({
   scanId: string;
   scanSignals: StyleSignalsV1;
   highFinal: EnrichedMatch[];
+  nearFinal?: EnrichedMatch[];
   wardrobeSummary: WardrobeSummary;
   intent: "shopping" | "own_item";
   scanCategory?: Category | null;
@@ -189,15 +198,32 @@ export async function fetchPersonalizedSuggestions({
     label: match.wardrobeItem.detectedLabel,
   }));
 
+  // Build near matches with cap_reasons for NEAR mode
+  const nearMatches: SafeNearMatchInfo[] = (nearFinal ?? []).slice(0, 3).map(match => ({
+    id: match.wardrobeItem.id,
+    category: match.wardrobeItem.category as Category,
+    dominant_color: match.wardrobeItem.colors?.[0]?.name ?? "unknown",
+    aesthetic: getWardrobeItemAesthetic(match.wardrobeItem),
+    label: match.wardrobeItem.detectedLabel,
+    cap_reasons: match.capReasons?.slice(0, 2) ?? [], // Top 2 cap reasons per match
+  }));
+
   const topIds = topMatches.map(match => match.id).sort().join("|");
+  const nearIds = nearMatches.map(match => match.id).sort().join("|");
   
-  // Derive mode from data (solo mode = no top matches)
-  const mode = topMatches.length === 0 ? "solo" : "paired";
+  // Derive mode from data arrays (same logic as server)
+  // near_matches.length > 0 → near, top_matches.length === 0 → solo, else → paired
+  const mode: SuggestionsMode = nearMatches.length > 0 
+    ? "near" 
+    : topMatches.length === 0 
+      ? "solo" 
+      : "paired";
   
-  // Build cache key with all context that affects output
+  // Build cache key with all context that affects output (includes mode + near IDs)
   const rawKey = [
     scanId,
     topIds,  // empty string for solo mode
+    nearIds, // empty string for paired/solo modes
     wardrobeSummary.updated_at,
     PROMPT_VERSION,
     SCHEMA_VERSION,
@@ -209,13 +235,22 @@ export async function fetchPersonalizedSuggestions({
 
   const startTime = Date.now();
   
+  // Determine valid IDs for mention validation based on mode
+  // NEAR mode: validate against near_match_ids
+  // PAIRED mode: validate against top_match_ids
+  // SOLO mode: empty array (no mentions allowed)
+  const validIds = mode === "near" 
+    ? nearMatches.map(match => match.id)
+    : topMatches.map(match => match.id);
+
   const cached = await checkSuggestionsCache(cacheKey);
   if (cached) {
     void incrementCacheHit(cacheKey);
     
-    const { suggestions, wasRepaired, removedCategories } = validateAndRepairSuggestions(
+    const { suggestions, wasRepaired, removedCategories, mentionsStrippedCount } = validateAndRepairSuggestions(
       cached,
-      topMatches.map(match => match.id),
+      validIds,
+      mode,
       scanCategory ?? null,
       preferAddOnCategories,
       addOnCategories,
@@ -247,7 +282,8 @@ export async function fetchPersonalizedSuggestions({
       prompt_version: PROMPT_VERSION,
       schema_version: SCHEMA_VERSION,
       was_repaired: wasRepaired,
-      is_solo_mode: mode === "solo",
+      mode,
+      mentions_stripped_count: mentionsStrippedCount,
       removed_by_scan_category_count: removedCategories.length,
       applied_add_on_preference: preferAddOnCategories ?? false,
     });
@@ -260,9 +296,10 @@ export async function fetchPersonalizedSuggestions({
     scan_id: scanId,
     intent,
     top_match_count: topMatches.length,
+    near_match_count: nearMatches.length,
     prompt_version: PROMPT_VERSION,
     schema_version: SCHEMA_VERSION,
-    is_solo_mode: mode === "solo",
+    mode,
     scan_category: scanCategory ?? null,
     prefer_add_on_categories: preferAddOnCategories ?? false,
   });
@@ -280,10 +317,12 @@ export async function fetchPersonalizedSuggestions({
       body: JSON.stringify({
         scan_signals: scanSignals,
         top_matches: topMatches,
+        near_matches: nearMatches.length > 0 ? nearMatches : undefined, // Only include for NEAR mode
         wardrobe_summary: wardrobeSummary,
         intent,
         cache_key: cacheKey,
         scan_id: scanId,
+        mode, // Telemetry only - server derives mode from arrays
       }),
       signal: controller.signal,
     });
@@ -293,9 +332,10 @@ export async function fetchPersonalizedSuggestions({
     }
 
     const payload = await response.json();
-    const { suggestions, wasRepaired, removedCategories } = validateAndRepairSuggestions(
+    const { suggestions, wasRepaired, removedCategories, mentionsStrippedCount } = validateAndRepairSuggestions(
       payload,
-      topMatches.map(match => match.id),
+      validIds,
+      mode,
       scanCategory ?? null,
       preferAddOnCategories,
       addOnCategories,
@@ -322,7 +362,8 @@ export async function fetchPersonalizedSuggestions({
       prompt_version: PROMPT_VERSION,
       schema_version: SCHEMA_VERSION,
       was_repaired: wasRepaired,
-      is_solo_mode: mode === "solo",
+      mode,
+      mentions_stripped_count: mentionsStrippedCount,
       removed_by_scan_category_count: removedCategories.length,
       applied_add_on_preference: preferAddOnCategories ?? false,
     });
@@ -369,6 +410,14 @@ const FALLBACK_TO_ELEVATE: ElevateBullet = {
   },
 };
 
+const FALLBACK_TO_ELEVATE_NEAR: ElevateBullet = {
+  text: "Try different styling approaches",
+  recommend: {
+    type: "styling_tip",
+    tip: "Experiment with tucking, rolling, or layering to adjust proportions",
+  },
+};
+
 const FALLBACK_ELEVATE_ORDER: Category[] = [
   "accessories",
   "bags",
@@ -402,6 +451,7 @@ function smartTrim(text: string, maxLen: number): string {
 export function validateAndRepairSuggestions(
   data: unknown,
   validIds: string[],
+  mode: SuggestionsMode = "paired",
   scanCategory?: Category | null,
   preferAddOnCategories?: boolean,
   addOnCategories?: AddOnCategory[],
@@ -409,11 +459,14 @@ export function validateAndRepairSuggestions(
   suggestions: PersonalizedSuggestions;
   wasRepaired: boolean;
   removedCategories: Category[];
+  mentionsStrippedCount: number;
 } {
   const validIdSet = new Set(validIds);
-  const isSoloMode = validIds.length === 0;
+  const isSoloMode = mode === "solo";
+  const isNearMode = mode === "near";
   let wasRepaired = false;
   const removedCategories: Category[] = [];
+  let mentionsStrippedCount = 0;
 
   const raw =
     typeof data === "object" && data !== null
@@ -437,6 +490,7 @@ export function validateAndRepairSuggestions(
         : [];
       
       // Solo mode: force empty mentions (never reference owned items)
+      // NEAR/PAIRED mode: validate against valid IDs (strip invalid ones)
       const validMentions = isSoloMode
         ? []
         : originalMentions.filter(
@@ -444,7 +498,9 @@ export function validateAndRepairSuggestions(
               typeof id === "string" && validIdSet.has(id),
           );
 
-      if (validMentions.length !== originalMentions.length) {
+      const strippedInThisBullet = originalMentions.length - validMentions.length;
+      if (strippedInThisBullet > 0) {
+        mentionsStrippedCount += strippedInThisBullet;
         wasRepaired = true;
       }
 
@@ -473,6 +529,35 @@ export function validateAndRepairSuggestions(
 
       if (trimmedText !== originalText) wasRepaired = true;
 
+      // Handle recommend union based on mode and what was returned
+      const recType = rec?.type;
+      
+      // NEAR mode expects styling_tip, PAIRED/SOLO expect consider_adding
+      if (isNearMode && recType === "styling_tip") {
+        // Validate styling_tip type
+        const tip = typeof rec?.tip === "string" && rec.tip.length > 0
+          ? smartTrim(rec.tip, 150)
+          : "Try different styling approaches to make this work";
+        
+        if (tip !== rec?.tip) wasRepaired = true;
+        
+        const tags = Array.isArray(rec?.tags)
+          ? (rec.tags as unknown[])
+              .filter((tag): tag is string => typeof tag === "string")
+              .slice(0, 3)
+          : undefined;
+
+        return {
+          text: trimmedText,
+          recommend: {
+            type: "styling_tip" as const,
+            tip,
+            ...(tags && tags.length > 0 ? { tags } : {}),
+          },
+        };
+      }
+
+      // Default: consider_adding (for PAIRED, SOLO, or when NEAR returns wrong type)
       const category = ALLOWED_ELEVATE_CATEGORIES.includes(
         rec?.category as Category,
       )
@@ -480,7 +565,7 @@ export function validateAndRepairSuggestions(
         : "accessories";
 
       if (category !== rec?.category) wasRepaired = true;
-      if (rec?.type !== "consider_adding") wasRepaired = true;
+      if (recType !== "consider_adding" && recType !== "styling_tip") wasRepaired = true;
 
       const attributes = Array.isArray(rec?.attributes)
         ? (rec?.attributes as unknown[])
@@ -493,7 +578,7 @@ export function validateAndRepairSuggestions(
       return {
         text: trimmedText,
         recommend: {
-          type: "consider_adding",
+          type: "consider_adding" as const,
           category,
           attributes,
         },
@@ -501,28 +586,53 @@ export function validateAndRepairSuggestions(
     });
   }
 
-  if (scanCategory) {
-    const filtered = toElevate.filter(
-      bullet => bullet.recommend.category !== scanCategory,
-    );
-    const removed = toElevate
-      .filter(bullet => bullet.recommend.category === scanCategory)
-      .map(bullet => bullet.recommend.category);
-    if (filtered.length !== toElevate.length) {
-      wasRepaired = true;
-      removedCategories.push(...removed);
+  // NEAR mode uses styling_tip recommendations - skip category-based filtering
+  // PAIRED/SOLO modes use consider_adding recommendations - apply category filters
+  if (!isNearMode) {
+    if (scanCategory) {
+      const filtered = toElevate.filter(bullet => {
+        if (bullet.recommend.type !== "consider_adding") return true;
+        return (bullet.recommend as RecommendConsiderAdding).category !== scanCategory;
+      });
+      const removed = toElevate
+        .filter(bullet => {
+          if (bullet.recommend.type !== "consider_adding") return false;
+          return (bullet.recommend as RecommendConsiderAdding).category === scanCategory;
+        })
+        .map(bullet => (bullet.recommend as RecommendConsiderAdding).category);
+      if (filtered.length !== toElevate.length) {
+        wasRepaired = true;
+        removedCategories.push(...removed);
+      }
+      toElevate = filtered;
     }
-    toElevate = filtered;
-  }
 
-  if (preferAddOnCategories) {
-    const hasAddOnBullet = toElevate.some(bullet =>
-      isAddOnCategory(bullet.recommend.category),
-    );
-    if (hasAddOnBullet && (addOnCategories?.length ?? 0) >= 2) {
-      const filtered = toElevate.filter(bullet =>
-        isAddOnCategory(bullet.recommend.category),
-      );
+    if (preferAddOnCategories) {
+      const hasAddOnBullet = toElevate.some(bullet => {
+        if (bullet.recommend.type !== "consider_adding") return false;
+        return isAddOnCategory((bullet.recommend as RecommendConsiderAdding).category);
+      });
+      if (hasAddOnBullet && (addOnCategories?.length ?? 0) >= 2) {
+        const filtered = toElevate.filter(bullet => {
+          if (bullet.recommend.type !== "consider_adding") return true;
+          return isAddOnCategory((bullet.recommend as RecommendConsiderAdding).category);
+        });
+        if (filtered.length !== toElevate.length) {
+          wasRepaired = true;
+        }
+        toElevate = filtered;
+      }
+    }
+
+    if (preferAddOnCategories && (addOnCategories?.length ?? 0) >= 2) {
+      const seen = new Set<Category>();
+      const filtered = toElevate.filter(bullet => {
+        if (bullet.recommend.type !== "consider_adding") return true;
+        const cat = (bullet.recommend as RecommendConsiderAdding).category;
+        if (seen.has(cat)) return false;
+        seen.add(cat);
+        return true;
+      });
       if (filtered.length !== toElevate.length) {
         wasRepaired = true;
       }
@@ -530,82 +640,101 @@ export function validateAndRepairSuggestions(
     }
   }
 
-  if (preferAddOnCategories && (addOnCategories?.length ?? 0) >= 2) {
-    const seen = new Set<Category>();
-    const filtered = toElevate.filter(bullet => {
-      if (seen.has(bullet.recommend.category)) return false;
-      seen.add(bullet.recommend.category);
-      return true;
-    });
-    if (filtered.length !== toElevate.length) {
+  // Build fallback bullets
+  if (isNearMode) {
+    // NEAR mode: use styling_tip fallbacks
+    const NEAR_FALLBACK_TIPS: ElevateBullet[] = [
+      {
+        text: "Consider layering to adjust proportions",
+        recommend: {
+          type: "styling_tip",
+          tip: "Try adding a third piece like a cardigan or jacket to balance the silhouette",
+        },
+      },
+      {
+        text: "Experiment with different styling techniques",
+        recommend: {
+          type: "styling_tip",
+          tip: "Rolling, cuffing, or tucking can help make pieces work together better",
+        },
+      },
+    ];
+
+    let fallbackIndex = 0;
+    while (toElevate.length < 2) {
+      toElevate.push({ ...NEAR_FALLBACK_TIPS[fallbackIndex % NEAR_FALLBACK_TIPS.length] });
+      fallbackIndex++;
       wasRepaired = true;
     }
-    toElevate = filtered;
-  }
+  } else {
+    // PAIRED/SOLO mode: use consider_adding fallbacks with category logic
+    const hasAddOnBullet = toElevate.some(bullet => {
+      if (bullet.recommend.type !== "consider_adding") return false;
+      return isAddOnCategory((bullet.recommend as RecommendConsiderAdding).category);
+    });
+    const availableAddOns =
+      addOnCategories && addOnCategories.length > 0
+        ? addOnCategories
+        : FALLBACK_ELEVATE_ADD_ON_ORDER;
+    const addOnCount = addOnCategories?.length ?? 0;
+    const isSingleAddOnPreference =
+      preferAddOnCategories && hasAddOnBullet && addOnCount === 1;
+    const addOnOrder = FALLBACK_ELEVATE_ADD_ON_ORDER.filter(category =>
+      availableAddOns.includes(category as AddOnCategory),
+    );
+    const coreOrder = FALLBACK_ELEVATE_ORDER.filter(
+      category => !isAddOnCategory(category),
+    );
+    const coreElevateShortlist: Category[] = [
+      "shoes",
+      "tops",
+    ];
+    const coreShortlistOrder = coreElevateShortlist.filter(
+      category => category !== (scanCategory ?? null),
+    );
+    const fallbackOrder =
+      isSingleAddOnPreference
+        ? [...coreShortlistOrder, ...coreOrder]
+        : preferAddOnCategories && hasAddOnBullet
+          ? (availableAddOns.length >= 2
+              ? addOnOrder
+              : [...addOnOrder, ...coreOrder])
+          : FALLBACK_ELEVATE_ORDER;
 
-  const hasAddOnBullet = toElevate.some(bullet =>
-    isAddOnCategory(bullet.recommend.category),
-  );
-  const availableAddOns =
-    addOnCategories && addOnCategories.length > 0
-      ? addOnCategories
-      : FALLBACK_ELEVATE_ADD_ON_ORDER;
-  const addOnCount = addOnCategories?.length ?? 0;
-  const isSingleAddOnPreference =
-    preferAddOnCategories && hasAddOnBullet && addOnCount === 1;
-  const addOnOrder = FALLBACK_ELEVATE_ADD_ON_ORDER.filter(category =>
-    availableAddOns.includes(category as AddOnCategory),
-  );
-  const coreOrder = FALLBACK_ELEVATE_ORDER.filter(
-    category => !isAddOnCategory(category),
-  );
-  const coreElevateShortlist: Category[] = [
-    "shoes",
-    "tops",
-  ];
-  const coreShortlistOrder = coreElevateShortlist.filter(
-    category => category !== (scanCategory ?? null),
-  );
-  const fallbackOrder =
-    isSingleAddOnPreference
-      ? [...coreShortlistOrder, ...coreOrder]
-      : preferAddOnCategories && hasAddOnBullet
-        ? (availableAddOns.length >= 2
-            ? addOnOrder
-            : [...addOnOrder, ...coreOrder])
-        : FALLBACK_ELEVATE_ORDER;
+    const buildFallbackElevate = (
+      usedCategories: Set<Category>,
+      blockedCategory?: Category | null,
+    ): ElevateBullet => {
+      const fallbackCategory =
+        fallbackOrder.find(
+          category =>
+            category !== blockedCategory && !usedCategories.has(category),
+        ) ??
+        fallbackOrder.find(
+          category => category !== blockedCategory,
+        ) ??
+        "accessories";
 
-  const buildFallbackElevate = (
-    usedCategories: Set<Category>,
-    blockedCategory?: Category | null,
-  ): ElevateBullet => {
-    const fallbackCategory =
-      fallbackOrder.find(
-        category =>
-          category !== blockedCategory && !usedCategories.has(category),
-      ) ??
-      fallbackOrder.find(
-        category => category !== blockedCategory,
-      ) ??
-      "accessories";
-
-    return {
-      ...FALLBACK_TO_ELEVATE,
-      recommend: {
-        ...FALLBACK_TO_ELEVATE.recommend,
-        category: fallbackCategory,
-      },
+      return {
+        ...FALLBACK_TO_ELEVATE,
+        recommend: {
+          ...FALLBACK_TO_ELEVATE.recommend,
+          category: fallbackCategory,
+        },
+      };
     };
-  };
 
-  const usedCategories = new Set(
-    toElevate.map(bullet => bullet.recommend.category),
-  );
-  while (toElevate.length < 2) {
-    const fallback = buildFallbackElevate(usedCategories, scanCategory ?? null);
-    toElevate.push(fallback);
-    usedCategories.add(fallback.recommend.category);
-    wasRepaired = true;
+    const usedCategories = new Set(
+      toElevate
+        .filter(bullet => bullet.recommend.type === "consider_adding")
+        .map(bullet => (bullet.recommend as RecommendConsiderAdding).category),
+    );
+    while (toElevate.length < 2) {
+      const fallback = buildFallbackElevate(usedCategories, scanCategory ?? null);
+      toElevate.push(fallback);
+      usedCategories.add((fallback.recommend as RecommendConsiderAdding).category);
+      wasRepaired = true;
+    }
   }
 
   return {
@@ -616,5 +745,6 @@ export function validateAndRepairSuggestions(
     },
     wasRepaired,
     removedCategories,
+    mentionsStrippedCount,
   };
 }
