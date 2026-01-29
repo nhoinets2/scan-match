@@ -1994,8 +1994,14 @@ function ResultsSuccess({
   const [photoViewerSource, setPhotoViewerSource] = useState<'main' | 'bottomSheet' | null>(null);
 
   // Personalized suggestions state (shared between main view + bottom sheet)
+  // HIGH tab / PAIRED / SOLO modes
   const [suggestionsResult, setSuggestionsResult] = useState<SuggestionsResult | null>(null);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  
+  // NEAR tab AI suggestions (separate state from HIGH)
+  const [nearSuggestionsResult, setNearSuggestionsResult] = useState<SuggestionsResult | null>(null);
+  const [nearSuggestionsLoading, setNearSuggestionsLoading] = useState(false);
+  const [nearSuggestionsTimedOut, setNearSuggestionsTimedOut] = useState(false);
 
   // Control bottom sheet rendering to prevent animation artifacts
   useEffect(() => {
@@ -2426,6 +2432,21 @@ function ResultsSuccess({
     // Paired mode: need at least one CORE high match
     const canFetchPairedAi = coreHighMatches.length > 0;
     
+    // DEBUG: Log AI gating conditions
+    if (__DEV__) {
+      console.log('[AI Suggestions] Gating check:', {
+        scanId: currentCheckId,
+        isFullyReady: trustFilterResult.isFullyReady,
+        hasWardrobeSummary: !!wardrobeSummary?.updated_at,
+        wardrobeCount,
+        coreHighMatches: coreHighMatches.length,
+        coreNearMatches: coreNearMatches.length,
+        canFetchSoloAi,
+        canFetchPairedAi,
+        willFetch: canFetchSoloAi || canFetchPairedAi,
+      });
+    }
+    
     // Debug: Log solo mode detection with core vs all matches
     if (__DEV__ && trustFilterResult.isFullyReady) {
       const totalHigh = trustFilterResult.finalized.highFinal.length;
@@ -2465,6 +2486,16 @@ function ResultsSuccess({
     // Fetch suggestions (async, fail-open)
     // For solo mode: pass empty highFinal array
     // For paired mode: pass CORE matches only (AI should reason about outfit-forming pieces)
+    // DEBUG: Log fetch start
+    if (__DEV__) {
+      console.log('[AI Suggestions] Starting fetch:', {
+        mode: isSoloMode ? 'SOLO' : 'PAIRED',
+        scanId: currentCheckId,
+        hasSignals: !!trustFilterResult.scanSignals,
+        preferAddOnCategories,
+      });
+    }
+    
     fetchPersonalizedSuggestions({
       scanId: currentCheckId,
       scanSignals: trustFilterResult.scanSignals,
@@ -2476,6 +2507,17 @@ function ResultsSuccess({
       addOnCategories: addOnCategoriesForSuggestions,
     })
       .then((result) => {
+        // DEBUG: Log result details
+        if (__DEV__) {
+          console.log('[AI Suggestions] Result received:', {
+            ok: result.ok,
+            source: result.ok ? result.source : 'N/A',
+            hasData: result.ok ? !!result.data : false,
+            whyItWorksCount: result.ok && result.data ? result.data.why_it_works?.length : 0,
+            toElevateCount: result.ok && result.data ? result.data.to_elevate?.length : 0,
+            error: !result.ok ? result.error : null,
+          });
+        }
         setSuggestionsResult(result);
         setSuggestionsLoading(false);
       })
@@ -2499,6 +2541,128 @@ function ResultsSuccess({
     scannedItem?.category,
     isHighTab,
     addOnCategoriesForSuggestions,
+  ]);
+
+  // Fetch NEAR mode AI suggestions when NEAR tab has matches
+  // Stable key to prevent double-fetch on tab switching
+  const nearFinalIdsKey = useMemo(() => {
+    return trustFilterResult.finalized.nearFinal
+      .map(m => m.wardrobeItem.id)
+      .sort()
+      .join('|');
+  }, [trustFilterResult.finalized.nearFinal]);
+
+  useEffect(() => {
+    // Reset NEAR state on scan change
+    setNearSuggestionsResult(null);
+    setNearSuggestionsLoading(false);
+    setNearSuggestionsTimedOut(false);
+  }, [currentCheckId]);
+
+  useEffect(() => {
+    // Wait for trust filter to be fully ready
+    if (!trustFilterResult.isFullyReady) {
+      return;
+    }
+
+    // Need valid scan ID and signals from Trust Filter
+    if (!currentCheckId || !trustFilterResult.scanSignals) {
+      return;
+    }
+
+    // Need wardrobe summary (required for stable cache key)
+    if (!wardrobeSummary?.updated_at) {
+      return;
+    }
+
+    // Only fetch for NEAR tab when we have NEAR matches
+    const nearFinal = trustFilterResult.finalized.nearFinal;
+    if (nearFinal.length === 0) {
+      setNearSuggestionsResult(null);
+      setNearSuggestionsLoading(false);
+      return;
+    }
+
+    // DEBUG: Log NEAR AI gating conditions
+    if (__DEV__) {
+      console.log('[NEAR AI Suggestions] Gating check:', {
+        scanId: currentCheckId,
+        isFullyReady: trustFilterResult.isFullyReady,
+        hasWardrobeSummary: !!wardrobeSummary?.updated_at,
+        nearMatchCount: nearFinal.length,
+        nearIds: nearFinalIdsKey,
+      });
+    }
+
+    // Determine intent based on scan context
+    const intent: "shopping" | "own_item" = fromScan ? "own_item" : "shopping";
+
+    // Start loading
+    setNearSuggestionsLoading(true);
+    setNearSuggestionsTimedOut(false);
+
+    // Set timeout for fast fallback to Mode B (10 seconds)
+    const timeoutId = setTimeout(() => {
+      setNearSuggestionsTimedOut(true);
+      if (__DEV__) {
+        console.log('[NEAR AI Suggestions] Timeout reached - falling back to Mode B');
+      }
+    }, 10000);
+
+    // DEBUG: Log fetch start
+    if (__DEV__) {
+      console.log('[NEAR AI Suggestions] Starting fetch:', {
+        mode: 'NEAR',
+        scanId: currentCheckId,
+        hasSignals: !!trustFilterResult.scanSignals,
+        nearMatchCount: nearFinal.length,
+      });
+    }
+
+    fetchPersonalizedSuggestions({
+      scanId: currentCheckId,
+      scanSignals: trustFilterResult.scanSignals,
+      highFinal: [], // Empty for NEAR mode
+      nearFinal: nearFinal, // NEAR matches
+      wardrobeSummary,
+      intent,
+      scanCategory: scannedItem?.category ?? null,
+      preferAddOnCategories: false, // Not applicable for NEAR mode
+      addOnCategories: [],
+    })
+      .then((result) => {
+        clearTimeout(timeoutId);
+        // DEBUG: Log result details
+        if (__DEV__) {
+          console.log('[NEAR AI Suggestions] Result received:', {
+            ok: result.ok,
+            source: result.ok ? result.source : 'N/A',
+            hasData: result.ok ? !!result.data : false,
+            whyItWorksCount: result.ok && result.data ? result.data.why_it_works?.length : 0,
+            toElevateCount: result.ok && result.data ? result.data.to_elevate?.length : 0,
+            error: !result.ok ? result.error : null,
+          });
+        }
+        setNearSuggestionsResult(result);
+        setNearSuggestionsLoading(false);
+      })
+      .catch((err) => {
+        clearTimeout(timeoutId);
+        // Fail-open: log error but don't show error UI
+        if (__DEV__) {
+          console.log('[NEAR Suggestions] Fetch failed:', err);
+        }
+        setNearSuggestionsResult(null);
+        setNearSuggestionsLoading(false);
+      });
+  }, [
+    trustFilterResult.isFullyReady,
+    nearFinalIdsKey, // Stable key based on sorted IDs
+    trustFilterResult.scanSignals,
+    currentCheckId,
+    wardrobeSummary?.updated_at,
+    fromScan,
+    scannedItem?.category,
   ]);
 
   // Selected outfit state for NEAR tab (drives precise Mode B bullets)
@@ -2981,12 +3145,14 @@ function ResultsSuccess({
   const helpfulAdditionRows: GuidanceRowModel[] = useMemo(() => {
     const iconProps = { size: 20, color: colors.text.secondary, strokeWidth: 1.75 };
 
-    // HIGH tab OR SOLO mode: If AI suggestions are loading or present, suppress Mode A
+    // HIGH tab OR SOLO mode: If AI suggestions are loading or succeeded, suppress Mode A
     // Mode A becomes the fallback only when AI suggestions fail/timeout
     // SOLO MODE: Mode A shown only when AI fails (never blank)
+    // NOTE: Check only suggestionsResult?.ok, not .data - if AI succeeded, don't show fallback
+    // even if data is empty (AI had nothing to suggest is still a valid success)
     const shouldSuppressModeA = 
       (isHighTab || isSoloMode) && 
-      (suggestionsLoading || (suggestionsResult?.ok && suggestionsResult.data));
+      (suggestionsLoading || suggestionsResult?.ok);
     
     if (shouldSuppressModeA) {
       if (__DEV__) {
@@ -3004,6 +3170,19 @@ function ResultsSuccess({
       (selectedNearOutfit?.candidates?.length ?? 0) > 0;
     
     if (!isHighTab && hasNearContent) {
+      // CRITICAL: Suppress Mode B when NEAR AI is loading or succeeded (with fast timeout fallback)
+      // Allow Mode B to show if AI timed out (fast fallback)
+      const shouldSuppressModeB = 
+        !nearSuggestionsTimedOut &&
+        (nearSuggestionsLoading || nearSuggestionsResult?.ok);
+      
+      if (shouldSuppressModeB) {
+        if (__DEV__) {
+          console.log('[helpfulAdditionRows] NEAR AI suggestions loading/present → suppressing Mode B');
+        }
+        return []; // NEAR AI suggestions take priority
+      }
+      
       // Get near matches from the tabs state (PairEvaluation[])
       const nearMatchEvals = tabsState.nearTab.nearMatches;
       
@@ -3131,7 +3310,7 @@ function ResultsSuccess({
     // Note: Using selectedNearOutfit?.id instead of full object to avoid extra renders
     // when the object reference changes but the selection is the same outfit
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHighTab, isSoloMode, tabsState.nearTab.nearMatches, selectedNearOutfit?.id, selectedNearOutfit?.candidates, confidenceResult.uiVibeForCopy, confidenceResult.modeASuggestions, wardrobeCount, suggestionsResult, suggestionsLoading]);
+  }, [isHighTab, isSoloMode, tabsState.nearTab.nearMatches, selectedNearOutfit?.id, selectedNearOutfit?.candidates, confidenceResult.uiVibeForCopy, confidenceResult.modeASuggestions, wardrobeCount, suggestionsResult, suggestionsLoading, nearSuggestionsResult, nearSuggestionsLoading, nearSuggestionsTimedOut]);
 
   // DEBUG: Log helpfulAdditionRows result
   if (__DEV__ && confidenceResult.evaluated) {
@@ -4901,7 +5080,8 @@ function ResultsSuccess({
           })()}
 
             {/* Styling suggestions - tab-aware: Mode A (HIGH) vs Mode B (NEAR) */}
-            {helpfulAdditionRows.length > 0 && (
+            {/* NOTE: Skip in solo mode - solo has its own dedicated rendering block above */}
+            {!isSoloMode && helpfulAdditionRows.length > 0 && (
               <Animated.View entering={FadeInDown.delay(350)} style={{ marginBottom: spacing.md, marginTop: spacing.xs }}>
                 <Text
                   style={{
@@ -5166,6 +5346,18 @@ function ResultsSuccess({
                   suggestions={suggestionsResult?.ok ? suggestionsResult.data : null}
                   isLoading={suggestionsLoading}
                   wardrobeItemsById={wardrobeItemsById}
+                />
+              </Animated.View>
+            )}
+
+            {/* NEAR Tab AI Card - "Why it's close" / "How to upgrade" */}
+            {(nearSuggestionsLoading || (nearSuggestionsResult?.ok && nearSuggestionsResult.data)) && !isHighTab && (
+              <Animated.View entering={FadeIn.delay(400)} style={{ marginBottom: spacing.md, marginTop: spacing.xs }}>
+                <PersonalizedSuggestionsCard
+                  suggestions={nearSuggestionsResult?.ok ? nearSuggestionsResult.data : null}
+                  isLoading={nearSuggestionsLoading}
+                  wardrobeItemsById={wardrobeItemsById}
+                  mode="near"
                 />
               </Animated.View>
             )}

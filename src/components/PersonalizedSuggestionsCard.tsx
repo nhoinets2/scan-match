@@ -27,6 +27,7 @@ export interface PersonalizedSuggestionsCardProps {
   isLoading: boolean;
   wardrobeItemsById: Map<string, WardrobeItem>;
   isSoloMode?: boolean;
+  mode?: "paired" | "solo" | "near";
 }
 
 /**
@@ -132,12 +133,11 @@ function WhyItWorksBullet({
 
 /**
  * Renders a to_elevate bullet.
- * Always uses "Consider adding..." format.
+ * Branches on recommend.type:
+ * - consider_adding: "Consider adding: {attributes} {category}" (paired/solo modes)
+ * - styling_tip: Just the tip text (near mode)
  */
 function ToElevateBullet({ bullet }: { bullet: ElevateBullet }) {
-  const { category, attributes } = bullet.recommend;
-  const attrText = attributes.length > 0 ? attributes.join(", ") + " " : "";
-
   return (
     <View style={{ flexDirection: "row", marginBottom: spacing.sm + 2 }}>
       {/* Bullet dot */}
@@ -155,24 +155,51 @@ function ToElevateBullet({ bullet }: { bullet: ElevateBullet }) {
 
       {/* Content */}
       <View style={{ flex: 1 }}>
-        <Text
-          style={{
-            ...typography.ui.bodyMedium,
-            color: colors.text.primary,
-          }}
-        >
-          Consider adding: {attrText}
-          {category}
-        </Text>
-        <Text
-          style={{
-            ...typography.ui.caption,
-            color: colors.text.secondary,
-            marginTop: spacing.xs / 2,
-          }}
-        >
-          {bullet.text}
-        </Text>
+        {bullet.recommend.type === "consider_adding" ? (
+          <>
+            <Text
+              style={{
+                ...typography.ui.bodyMedium,
+                color: colors.text.primary,
+              }}
+            >
+              Consider adding: {bullet.recommend.attributes.length > 0 ? bullet.recommend.attributes.join(", ") + " " : ""}
+              {bullet.recommend.category}
+            </Text>
+            <Text
+              style={{
+                ...typography.ui.caption,
+                color: colors.text.secondary,
+                marginTop: spacing.xs / 2,
+              }}
+            >
+              {bullet.text}
+            </Text>
+          </>
+        ) : (
+          // styling_tip type - render tip directly as primary text
+          <>
+            <Text
+              style={{
+                ...typography.ui.bodyMedium,
+                color: colors.text.primary,
+              }}
+            >
+              {bullet.recommend.tip}
+            </Text>
+            {bullet.text && (
+              <Text
+                style={{
+                  ...typography.ui.caption,
+                  color: colors.text.secondary,
+                  marginTop: spacing.xs / 2,
+                }}
+              >
+                {bullet.text}
+              </Text>
+            )}
+          </>
+        )}
       </View>
     </View>
   );
@@ -216,6 +243,7 @@ export function PersonalizedSuggestionsCard({
   isLoading,
   wardrobeItemsById,
   isSoloMode = false,
+  mode,
 }: PersonalizedSuggestionsCardProps) {
   // Loading state (only show if actively loading)
   if (isLoading) {
@@ -227,9 +255,23 @@ export function PersonalizedSuggestionsCard({
     return null;
   }
 
+  // Derive effective mode (use mode prop if provided, otherwise fallback to isSoloMode)
+  const effectiveMode = mode ?? (isSoloMode ? "solo" : "paired");
+
   // Section titles change based on mode
-  const whyItWorksTitle = isSoloMode ? "How to style it" : "Why it works";
-  const toElevateTitle = isSoloMode ? "What to add first" : "To elevate";
+  const whyItWorksTitle =
+    effectiveMode === "near"
+      ? "Why it's close"
+      : effectiveMode === "solo"
+      ? "How to style it"
+      : "Why it works";
+
+  const toElevateTitle =
+    effectiveMode === "near"
+      ? "How to upgrade"
+      : effectiveMode === "solo"
+      ? "What to add first"
+      : "To elevate";
 
   return (
     <View

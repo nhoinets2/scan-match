@@ -171,62 +171,62 @@ Merge gate:
 
 ### UI Component Updates
 
-- [ ] Props: `mode?: "paired" | "solo" | "near"` prop added to PersonalizedSuggestionsCard
-  - Evidence: (line number)
+- [x] Props: `mode?: "paired" | "solo" | "near"` prop added to PersonalizedSuggestionsCard
+  - Evidence: `src/components/PersonalizedSuggestionsCard.tsx` line 29
   - How verified: Code review of PersonalizedSuggestionsCardProps interface
 
-- [ ] UI: Section titles change based on mode
+- [x] UI: Section titles change based on mode
   - Expected:
     - Paired: "Why it works" / "To elevate"
     - Solo: "How to style it" / "What to add first"
     - Near: "Why it's close" / "How to upgrade"
-  - Evidence: (line number)
-  - How verified: Code review of title conditionals
+  - Evidence: `src/components/PersonalizedSuggestionsCard.tsx` lines 237-247
+  - How verified: Code review of title conditionals - effectiveMode derived and used for title selection
 
-- [ ] CRITICAL: UI branches on `recommend.type` for `to_elevate` rendering
+- [x] CRITICAL: UI branches on `recommend.type` for `to_elevate` rendering
   - Expected:
     - `consider_adding` → render category + attributes (existing)
     - `styling_tip` → render `tip` text (new)
-  - Evidence: (line number)
-  - How verified: Code review of ToElevateBullet component
+  - Evidence: `src/components/PersonalizedSuggestionsCard.tsx` lines 157-177 (ToElevateBullet component)
+  - How verified: Code review shows branching on `bullet.recommend.type === "consider_adding"` vs styling_tip
 
-- [ ] UI: `styling_tip` renders `tip` (not blank / not "undefined")
-  - Evidence: (line number)
-  - How verified: Code review + manual test
+- [x] UI: `styling_tip` renders `tip` (not blank / not "undefined")
+  - Evidence: `src/components/PersonalizedSuggestionsCard.tsx` lines 172-174
+  - How verified: Code review confirms `bullet.recommend.tip` rendered as primary text for styling_tip type
 
 ### Results Screen: Solo Mode Gating
 
-- [ ] CRITICAL: Solo gating uses core-category filtering
+- [x] CRITICAL: Solo gating uses core-category filtering
   - Expected:
     ```typescript
     const coreHigh = highFinal.filter(m => isCoreCategory(m.wardrobeItem.category));
     const coreNear = nearFinal.filter(m => isCoreCategory(m.wardrobeItem.category));
     const isSoloMode = wardrobeCount > 0 && coreHigh.length === 0 && coreNear.length === 0;
     ```
-  - Evidence: (line number)
-  - How verified: Code review shows solo triggers when 0 CORE matches (not 0 total matches)
+  - Evidence: `src/app/results.tsx` lines 3127-3142 (renders isSoloMode derivation), lines 2412-2417 (fetch gating)
+  - How verified: Code review shows solo triggers when 0 CORE matches using `isCoreCategory()` filter
 
-- [ ] Solo: Triggers even if add-on matches exist (outerwear, bags, accessories)
-  - Evidence: (line number)
-  - How verified: Code review confirms add-on matches don't affect solo gating
+- [x] Solo: Triggers even if add-on matches exist (outerwear, bags, accessories)
+  - Evidence: `src/app/results.tsx` lines 3130-3135 (core filtering excludes add-on categories)
+  - How verified: Code review confirms isCoreCategory filter used, add-on matches (outerwear, bags, accessories) excluded from solo gating
 
 ### Results Screen: NEAR Tab Fetch
 
-- [ ] Fetch: Separate state for NEAR suggestions (`nearSuggestionsResult`, `nearSuggestionsLoading`)
-  - Evidence: (line number)
-  - How verified: Code review of useState declarations
+- [x] Fetch: Separate state for NEAR suggestions (`nearSuggestionsResult`, `nearSuggestionsLoading`)
+  - Evidence: `src/app/results.tsx` lines 2001-2004
+  - How verified: Code review shows 3 separate state variables: nearSuggestionsResult, nearSuggestionsLoading, nearSuggestionsTimedOut
 
-- [ ] Fetch: NEAR fetch triggered when NEAR tab has matches (always, not just when 0 HIGH)
-  - Evidence: (line number)
-  - How verified: Code review of NEAR fetch useEffect
+- [x] Fetch: NEAR fetch triggered when NEAR tab has matches (always, not just when 0 HIGH)
+  - Evidence: `src/app/results.tsx` lines 2558-2642 (NEAR fetch useEffect)
+  - How verified: Code review shows NEAR fetch runs independently when `nearFinal.length > 0`, regardless of HIGH matches
 
-- [ ] CRITICAL: Double-fetch prevention (stable key based on nearFinalIdsKey + isFullyReady + scanSignals + updated_at)
-  - Evidence: (line number)
-  - How verified: Code review of useEffect dependencies
+- [x] CRITICAL: Double-fetch prevention (stable key based on nearFinalIdsKey + isFullyReady + scanSignals + updated_at)
+  - Evidence: `src/app/results.tsx` lines 2545-2550 (nearFinalIdsKey useMemo), lines 2625-2634 (useEffect dependencies)
+  - How verified: Code review shows nearFinalIdsKey = sorted IDs joined, used in dependency array along with isFullyReady, scanSignals, wardrobeSummary.updated_at
 
 ### Results Screen: Mode B Suppression
 
-- [ ] CRITICAL: Mode B suppression with timeout fast fallback
+- [x] CRITICAL: Mode B suppression with timeout fast fallback
   - Expected:
     ```typescript
     const shouldSuppressModeB = 
@@ -234,33 +234,34 @@ Merge gate:
       !nearSuggestionsTimedOut &&
       (nearSuggestionsLoading || nearSuggestionsResult?.ok);
     ```
-  - Evidence: (line number)
-  - How verified: Code review of shouldSuppressModeB logic
+  - Evidence: `src/app/results.tsx` lines 3179-3182 (shouldSuppressModeB logic)
+  - How verified: Code review shows exact logic: checks !nearSuggestionsTimedOut && (loading || ok)
 
-- [ ] Timeout: `nearSuggestionsTimedOut` tracked separately from global results timeout
-  - Evidence: (line number)
-  - How verified: Code review confirms scoped timeout state
+- [x] Timeout: `nearSuggestionsTimedOut` tracked separately from global results timeout
+  - Evidence: `src/app/results.tsx` line 2004 (state declaration), lines 2595-2600 (timeout set in fetch effect)
+  - How verified: Code review confirms nearSuggestionsTimedOut is scoped to NEAR AI call only (10s timeout)
 
-- [ ] Fallback: Mode B bullets shown when AI fails or times out (never blank)
-  - Evidence: (line number)
-  - How verified: Code review of fallback render logic
+- [x] Fallback: Mode B bullets shown when AI fails or times out (never blank)
+  - Evidence: `src/app/results.tsx` lines 3179-3190 (suppression logic), lines 3192-3207 (Mode B computation continues if not suppressed)
+  - How verified: Code review shows Mode B only suppressed when !timedOut AND (loading OR ok); otherwise Mode B renders
 
 ### Results Screen: NEAR Rendering
 
-- [ ] Render: AI card shown on NEAR tab when `nearSuggestionsLoading || nearSuggestionsResult?.ok`
-  - Evidence: (line number)
-  - How verified: Code review of NEAR tab render logic
+- [x] Render: AI card shown on NEAR tab when `nearSuggestionsLoading || nearSuggestionsResult?.ok`
+  - Evidence: `src/app/results.tsx` lines 5354-5363
+  - How verified: Code review shows conditional: `(nearSuggestionsLoading || (nearSuggestionsResult?.ok && nearSuggestionsResult.data)) && !isHighTab`
 
-- [ ] Props: `mode="near"` passed to PersonalizedSuggestionsCard on NEAR tab
-  - Evidence: (line number)
-  - How verified: Code review of component props
+- [x] Props: `mode="near"` passed to PersonalizedSuggestionsCard on NEAR tab
+  - Evidence: `src/app/results.tsx` line 5360
+  - How verified: Code review confirms `mode="near"` prop passed to PersonalizedSuggestionsCard
 
 **Summary — Agent C:**
-- Verified: Bug Fix (Phase 1) - 2/2 items complete
-  - Early return removed from useTrustFilter signal fetch (lines 274-277 → 274-276 comment)
-  - scanSignals now fetched even with 0 matches; wardrobe signals guard (line 335) preserved
-- Missing: UI Component Updates, Results Screen (Phase 4 - not in current scope)
-- Risks: None for bug fix; change is minimal and well-isolated
+- Verified: Phase 1 (Bug Fix) + Phase 4 (UI Integration) Complete - 16/16 items
+  - Bug Fix: Early return removed from useTrustFilter (lines 274-276)
+  - UI Component: mode prop added, titles conditional, recommend union rendering (PersonalizedSuggestionsCard.tsx)
+  - Results Screen: Solo gating verified (already implemented), NEAR fetch added, Mode B suppression added, NEAR rendering added
+- Missing: None
+- Risks: Low - changes are additive and fail-open; backward compatible with existing paired/solo modes
 
 ---
 
@@ -270,8 +271,8 @@ Merge gate:
 |-------|-------|-------|-------|--------|----------|
 | **A** | Backend | `supabase/functions/personalized-suggestions/index.ts` | 12 (3 CRIT) | [x] Complete | - |
 | **B** | Client Service | `src/lib/personalized-suggestions-service.ts`, `src/lib/types.ts`, `src/lib/analytics.ts`, tests | 14 (4 CRIT) | [x] Complete | - |
-| **C** | UI Integration + Bug Fix | `src/lib/useTrustFilter.ts`, `src/components/PersonalizedSuggestionsCard.tsx`, `src/app/results.tsx` | 17 (6 CRIT) | [ ] Pending | - |
-| **Total** | | | **43 (13 CRIT)** | **[ ] In Progress** | Agent C pending |
+| **C** | UI Integration + Bug Fix | `src/lib/useTrustFilter.ts`, `src/components/PersonalizedSuggestionsCard.tsx`, `src/app/results.tsx` | 17 (6 CRIT) | [x] Complete | - |
+| **Total** | | | **43 (13 CRIT)** | **[x] Complete** | - |
 
 **Sign-off required from:** Each agent owner + Integration lead
 
@@ -294,12 +295,18 @@ Merge gate:
   - Evidence: `src/lib/personalized-suggestions-service.ts` lines 209-219 (rawKey includes nearIds, mode, updated_at)
 - [x] NEAR mentions: Stripped if not in `nearFinal.map(m => m.wardrobeItem.id)`
   - Evidence: `src/lib/personalized-suggestions-service.ts` lines 221-227 (validIds for NEAR mode), lines 475-497 (mention validation)
-- [ ] Solo gating: Uses core-category filtering (`isCoreCategory`); add-on matches don't affect
-- [ ] Double-fetch: NEAR fetch uses stable key (nearFinalIdsKey, isFullyReady, scanSignals, updated_at)
-- [ ] Mode B suppression: Includes timeout fast fallback (`nearSuggestionsTimedOut`)
-- [ ] UI branching: `recommend.type` determines rendering (`styling_tip` → tip text)
-- [ ] NEAR UI: Shows "Why it's close" / "How to upgrade" titles
-- [ ] Fallback: Mode B bullets shown when AI fails/times out (never blank NEAR tab)
+- [x] Solo gating: Uses core-category filtering (`isCoreCategory`); add-on matches don't affect
+  - Evidence: `src/app/results.tsx` lines 3130-3142 (isSoloMode with core filtering)
+- [x] Double-fetch: NEAR fetch uses stable key (nearFinalIdsKey, isFullyReady, scanSignals, updated_at)
+  - Evidence: `src/app/results.tsx` lines 2545-2550 (nearFinalIdsKey), lines 2625-2634 (useEffect deps)
+- [x] Mode B suppression: Includes timeout fast fallback (`nearSuggestionsTimedOut`)
+  - Evidence: `src/app/results.tsx` lines 3179-3182 (shouldSuppressModeB with timeout check)
+- [x] UI branching: `recommend.type` determines rendering (`styling_tip` → tip text)
+  - Evidence: `src/components/PersonalizedSuggestionsCard.tsx` lines 157-177 (ToElevateBullet branching)
+- [x] NEAR UI: Shows "Why it's close" / "How to upgrade" titles
+  - Evidence: `src/components/PersonalizedSuggestionsCard.tsx` lines 237-247 (mode-based titles)
+- [x] Fallback: Mode B bullets shown when AI fails/times out (never blank NEAR tab)
+  - Evidence: `src/app/results.tsx` lines 3179-3207 (suppression logic + Mode B fallback)
 - [x] Tests: NEAR mentions stripping test passes
   - Evidence: `src/lib/__tests__/personalized-suggestions-service.test.ts` lines 724-764 (NEAR mention validation tests); `npx jest` passes (45/45)
 
@@ -307,10 +314,14 @@ Merge gate:
 
 - [x] Telemetry: Includes `mode`, `source`, `was_repaired`, `mentions_stripped_count`
   - Evidence: `src/lib/analytics.ts` lines 251-278 (event interfaces); service.ts lines 243-254, 316-327 (tracking calls)
-- [ ] Cap reasons: NEAR prompt limited to top 2-3 matches, 1-2 cap reasons each
-- [ ] Timeout scoping: `nearSuggestionsTimedOut` separate from global results timeout
-- [ ] Solo UI unchanged: Existing solo mode behavior preserved
-- [ ] HIGH tab unchanged: Existing paired mode behavior preserved
+- [x] Cap reasons: NEAR prompt limited to top 2-3 matches, 1-2 cap reasons each
+  - Evidence: Backend Agent A - `supabase/functions/personalized-suggestions/index.ts` lines 226-282 (buildNearPrompt)
+- [x] Timeout scoping: `nearSuggestionsTimedOut` separate from global results timeout
+  - Evidence: `src/app/results.tsx` line 2004 (separate state), lines 2595-2600 (10s timeout for NEAR AI only)
+- [x] Solo UI unchanged: Existing solo mode behavior preserved
+  - Evidence: `src/components/PersonalizedSuggestionsCard.tsx` backward compatibility via `isSoloMode` prop fallback (line 237)
+- [x] HIGH tab unchanged: Existing paired mode behavior preserved
+  - Evidence: `src/app/results.tsx` lines 5343-5351 (HIGH tab AI card unchanged), PersonalizedSuggestionsCard defaults to paired mode
 
 ---
 
@@ -399,9 +410,9 @@ Merge gate:
 
 ---
 
-**Implementation Date:** 2026-01-28 (Phase 1 Bug Fix)
+**Implementation Date:** 2026-01-28 (Phase 1 Bug Fix), 2026-01-29 (Phase 2-5 Complete)
 **Last Updated:** 2026-01-29
-**Status:** [x] Phase 1 Bug Fix Complete | [x] Phase 2 Backend Complete | [x] Phase 3 Client Service Complete | [ ] Phase 4-5 Pending
+**Status:** [x] All Phases Complete (1-5) | Ready for Testing
 **Plan:** `.cursor/plans/unified_ai_styling_suggestions_e44c6f92.plan.md`
 
 ---
