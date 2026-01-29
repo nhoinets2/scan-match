@@ -1,14 +1,17 @@
 # Unified AI Styling Suggestions - Implementation Complete
 
-**Agents:** A (Backend) ✓, B (Client Service) ✓, C (UI Integration) Pending
-**Status:** Phase 1-3 Complete, Phase 4-5 Pending
-**Date:** 2026-01-29
+**Agents:** A (Backend) ✓, B (Client Service) ✓, C (UI Integration) ✓
+**Status:** All Phases Complete (1-5)
+**Date:** 2026-01-28 (Phase 1), 2026-01-29 (Phase 2-5)
 **Files Modified:**
+- `src/lib/useTrustFilter.ts` (Agent C - Phase 1 Bug Fix)
 - `supabase/functions/personalized-suggestions/index.ts` (Agent A)
 - `src/lib/types.ts` (Agent B)
 - `src/lib/personalized-suggestions-service.ts` (Agent B)
 - `src/lib/analytics.ts` (Agent B)
 - `src/lib/__tests__/personalized-suggestions-service.test.ts` (Agent B)
+- `src/components/PersonalizedSuggestionsCard.tsx` (Agent C)
+- `src/app/results.tsx` (Agent C)
 
 ---
 
@@ -201,8 +204,6 @@ meta: {
 | **Response schema** | Compatible | `recommend` is now union type |
 
 Existing clients sending only `top_matches` will continue to work exactly as before.
-
----
 
 ---
 
@@ -567,6 +568,252 @@ npx tsc --noEmit
 
 ---
 
+# Agent C: UI Integration Implementation Complete
+
+**Agent:** C (UI Integration)
+**Status:** Complete
+**Date:** 2026-01-28 (Phase 1 Bug Fix), 2026-01-29 (Phase 4-5 UI Integration)
+**Files Modified:**
+- `src/lib/useTrustFilter.ts` (Phase 1 Bug Fix)
+- `src/components/PersonalizedSuggestionsCard.tsx`
+- `src/app/results.tsx`
+
+---
+
+## Summary
+
+Implemented UI integration for NEAR mode AI styling suggestions, including mode-aware component rendering, NEAR tab fetch logic with timeout fallback, and Mode B suppression. Also fixed solo mode bug where 0 total matches prevented AI suggestions.
+
+---
+
+## Phase 1: Bug Fix - Solo Mode with 0 Total Matches
+
+### Problem
+Solo mode AI suggestions failed when wardrobe had items but 0 total matches (no HIGH + no NEAR). Root cause: early return in `useTrustFilter.ts` skipped `scanSignals` fetching when `matches.length === 0`.
+
+### Fix
+
+**File:** `src/lib/useTrustFilter.ts` (lines 274-276)
+
+**Before:**
+```typescript
+// Skip if no matches to filter
+if (confidenceResult.matches.length === 0) {
+  return;
+}
+```
+
+**After:**
+```typescript
+// Note: Don't skip when matches.length === 0
+// Solo mode needs scanSignals even with 0 matches
+// Wardrobe signals fetching has its own guard (matchedItemIds.length > 0)
+```
+
+**Impact:** Solo mode AI now triggers with 0 total matches. Wardrobe signals guard at line 335 prevents unnecessary fetching.
+
+---
+
+## Phase 4-5: UI Integration
+
+### 1. PersonalizedSuggestionsCard Component Updates
+
+**File:** `src/components/PersonalizedSuggestionsCard.tsx`
+
+#### Added Mode Prop (Line 29)
+```typescript
+export interface PersonalizedSuggestionsCardProps {
+  suggestions: PersonalizedSuggestions | null;
+  isLoading: boolean;
+  wardrobeItemsById: Map<string, WardrobeItem>;
+  isSoloMode?: boolean;
+  mode?: "paired" | "solo" | "near";  // NEW
+}
+```
+
+#### Mode-Aware Section Titles (Lines 237-247)
+```typescript
+// Derive effective mode (use mode prop if provided, otherwise fallback to isSoloMode)
+const effectiveMode = mode ?? (isSoloMode ? "solo" : "paired");
+
+// Section titles change based on mode
+const whyItWorksTitle =
+  effectiveMode === "near"
+    ? "Why it's close"
+    : effectiveMode === "solo"
+    ? "How to style it"
+    : "Why it works";
+
+const toElevateTitle =
+  effectiveMode === "near"
+    ? "How to upgrade"
+    : effectiveMode === "solo"
+    ? "What to add first"
+    : "To elevate";
+```
+
+#### Recommend Union Rendering (Lines 157-177)
+Updated `ToElevateBullet` to branch on `recommend.type`:
+
+```typescript
+{bullet.recommend.type === "consider_adding" ? (
+  <>
+    <Text style={...}>
+      Consider adding: {bullet.recommend.attributes.join(", ") + " "}
+      {bullet.recommend.category}
+    </Text>
+    <Text style={...}>{bullet.text}</Text>
+  </>
+) : (
+  // styling_tip type - render tip directly as primary text
+  <>
+    <Text style={...}>
+      {bullet.recommend.tip}
+    </Text>
+    {bullet.text && (
+      <Text style={...}>{bullet.text}</Text>
+    )}
+  </>
+)}
+```
+
+**Key change:** `styling_tip` renders the tip text as the main content, not "Consider adding: ..."
+
+---
+
+### 2. Results Screen Updates
+
+**File:** `src/app/results.tsx`
+
+#### NEAR Suggestions State (Lines 2001-2004)
+```typescript
+// NEAR tab AI suggestions (separate state from HIGH)
+const [nearSuggestionsResult, setNearSuggestionsResult] = useState<SuggestionsResult | null>(null);
+const [nearSuggestionsLoading, setNearSuggestionsLoading] = useState(false);
+const [nearSuggestionsTimedOut, setNearSuggestionsTimedOut] = useState(false);
+```
+
+#### Stable Key for Double-Fetch Prevention (Lines 2545-2550)
+```typescript
+// Stable key to prevent double-fetch on tab switching
+const nearFinalIdsKey = useMemo(() => {
+  return trustFilterResult.finalized.nearFinal
+    .map(m => m.wardrobeItem.id)
+    .sort()
+    .join('|');
+}, [trustFilterResult.finalized.nearFinal]);
+```
+
+#### NEAR Fetch Effect (Lines 2558-2642)
+- Fetches NEAR AI when `nearFinal.length > 0`
+- 10-second timeout for fast fallback to Mode B
+- Passes `nearFinal` array to service, empty `highFinal`
+- Includes extensive debug logging
+
+```typescript
+useEffect(() => {
+  // Wait for trust filter to be fully ready
+  if (!trustFilterResult.isFullyReady) return;
+  if (!currentCheckId || !trustFilterResult.scanSignals) return;
+  if (!wardrobeSummary?.updated_at) return;
+
+  const nearFinal = trustFilterResult.finalized.nearFinal;
+  if (nearFinal.length === 0) {
+    setNearSuggestionsResult(null);
+    setNearSuggestionsLoading(false);
+    return;
+  }
+
+  setNearSuggestionsLoading(true);
+  setNearSuggestionsTimedOut(false);
+
+  // Set 10s timeout for fast fallback
+  const timeoutId = setTimeout(() => {
+    setNearSuggestionsTimedOut(true);
+  }, 10000);
+
+  fetchPersonalizedSuggestions({
+    scanId: currentCheckId,
+    scanSignals: trustFilterResult.scanSignals,
+    highFinal: [],  // Empty for NEAR mode
+    nearFinal: nearFinal,  // NEAR matches
+    wardrobeSummary,
+    intent,
+    scanCategory: scannedItem?.category ?? null,
+    preferAddOnCategories: false,
+    addOnCategories: [],
+  })
+    .then((result) => {
+      clearTimeout(timeoutId);
+      setNearSuggestionsResult(result);
+      setNearSuggestionsLoading(false);
+    })
+    .catch((err) => {
+      clearTimeout(timeoutId);
+      setNearSuggestionsResult(null);
+      setNearSuggestionsLoading(false);
+    });
+}, [
+  trustFilterResult.isFullyReady,
+  nearFinalIdsKey,  // Stable key prevents double-fetch
+  trustFilterResult.scanSignals,
+  currentCheckId,
+  wardrobeSummary?.updated_at,
+  fromScan,
+  scannedItem?.category,
+]);
+```
+
+#### Mode B Suppression with Timeout (Lines 3179-3190)
+```typescript
+if (!isHighTab && hasNearContent) {
+  // CRITICAL: Suppress Mode B when NEAR AI is loading or succeeded
+  // Allow Mode B to show if AI timed out (fast fallback)
+  const shouldSuppressModeB = 
+    !nearSuggestionsTimedOut &&
+    (nearSuggestionsLoading || nearSuggestionsResult?.ok);
+  
+  if (shouldSuppressModeB) {
+    return []; // NEAR AI suggestions take priority
+  }
+  
+  // Mode B computation continues here if not suppressed...
+}
+```
+
+**Key behavior:** Mode B only suppressed when AI is loading OR succeeded. If timeout fires or AI fails, Mode B renders immediately (never blank).
+
+#### NEAR AI Card Rendering (Lines 5354-5363)
+```typescript
+{/* NEAR Tab AI Card - "Why it's close" / "How to upgrade" */}
+{(nearSuggestionsLoading || (nearSuggestionsResult?.ok && nearSuggestionsResult.data)) && !isHighTab && (
+  <Animated.View entering={FadeIn.delay(400)} style={{ marginBottom: spacing.md, marginTop: spacing.xs }}>
+    <PersonalizedSuggestionsCard
+      suggestions={nearSuggestionsResult?.ok ? nearSuggestionsResult.data : null}
+      isLoading={nearSuggestionsLoading}
+      wardrobeItemsById={wardrobeItemsById}
+      mode="near"  // CRITICAL: passes mode prop for correct titles
+    />
+  </Animated.View>
+)}
+```
+
+#### Solo Mode Gating Verification (Lines 3130-3142)
+Already implemented correctly - uses `isCoreCategory()` filtering to exclude add-on matches (outerwear, bags, accessories) from solo gating. Solo triggers when `wardrobeCount > 0 && coreHigh.length === 0 && coreNear.length === 0`.
+
+---
+
+## Backward Compatibility
+
+| Existing Flow | Status | Notes |
+|---------------|--------|-------|
+| **HIGH tab** | Unchanged | Existing `isHighTab` conditional preserved |
+| **Paired mode** | Unchanged | Still uses HIGH tab logic, `mode` prop defaults to "paired" |
+| **Solo mode** | Enhanced | Bug fix enables 0 total matches case; existing UI preserved via `isSoloMode` prop |
+| **Mode A/B bullets** | Enhanced | Mode B now suppressed on NEAR tab when AI present |
+
+---
+
 ## Files Modified
 
 ### Agent A (Backend)
@@ -578,7 +825,8 @@ npx tsc --noEmit
 - `src/lib/analytics.ts`
 - `src/lib/__tests__/personalized-suggestions-service.test.ts`
 
-### Agent C (UI Integration) - Pending
+### Agent C (UI Integration)
+- `src/lib/useTrustFilter.ts` (Bug Fix)
 - `src/components/PersonalizedSuggestionsCard.tsx`
 - `src/app/results.tsx`
 
@@ -602,9 +850,15 @@ All items marked complete in:
 - Telemetry: 1/1 ✓
 - Unit Tests: 5/5 ✓ (4 CRITICAL)
 
-### Agent C (UI Integration): Pending
-- UI Component Updates: 0/4
-- Results Screen: 0/10
+### Agent C (UI Integration + Bug Fix): 17/17 ✓
+- Bug Fix (Solo Mode 0 Matches): 2/2 ✓
+- UI Component Updates: 4/4 ✓ (1 CRITICAL)
+- Solo Mode Gating: 2/2 ✓ (1 CRITICAL)
+- NEAR Tab Fetch: 3/3 ✓ (1 CRITICAL)
+- Mode B Suppression: 3/3 ✓ (1 CRITICAL)
+- NEAR Rendering: 2/2 ✓
+
+**Total: 43/43 items complete (13 CRITICAL)** ✓
 
 ---
 
@@ -615,11 +869,40 @@ All items marked complete in:
 supabase functions deploy personalized-suggestions --no-verify-jwt
 ```
 
-### Client (Agent B)
+### Client (Agent B + C)
 No separate deployment - changes included in app bundle.
 
 No database migrations required - uses existing `personalized_suggestions_cache` table.
 
 ---
 
-**Phase 1-3 Complete.** Ready for Agent C (UI Integration) to proceed with Phase 4-5.
+## Testing Verification
+
+### Manual QA Checklist
+
+**NEAR Tab:**
+1. Scan item with NEAR matches → switch to NEAR tab
+2. Verify: AI loading skeleton appears (Mode B suppressed)
+3. Verify: AI card shows "Why it's close" / "How to upgrade"
+4. Verify: Styling tips render (not category recommendations)
+5. Simulate timeout → verify Mode B appears after 10s
+
+**Solo Mode (0 Total Matches):**
+1. Scan item with wardrobe but 0 HIGH + 0 NEAR matches
+2. Verify: Solo AI card appears with "How to style it" / "What to add first"
+3. Verify: Falls back to Mode A if AI fails
+
+**HIGH Tab (Regression):**
+1. Scan item with HIGH matches
+2. Verify: AI card shows "Why it works" / "To elevate" (unchanged)
+3. Verify: Category recommendations work
+
+### Unit Tests
+Agent B: 45/45 tests passing ✓
+```bash
+npx jest src/lib/__tests__/personalized-suggestions-service.test.ts
+```
+
+---
+
+**All Phases Complete (1-5).** Ready for production deployment and user testing.
