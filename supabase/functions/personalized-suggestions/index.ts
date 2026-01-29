@@ -665,6 +665,7 @@ Deno.serve(async (req) => {
         prompt = buildNearPrompt(scan_signals, safeNearMatches, safeWardrobeSummary, intent ?? 'own_item');
         break;
       case 'solo':
+        console.log(`[personalized-suggestions] Solo mode: scan_category=${safeScanCategory}`);
         prompt = buildSoloPrompt(scan_signals, safeScanCategory, safeWardrobeSummary, intent ?? 'own_item');
         break;
       case 'paired':
@@ -739,6 +740,7 @@ Deno.serve(async (req) => {
       let rawSuggestions: unknown;
       try {
         rawSuggestions = JSON.parse(cleanedResponse);
+        console.log(`[personalized-suggestions] Raw AI response:`, JSON.stringify(rawSuggestions, null, 2));
       } catch (parseError) {
         const preview = cleanedResponse.slice(0, 200);
         console.error(`[personalized-suggestions] JSON parse failed. Preview: ${preview}`);
