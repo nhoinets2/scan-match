@@ -31,7 +31,7 @@ import type {
 // CONFIG
 // ============================================
 
-const PROMPT_VERSION = 2;
+const PROMPT_VERSION = 3; // Bumped: Added scanCategory to PAIRED/NEAR prompts
 const SCHEMA_VERSION = 2;
 const TIMEOUT_MS = 7500; // Slightly less than Edge Function timeout (8000ms)
 
