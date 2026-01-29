@@ -3408,61 +3408,6 @@ function ResultsSuccess({
       }));
   }, [confidenceResult.evaluated, confidenceResult.showMatchesSection, confidenceResult.matches]);
 
-  // NEAR add-ons (for Worth trying tab) - HIGH + MEDIUM tier optional items
-  const nearAddOns = useMemo(() => {
-    if (nearMatches.length === 0 && (!confidenceResult.evaluated || !confidenceResult.showMatchesSection)) {
-      return [];
-    }
-    
-    const result = [];
-    const seenIds = new Set<string>();
-    
-    // Add HIGH tier optional items (no badge needed)
-    if (confidenceResult.evaluated && confidenceResult.showMatchesSection) {
-      for (const m of confidenceResult.matches) {
-        const cat = m.wardrobeItem.category as Category;
-        if (isOptionalCategory(cat)) {
-          if (!seenIds.has(m.wardrobeItem.id)) {
-            seenIds.add(m.wardrobeItem.id);
-            // Type assertion safe: isOptionalCategory guarantees it's outerwear|bags|accessories
-            result.push({
-              id: m.wardrobeItem.id,
-              imageUri: m.wardrobeItem.imageUri,
-              category: cat as AddOnCategory,
-              colors: m.wardrobeItem.colors,
-              detectedLabel: m.wardrobeItem.detectedLabel,
-              userStyleTags: m.wardrobeItem.userStyleTags,
-              tier: 'HIGH',
-            });
-          }
-        }
-      }
-    }
-    
-    // Add MEDIUM tier optional items (will show "Needs tweak" badge)
-    for (const m of nearMatches) {
-      const cat = m.wardrobeItem.category as Category;
-      if (isOptionalCategory(cat)) {
-        if (!seenIds.has(m.wardrobeItem.id)) {
-          seenIds.add(m.wardrobeItem.id);
-          // Type assertion safe: isOptionalCategory guarantees it's outerwear|bags|accessories
-          result.push({
-            id: m.wardrobeItem.id,
-            imageUri: m.wardrobeItem.imageUri,
-            category: cat as AddOnCategory,
-            colors: m.wardrobeItem.colors,
-            detectedLabel: m.wardrobeItem.detectedLabel,
-            userStyleTags: m.wardrobeItem.userStyleTags,
-            tier: 'MEDIUM',
-          });
-        }
-      }
-    }
-    
-    return result;
-  }, [nearMatches, confidenceResult.evaluated, confidenceResult.showMatchesSection, confidenceResult.matches]);
-
-
   // Suggestions visibility is driven by helpfulAdditionRows.length > 0
   // Titles are tab-aware: "Complete the look" (HIGH) / "Make it work" (NEAR)
 
@@ -5038,10 +4983,12 @@ function ResultsSuccess({
           })()}
 
           {/* Optional add-ons section - Compact Strip with AI Integration */}
+          {/* Only show on HIGH tab - NEAR tab should focus on making outfit work, not accessorizing */}
           {(() => {
-            const addOnsWithTier = isHighTab ? highAddOns : nearAddOns;
+            if (!isHighTab) return null;
+            
             // Remove tier property (components don't need it)
-            const addOns = addOnsWithTier.map(item => ({
+            const addOns = highAddOns.map(item => ({
               id: item.id,
               imageUri: item.imageUri,
               category: item.category,
@@ -5612,10 +5559,12 @@ function ResultsSuccess({
       />
 
       {/* Add-ons bottom sheet - Compact Add-ons Strip expansion */}
+      {/* Only show on HIGH tab - matches the strip visibility */}
       {(() => {
-        const addOnsWithTier = isHighTab ? highAddOns : nearAddOns;
+        if (!isHighTab) return null;
+        
         // Remove tier property (components don't need it)
-        const addOns = addOnsWithTier.map(item => ({
+        const addOns = highAddOns.map(item => ({
           id: item.id,
           imageUri: item.imageUri,
           category: item.category,

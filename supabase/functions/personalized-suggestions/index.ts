@@ -140,6 +140,7 @@ interface PersonalizedSuggestions {
 
 function buildPrompt(
   scanSignals: StyleSignalsV1,
+  scanCategory: string,
   topMatches: SafeMatchInfo[],
   wardrobeSummary: WardrobeSummary,
   intent: 'shopping' | 'own_item'
@@ -158,6 +159,7 @@ function buildPrompt(
 
 CONTEXT:
 intent:${intent}
+scanned_item:category=${scanCategory}
 scan:${scanSummary}
 matches:${matchesSummary}
 wardrobe:${wardrobeOverview}
@@ -165,12 +167,12 @@ wardrobe:${wardrobeOverview}
 OUTPUT FORMAT (strict JSON only):
 {
   "why_it_works": [
-    { "text": "explanation without naming items", "mentions": ["ITEM_ID"] },
-    { "text": "explanation without naming items", "mentions": ["ITEM_ID"] }
+    { "text": "why this wardrobe item pairs well with the scanned ${scanCategory}", "mentions": ["ITEM_ID"] },
+    { "text": "why this wardrobe item pairs well with the scanned ${scanCategory}", "mentions": ["ITEM_ID"] }
   ],
   "to_elevate": [
-    { "text": "why this would help", "recommend": { "type": "consider_adding", "category": "CATEGORY", "attributes": ["attr1", "attr2"] } },
-    { "text": "why this would help", "recommend": { "type": "consider_adding", "category": "CATEGORY", "attributes": ["attr1", "attr2"] } }
+    { "text": "why this would help complete the outfit with the ${scanCategory}", "recommend": { "type": "consider_adding", "category": "CATEGORY", "attributes": ["attr1", "attr2"] } },
+    { "text": "why this would help complete the outfit with the ${scanCategory}", "recommend": { "type": "consider_adding", "category": "CATEGORY", "attributes": ["attr1", "attr2"] } }
   ]
 }
 
@@ -183,6 +185,8 @@ STRICT RULES (must follow):
 6. Keep "text" concise (aim for 60-80 characters, max 100)
 7. "attributes" must be natural language (e.g., "solid color" not "solid_color", "fitted silhouette" not "fitted_silhouette")
 8. Be specific to these actual items, not generic fashion advice
+9. Always connect explanations to the scanned ${scanCategory} - explain how wardrobe items PAIR with it
+10. When explaining "why_it_works", describe the relationship between the wardrobe item and the scanned ${scanCategory}
 Respond with ONLY the JSON object.`;
 }
 
@@ -239,6 +243,7 @@ Respond with ONLY the JSON object.`;
  */
 function buildNearPrompt(
   scanSignals: StyleSignalsV1,
+  scanCategory: string,
   nearMatches: SafeNearMatchInfo[],
   wardrobeSummary: WardrobeSummary,
   intent: 'shopping' | 'own_item'
@@ -263,20 +268,21 @@ function buildNearPrompt(
 
 CONTEXT:
 intent:${intent}
+scanned_item:category=${scanCategory}
 scan:${scanSummary}
 near_matches:${matchesSummary}
 wardrobe:${wardrobeOverview}
-note: These items are CLOSE matches but not perfect. Focus on HOW to make them work.
+note: These items are CLOSE matches but not perfect. Focus on HOW to make them work with the scanned ${scanCategory}.
 
 OUTPUT FORMAT (strict JSON only):
 {
   "why_it_works": [
-    { "text": "why this item is close to working", "mentions": ["ITEM_ID"] },
-    { "text": "why this item is close to working", "mentions": ["ITEM_ID"] }
+    { "text": "why this wardrobe item could pair with the scanned ${scanCategory}", "mentions": ["ITEM_ID"] },
+    { "text": "why this wardrobe item could pair with the scanned ${scanCategory}", "mentions": ["ITEM_ID"] }
   ],
   "to_elevate": [
-    { "text": "how to bridge the style gap", "recommend": { "type": "styling_tip", "tip": "specific styling advice", "tags": ["tag1"] } },
-    { "text": "how to bridge the style gap", "recommend": { "type": "styling_tip", "tip": "specific styling advice", "tags": ["tag1"] } }
+    { "text": "styling tip for wearing the ${scanCategory} with these items", "recommend": { "type": "styling_tip", "tip": "specific styling advice", "tags": ["tag1"] } },
+    { "text": "styling tip for wearing the ${scanCategory} with these items", "recommend": { "type": "styling_tip", "tip": "specific styling advice", "tags": ["tag1"] } }
   ]
 }
 
@@ -289,6 +295,9 @@ STRICT RULES (must follow):
 6. Keep "text" concise (aim for 60-80 characters, max 100)
 7. Use natural language (e.g., "solid color" not "solid_color", "fitted silhouette" not "fitted_silhouette")
 8. Focus on HOW to style these items to make them work, based on cap reasons
+9. Always connect explanations to the scanned ${scanCategory} - don't describe wardrobe items in isolation
+10. For "why_it_works": explain why the wardrobe item could work WITH the scanned ${scanCategory}
+11. For "to_elevate": provide styling tips specific to pairing the ${scanCategory} with the near match items
 Respond with ONLY the JSON object.`;
 }
 
@@ -668,7 +677,8 @@ Deno.serve(async (req) => {
     let prompt: string;
     switch (derivedMode) {
       case 'near':
-        prompt = buildNearPrompt(scan_signals, safeNearMatches, safeWardrobeSummary, intent ?? 'own_item');
+        console.log(`[personalized-suggestions] Near mode: scan_category=${safeScanCategory}`);
+        prompt = buildNearPrompt(scan_signals, safeScanCategory, safeNearMatches, safeWardrobeSummary, intent ?? 'own_item');
         break;
       case 'solo':
         console.log(`[personalized-suggestions] Solo mode: scan_category=${safeScanCategory}`);
@@ -676,7 +686,8 @@ Deno.serve(async (req) => {
         break;
       case 'paired':
       default:
-        prompt = buildPrompt(scan_signals, safeTopMatches, safeWardrobeSummary, intent ?? 'own_item');
+        console.log(`[personalized-suggestions] Paired mode: scan_category=${safeScanCategory}`);
+        prompt = buildPrompt(scan_signals, safeScanCategory, safeTopMatches, safeWardrobeSummary, intent ?? 'own_item');
         break;
     }
     
