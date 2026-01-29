@@ -333,8 +333,9 @@ export async function fetchPersonalizedSuggestions({
     }
 
     const payload = await response.json();
+    const rawSuggestions = payload?.data ?? payload;
     const { suggestions, wasRepaired, removedCategories, mentionsStrippedCount } = validateAndRepairSuggestions(
-      payload,
+      rawSuggestions,
       validIds,
       mode,
       scanCategory ?? null,
