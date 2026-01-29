@@ -92,6 +92,7 @@ interface StyleSignalsV1 {
 
 interface SuggestionsRequest {
   scan_signals: StyleSignalsV1;
+  scan_category?: Category;
   top_matches: SafeMatchInfo[];
   near_matches?: SafeNearMatchInfo[];  // NEAR mode: MEDIUM tier items
   wardrobe_summary: WardrobeSummary;
@@ -186,6 +187,7 @@ Respond with ONLY the JSON object.`;
 
 function buildSoloPrompt(
   scanSignals: StyleSignalsV1,
+  scannedCategory: Category,
   wardrobeSummary: WardrobeSummary,
   intent: 'shopping' | 'own_item'
 ): string {
@@ -196,6 +198,7 @@ function buildSoloPrompt(
 
 CONTEXT:
 intent:${intent}
+scanned_item:category=${scannedCategory}
 scan:${scanSummary}
 wardrobe:${wardrobeOverview}
 matches:[] (solo mode - no pairings)
@@ -203,8 +206,8 @@ matches:[] (solo mode - no pairings)
 OUTPUT FORMAT (strict JSON only):
 {
   "why_it_works": [
-    { "text": "styling guidance without naming items", "mentions": [] },
-    { "text": "styling guidance without naming items", "mentions": [] }
+    { "text": "specific styling tip for this ${scannedCategory}", "mentions": [] },
+    { "text": "complementary styling approach for this item", "mentions": [] }
   ],
   "to_elevate": [
     { "text": "why this would help", "recommend": { "type": "consider_adding", "category": "CATEGORY", "attributes": ["attr1", "attr2"] } },
@@ -219,7 +222,12 @@ STRICT RULES (must follow):
 4. "to_elevate" MUST use type: "consider_adding"
 5. "category" in to_elevate MUST be one of: ${ALLOWED_CATEGORIES.join(', ')}
 6. Keep "text" concise (aim for 60-80 characters, max 100)
-7. Focus on how to style this item, not what it pairs with
+7. Focus on how to style THIS ${scannedCategory}, not generic advice
+8. For "to_elevate": PRIORITIZE core outfit-forming pieces first:
+   - If scanned item is outerwear/accessories: suggest tops, bottoms, shoes, dresses
+   - If scanned item is tops/bottoms/shoes: suggest complementary core pieces to complete outfit
+   - Only suggest accessories AFTER core pieces are covered
+9. "category" in to_elevate should be core pieces (tops, bottoms, shoes, dresses) NOT accessories/bags/outerwear
 Respond with ONLY the JSON object.`;
 }
 
@@ -578,7 +586,7 @@ Deno.serve(async (req) => {
     // ============================================
     
     const body: SuggestionsRequest = await req.json();
-    const { scan_signals, top_matches, near_matches, wardrobe_summary, intent, cache_key, scan_id, has_pairings } = body;
+    const { scan_signals, scan_category, top_matches, near_matches, wardrobe_summary, intent, cache_key, scan_id, has_pairings } = body;
     void has_pairings;
     
     // Validate required fields (near_matches optional)
@@ -646,6 +654,9 @@ Deno.serve(async (req) => {
     }
     
     const safeWardrobeSummary = wardrobe_summary ?? { total: 0, by_category: {}, dominant_aesthetics: [], updated_at: '' };
+    const safeScanCategory = (ALLOWED_CATEGORIES as readonly string[]).includes(scan_category ?? '')
+      ? (scan_category as Category)
+      : 'tops';
     
     // Build prompt based on derived mode
     let prompt: string;
@@ -654,7 +665,7 @@ Deno.serve(async (req) => {
         prompt = buildNearPrompt(scan_signals, safeNearMatches, safeWardrobeSummary, intent ?? 'own_item');
         break;
       case 'solo':
-        prompt = buildSoloPrompt(scan_signals, safeWardrobeSummary, intent ?? 'own_item');
+        prompt = buildSoloPrompt(scan_signals, safeScanCategory, safeWardrobeSummary, intent ?? 'own_item');
         break;
       case 'paired':
       default:
