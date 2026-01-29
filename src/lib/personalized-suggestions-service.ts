@@ -31,7 +31,7 @@ import type {
 // CONFIG
 // ============================================
 
-const PROMPT_VERSION = 1;
+const PROMPT_VERSION = 2;
 const SCHEMA_VERSION = 2;
 const TIMEOUT_MS = 7500; // Slightly less than Edge Function timeout (8000ms)
 
@@ -316,6 +316,7 @@ export async function fetchPersonalizedSuggestions({
       },
       body: JSON.stringify({
         scan_signals: scanSignals,
+        scan_category: scanCategory ?? null,
         top_matches: topMatches,
         near_matches: nearMatches.length > 0 ? nearMatches : undefined, // Only include for NEAR mode
         wardrobe_summary: wardrobeSummary,

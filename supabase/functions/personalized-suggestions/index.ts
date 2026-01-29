@@ -25,7 +25,7 @@ const corsHeaders = {
 };
 
 // Current versions - increment when prompt/schema changes
-const PROMPT_VERSION = 1;
+const PROMPT_VERSION = 2;
 const SCHEMA_VERSION = 1;
 
 // Timeout for OpenAI call (fail-open behavior)
