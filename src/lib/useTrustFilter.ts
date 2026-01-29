@@ -271,10 +271,9 @@ export function useTrustFilter(
       return;
     }
 
-    // Skip if no matches to filter
-    if (confidenceResult.matches.length === 0) {
-      return;
-    }
+    // Note: Don't skip when matches.length === 0
+    // Solo mode needs scanSignals even with 0 matches
+    // Wardrobe signals fetching has its own guard (matchedItemIds.length > 0)
 
     // Skip if already fetched for this scan
     if (signalsFetched && scanId) {
@@ -364,7 +363,7 @@ export function useTrustFilter(
     };
 
     fetchSignals();
-  }, [scanId, matchedItemIds, confidenceResult.matches.length, signalsFetched, scannedItem?.imageUri]);
+  }, [scanId, matchedItemIds, signalsFetched, scannedItem?.imageUri]);
 
   // Reset when scan changes
   useEffect(() => {
