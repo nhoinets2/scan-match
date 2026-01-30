@@ -1,17 +1,23 @@
 <stack>
-  Expo SDK 53, React Native 0.76.7, bun (not npm).
+  Expo SDK 53, React Native 0.76.7, npm (not bun).
   React Query for server/async state.
   NativeWind + Tailwind v3 for styling.
   react-native-reanimated v3 for animations (preferred over Animated from react-native).
   react-native-gesture-handler for gestures.
   lucide-react-native for icons.
-  All packages are pre-installed. DO NOT install new packages unless they are @expo-google-font packages or pure JavaScript helpers like lodash, dayjs, etc.
+  
+  Dependencies are managed via npm + package-lock.json.
+  DO NOT add new packages unless necessary.
+  Allowed: @expo-google-fonts/* or small pure-JS helpers (lodash, dayjs, etc.) IF needed.
+  If you propose adding a package, explain why and list alternatives.
 </stack>
 
 <structure>
-  src/app/          — Expo Router file-based routes (src/app/_layout.tsx is root). Add new screens to this folder.
-  src/components/   — Reusable UI components. Add new components to this folder.
-  src/lib/          — Utilities: cn.ts (className merge), example-context.ts (state pattern)
+  src/app/            — Expo Router file-based routes (src/app/_layout.tsx is root). Add new screens here.
+  src/components/     — Reusable UI components.
+  src/lib/            — Utilities, services, and clients (e.g., cn.ts, supabase.ts, trust-filter/).
+  supabase/functions/ — Edge Functions (Deno runtime, server-side AI calls).
+  maestro-tests/      — E2E tests (Maestro).
 </structure>
 
 <typescript>
@@ -21,20 +27,89 @@
 </typescript>
 
 <environment>
-  You are in Vibecode. The system manages git and the dev server (port 8081).
-  DO NOT: manage git, touch the dev server, or check its state.
-  The user views the app through Vibecode App.
-  The user cannot see the code or interact with the terminal. Do not tell the user to do anything with the code or terminal.
-  You can see logs in the expo.log file.
-  The Vibecode App has tabs like ENV tab, API tab, LOGS tab. You can ask the user to use these tabs to view the logs, add enviroment variables, or give instructions for APIs like OpenAI, Nanobanana, Grok, Elevenlabs, etc. but first try to implement the functionality yourself.
-  The user is likely non-technical, communicate with them in an easy to understand manner.
-  If the user's request is vague or ambitious, scope down to specific functionality. Do everything for them.
-  For images, use URLs from unsplash.com. You can also tell the user they can use the IMAGES tab to generate and uplooad images.
+  You are working in a LOCAL development environment on the user's Mac, inside the repository folder.
+  The user edits code in Cursor and can run commands in an integrated terminal.
+  The user runs Expo Metro locally (typically on port 8081) and uses an iOS Development Build on their phone.
+  Hot reload / Fast Refresh should work when Metro is running.
+
+  ✅ YOU MAY:
+  - Use git locally (status/add/commit/push) BUT always ask before pushing, and never commit secrets.
+  - Suggest terminal commands for the user to run (npm, expo, eas, git).
+  - Edit project files directly and explain what changed.
+  - Use EAS Build/Submit for dev builds, preview builds, and TestFlight.
+
+  ❌ DO NOT:
+  - Assume Vibecode exists (no ENV/API/LOGS tabs).
+  - Tell the user to use Vibecode App or any Vibecode UI.
+  - Add or request EXPO_PUBLIC_* secrets for OpenAI (OpenAI keys must remain server-side, e.g., Supabase Edge Functions).
+  - Commit .env or any credentials. Never print keys. Never paste secrets into logs or code.
+
+  Logging:
+  - Logs are visible in the local terminal running `npx expo start` and in the device/dev build.
+  - If you need additional diagnostics, ask the user to paste terminal output or screenshots.
+
+  Environment variables:
+  - Local dev uses a `.env` file (not committed) + `.env.example` for placeholders.
+  - Cloud builds (EAS/TestFlight) must use EAS Secrets, not local `.env`.
+
+  Package management:
+  - Use npm + package-lock.json only. Do not introduce bun.lockb/yarn.lock/pnpm-lock.yaml unless explicitly requested.
+  - If dependencies change, update package-lock.json and explain why.
+
+  Workflow defaults:
+  - Start dev: `npx expo start --dev-client`
+  - If issues: `npx expo start --dev-client -c`
+  - Install deps: `npm install`
 </environment>
 
+<docs_and_versioning>
+  This repo has living documentation. When code changes affect behavior, update docs in the same PR/commit.
+
+  Files:
+  - COMPREHENSIVE_SYSTEM_DOCUMENTATION.md = system behavior, UI states, decision tables.
+  - CHANGELOG.md = what changed + why (user-visible changes).
+  - VERSIONS.md = 3 version types (app, build, schema/behavior) + version constant reference.
+  - docs/handoff = agent handoffs and implementation notes.
+
+  When to update what:
+  - Code fix / small change → add CHANGELOG.md entry
+  - Behavior change affecting caches/outputs → bump version constant in code + update VERSIONS.md table
+  - Architecture/UI state/decision logic change → update COMPREHENSIVE_SYSTEM_DOCUMENTATION.md
+
+  Never put secrets in docs.
+</docs_and_versioning>
+
+<secrets>
+  Never commit secrets (API keys, service keys, .p8 files, certificates).
+  Never add real values to `.env.example`.
+  If a secret was committed in history, remove it properly (rewrite history) or rotate it.
+  Assume GitHub push-protection may block pushes if secrets appear in commits.
+</secrets>
+
+<agent_rules>
+  - Make changes in small batches (1–3 files), then summarize.
+  - After each batch, provide exact commands to run to verify.
+  - Never change dependency versions unless required; if required, propose first.
+  - Always keep the app running (avoid breaking the build).
+  - Never modify `.env` values or request secrets; only update `.env.example`.
+</agent_rules>
+
+<testing>
+  Jest for unit tests: src/lib/__tests__/
+  Maestro for E2E tests: maestro-tests/
+  Run: `npm test` (Jest)
+  Before modifying core logic (Confidence Engine, Trust Filter, etc.), check for existing tests.
+</testing>
+
+<release_pipeline>
+  Local dev uses `.env` (not committed).
+  EAS cloud builds do NOT read local `.env`.
+  For TestFlight/production builds, required EXPO_PUBLIC_* vars must be set via EAS Secrets or EAS Environment Variables.
+  Bundle identifier must remain stable to keep the same App Store Connect app.
+</release_pipeline>
 
 <forbidden_files>
-  Do not edit: patches/, babel.config.js, metro.config.js, app.json, tsconfig.json, nativewind-env.d.ts
+  Do not edit unless explicitly asked: patches/, babel.config.js, metro.config.js, app.json, tsconfig.json, nativewind-env.d.ts
 </forbidden_files>
 
 <routing>
@@ -139,11 +214,6 @@
     Your react-native-reanimated and react-native-gesture-handler training may be outdated. Look up current docs before implementing.
   </outdated_knowledge>
 </mistakes>
-
-<appstore>
-  Cannot assist with App Store or Google Play submission processes (app.json, eas.json, EAS CLI commands).
-  For submission help, click "Share" on the top right corner on the Vibecode App and select "Submit to App Store".
-</appstore> 
 
 <skills>
 You have access to a few skills in the `.claude/skills` folder. Use them to your advantage.
