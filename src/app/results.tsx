@@ -5628,7 +5628,10 @@ function ResultsSuccess({
         wardrobeCount={wardrobeCount}
         onAddToWardrobe={() => {
           setSelectedTipSheet(null); // Close tip sheet first
-          handleAddWardrobe(); // Navigate to add wardrobe flow
+          // Small delay to ensure modal closes before navigation
+          setTimeout(() => {
+            handleAddWardrobe(); // Navigate to add wardrobe flow
+          }, 100);
         }}
       />
 

@@ -1451,36 +1451,13 @@ export default function AddItemScreen() {
   // Permission handling
   if (!permission) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#000000", alignItems: "center", justifyContent: "center" }}>
+      <View style={{ flex: 1, backgroundColor: colors.bg.primary, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator size="large" color={colors.accent.terracotta} />
         <Text 
           style={{ 
             ...typography.ui.body,
-            color: colors.text.inverse,
-          }}
-        >
-          Loading camera...
-        </Text>
-      </View>
-    );
-  }
-
-  // Permission state machine - single source of truth
-  if (!permission) {
-    // Loading permission status
-    return (
-      <View 
-        style={{ 
-          flex: 1, 
-          backgroundColor: colors.bg.primary, 
-          alignItems: "center", 
-          justifyContent: "center",
-          paddingHorizontal: spacing.xl 
-        }}
-      >
-        <Text
-          style={{ 
-            ...typography.ui.body,
             color: colors.text.secondary,
+            marginTop: spacing.md,
           }}
         >
           Loading camera...
