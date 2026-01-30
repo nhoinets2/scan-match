@@ -481,7 +481,7 @@ async function uploadWorker(job: UploadJob): Promise<void> {
   if (updatedCount > 0) {
     logUploadEvent('upload_succeeded', jobId, { kind, publicUrl });
     if (kind === 'wardrobe') {
-      console.log('[UploadWorker] Triggering style signal generation for:', jobId);
+      console.log('[UploadWorker] ✅ Upload succeeded, triggering style signal generation for:', jobId);
       enqueueWardrobeEnrichment(jobId);
     }
   } else {

@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Style Signals Generation Telemetry**: Added comprehensive analytics tracking for wardrobe item signal generation lifecycle:
+  - `style_signals_started` - When generation begins (with item_id, type)
+  - `style_signals_completed` - On success (with duration, cache status, archetype, formality, prompt version)
+  - `style_signals_failed` - On failure (with error_type, error_message)
+  - Enhanced logging with ✅/❌ indicators and timing information
+  - All events sampled at 100% for full observability
+  - Enables monitoring of success rates, latency, cache hit rates, and error types
 - **Trust Filter Telemetry**: Wired analytics tracking into `useTrustFilter` hook:
   - `trust_filter_started` - When evaluation begins
   - `trust_filter_completed` - Summary with demote/hide/skip counts and duration

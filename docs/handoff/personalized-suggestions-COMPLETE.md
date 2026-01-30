@@ -466,6 +466,12 @@ This feature benefits from two infrastructure improvements:
 - Trust Filter finds cached signals instantly (no 10s timeout)
 - See: [Parallel Style Signals](./parallel-style-signals-COMPLETE.md)
 
+### Proactive Wardrobe Enrichment
+- Style signals now generated **immediately** after wardrobe item image upload
+- Signals ready for first scan (no "rescan twice" UX issue)
+- Lazy enrichment still provides fallback if signals missing
+- Trust Filter sees signals on first evaluation
+
 ### Claude Sonnet 4.5 Migration
 - `analyze-image` and `style-signals` Edge Functions switched from GPT-4o to Claude Sonnet 4.5
 - Faster latency (~4.3s vs ~8s for style-signals)

@@ -142,8 +142,10 @@ The **Confidence Engine** is the sole matching system in the app. It uses determ
 │  • Generates signals via Edge Function (Claude Sonnet 4.5)      │
 │  • 12 aesthetic archetypes, formality bands, pattern levels     │
 │  • Two-tier caching: in-memory + DB-backed                      │
-│  • Lazy enrichment for wardrobe items                           │
-│  • Pre-fetched in parallel with image analysis                  │
+│  • Proactive enrichment: triggers after wardrobe image upload   │
+│  • Lazy enrichment: fallback when signals missing               │
+│  • Pre-fetched in parallel with image analysis (scans)          │
+│  • Magic byte detection for accurate image MIME type            │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -350,6 +352,11 @@ Style signals are generated via **Claude Sonnet 4.5** (migrated from GPT-4 Visio
 | **Pattern Level** | Pattern intensity | solid, subtle_pattern, bold_pattern |
 | **Season Heaviness** | Visual weight | light, medium, heavy |
 
+**Generation Timing:**
+- **Scan items:** Generated in parallel with image analysis (pre-fetched for Trust Filter)
+- **Wardrobe items:** Generated immediately after image upload completes (proactive enrichment)
+- **Fallback:** Lazy enrichment still triggers if signals missing when needed by Trust Filter
+
 ### Trust Filter Actions
 
 | Action | Result | When Used |
@@ -380,6 +387,27 @@ Style signals are generated via **Claude Sonnet 4.5** (migrated from GPT-4 Visio
 
 If style signals are unavailable (timeout, error), Trust Filter passes through all matches unchanged. The system is "fail-open" to ensure users always see content.
 
+### Wardrobe Item Enrichment Flow
+
+**Proactive Generation (Primary Path):**
+1. User adds wardrobe item → Image uploaded to Supabase Storage
+2. Upload worker updates database with public URL
+3. `enqueueWardrobeEnrichment(itemId)` called immediately (fire-and-forget)
+4. Edge Function generates signals in background
+5. Signals ready for first scan (no rescan needed)
+
+**Lazy Enrichment (Fallback Path):**
+1. Trust Filter detects missing signals for wardrobe item
+2. `enqueueWardrobeEnrichmentBatch()` triggered
+3. Background generation starts (doesn't block current evaluation)
+4. Signals ready for subsequent scans
+
+**Key Behaviors:**
+- Proactive generation eliminates "rescan twice" UX issue
+- Lazy enrichment still provides safety net
+- Both paths are fire-and-forget (non-blocking)
+- Trust Filter remains fail-open if signals unavailable
+
 ### Performance Optimization: Parallel Pre-fetch
 
 Style signals generation runs **in parallel** with image analysis at scan start, rather than waiting for Trust Filter to request them:
@@ -408,6 +436,25 @@ TOTAL: ~27s                            TOTAL: ~12-15s
 - Fire-and-forget: Style signals call doesn't block analysis completion
 - Fail-open: If pre-fetch fails, Trust Filter retries as before
 - Abortable: Both calls cancel cleanly when user navigates away
+
+### Edge Function Improvements
+
+**Magic Byte Media Type Detection:**
+- Edge Function now detects actual image format using magic bytes (file signature)
+- Prevents Anthropic API 400 errors from MIME type mismatches
+- Headers may report `image/jpeg` while actual file is WebP/PNG
+- `detectMediaType()` function reads first bytes to determine true format:
+  - JPEG: `FF D8 FF`
+  - PNG: `89 50 4E 47`
+  - WebP: `RIFF....WEBP`
+  - GIF: `GIF8`
+- Sends correct media type to Anthropic regardless of storage headers
+
+**Enhanced Error Logging:**
+- Custom `AnthropicError` class captures HTTP status and full error details
+- Error messages include image metadata (type, byte size)
+- Detailed errors stored in `style_signals_error` DB column (truncated to 500 chars)
+- Enables debugging of API issues without redeploying functions
 
 ### Integration
 

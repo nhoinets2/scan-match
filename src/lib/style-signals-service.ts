@@ -13,6 +13,7 @@
 import { supabase } from './supabase';
 import * as Crypto from 'expo-crypto';
 import type { StyleSignalsV1 } from './trust-filter/types';
+import { trackEvent } from './analytics';
 
 // ============================================
 // TYPES
@@ -465,11 +466,31 @@ export function clearDirectSignalsCache(): void {
 export async function generateWardrobeStyleSignals(
   itemId: string
 ): Promise<StyleSignalsResponse> {
+  const startTime = Date.now();
+  
+  // Track start
+  trackEvent('style_signals_started', {
+    type: 'wardrobe',
+    item_id: itemId,
+  });
+
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData?.session?.access_token;
 
     if (!token) {
+      const durationMs = Date.now() - startTime;
+      
+      // Track failure
+      trackEvent('style_signals_failed', {
+        type: 'wardrobe',
+        item_id: itemId,
+        error_type: 'unauthorized',
+        error_message: 'Not authenticated',
+      });
+      
+      console.log('[StyleSignals] Failed:', itemId, 'unauthorized', `${durationMs}ms`);
+      
       return {
         ok: false,
         error: { kind: 'unauthorized', message: 'Not authenticated' },
@@ -488,13 +509,63 @@ export async function generateWardrobeStyleSignals(
       }),
     });
 
-    const result = await response.json();
-    return result as StyleSignalsResponse;
+    const result = await response.json() as StyleSignalsResponse;
+    const durationMs = Date.now() - startTime;
+
+    // Track success or failure based on response
+    if (result.ok && result.data) {
+      trackEvent('style_signals_completed', {
+        type: 'wardrobe',
+        item_id: itemId,
+        cached: result.cached ?? false,
+        duration_ms: durationMs,
+        primary_archetype: result.data.primaryArchetype,
+        formality_band: result.data.formalityBand,
+        prompt_version: result.data.promptVersion ?? 0,
+      });
+      
+      console.log(
+        '[StyleSignals] ✅ Completed:', 
+        itemId, 
+        `cached=${result.cached}`,
+        `${durationMs}ms`,
+        result.data.primaryArchetype,
+        result.data.formalityBand
+      );
+    } else {
+      trackEvent('style_signals_failed', {
+        type: 'wardrobe',
+        item_id: itemId,
+        error_type: result.error?.kind ?? 'unknown',
+        error_message: result.error?.message ?? 'Unknown error',
+      });
+      
+      console.log(
+        '[StyleSignals] ❌ Failed:', 
+        itemId, 
+        result.error?.kind ?? 'unknown',
+        `${durationMs}ms`
+      );
+    }
+
+    return result;
   } catch (error) {
-    console.error('[StyleSignalsService] Error generating wardrobe signals:', error);
+    const durationMs = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : 'Failed to connect to server';
+    
+    // Track failure
+    trackEvent('style_signals_failed', {
+      type: 'wardrobe',
+      item_id: itemId,
+      error_type: 'network_error',
+      error_message: errorMessage,
+    });
+    
+    console.error('[StyleSignals] ❌ Network error:', itemId, errorMessage, `${durationMs}ms`);
+    
     return {
       ok: false,
-      error: { kind: 'network_error', message: 'Failed to connect to server' },
+      error: { kind: 'network_error', message: errorMessage },
     };
   }
 }
@@ -506,9 +577,19 @@ export async function generateWardrobeStyleSignals(
  * @param itemId - The wardrobe item ID to enrich
  */
 export function enqueueWardrobeEnrichment(itemId: string): void {
+  console.log('[StyleSignals] Enqueuing background enrichment for:', itemId);
+  
   // Fire and forget - don't await
   generateWardrobeStyleSignals(itemId).catch((error) => {
-    console.warn('[StyleSignalsService] Background enrichment failed:', error);
+    console.warn('[StyleSignals] Background enrichment unexpected error:', itemId, error);
+    
+    // Track unexpected errors (errors not caught by generateWardrobeStyleSignals)
+    trackEvent('style_signals_failed', {
+      type: 'wardrobe',
+      item_id: itemId,
+      error_type: 'unexpected_error',
+      error_message: error instanceof Error ? error.message : 'Unknown error',
+    });
   });
 }
 
