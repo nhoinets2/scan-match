@@ -91,6 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Moved REFUND_POLICY.md** to `docs/`
 
 ### Fixed
+- **Wardrobe retry badge feedback** - Retry badges now switch to a spinner immediately on tap and update item data via a silent background refresh, so users no longer need to manually refresh the screen.
 - **Post-upgrade scan retry stuck on limit screen** - After purchasing Pro subscription from "Scan limit reached" screen, users were stuck on the same screen instead of retrying the scan. Now properly refreshes Pro status after purchase and automatically retries the scan with the same photo. Shows "Activating Pro..." overlay during status refresh.
 - **Post-upgrade wardrobe add not reflecting Pro status** - After purchasing Pro subscription from wardrobe limit paywall, users could still see the paywall again if they tried to capture immediately (Pro status wasn't refreshed yet). Now properly awaits Pro status refresh with "Activating Pro..." overlay before allowing capture.
 - **Subscription status leaking between users** - When user logs out and another user logs in, the new user no longer sees the previous user's Pro subscription status

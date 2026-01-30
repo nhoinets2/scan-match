@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   useWindowDimensions,
+  GestureResponderEvent,
 } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -26,6 +27,7 @@ import { Camera, CloudUpload, RefreshCw, WifiOff, AlertCircle } from "lucide-rea
 import { ImageWithFallback } from "@/components/PlaceholderImage";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { useWardrobe, useRemoveWardrobeItem } from "@/lib/database";
 import { useAuth } from "@/lib/auth-context";
 import { colors, spacing, typography, borderRadius, cards, shadows, button } from "@/lib/design-tokens";
@@ -36,6 +38,7 @@ import { ButtonPrimary } from "@/components/ButtonPrimary";
 import { ButtonTertiary } from "@/components/ButtonTertiary";
 import { capitalizeFirst } from "@/lib/text-utils";
 import { sweepOrphanedLocalImages, isUploadFailed, retryFailedUpload, getPendingUploadLocalUris, hasAnyPendingUploads, getRecentlyCreatedUris, hasPendingUpload, onQueueIdle } from "@/lib/storage";
+import { isRetryExhausted, retryStyleSignals } from '@/lib/style-signals-retry-queue';
 
 const WARDROBE_FILTER_KEY = "wardrobe_filter_selection";
 
@@ -84,6 +87,26 @@ const WardrobeGridItem = React.memo(function WardrobeGridItem({
   const isPending = hasPendingUpload(item.id);
   const isFailed = isUploadFailed(item.id);
   const showSyncStatus = isPending || isFailed;
+
+  // Local state for instant retry feedback (no flicker)
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  // Cache style signals retry status
+  const hasStyleSignalsExhausted = !isRetrying && isRetryExhausted(item.id);
+
+  const handleRetry = async (e: GestureResponderEvent) => {
+    e.stopPropagation();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    setIsRetrying(true);
+
+    try {
+      await retryStyleSignals(item.id);
+      queryClient.invalidateQueries({ queryKey: ["wardrobe"] });
+    } finally {
+      setIsRetrying(false);
+    }
+  };
 
   return (
     <Pressable
@@ -134,6 +157,7 @@ const WardrobeGridItem = React.memo(function WardrobeGridItem({
             flexDirection: "row",
             alignItems: "center",
             gap: spacing.xs / 2,
+            zIndex: 10,
           }}
         >
           {isFailed ? (
@@ -163,6 +187,54 @@ const WardrobeGridItem = React.memo(function WardrobeGridItem({
               </Text>
             </>
           )}
+        </Pressable>
+      )}
+
+      {/* Style signals retry indicator - shows at top-left */}
+      {isRetrying && (
+        <View
+          style={{
+            position: "absolute",
+            top: spacing.sm,
+            left: spacing.sm,
+            backgroundColor: colors.overlay.dark,
+            borderRadius: borderRadius.pill,
+            padding: spacing.xs,
+            zIndex: 10,
+          }}
+        >
+          <ActivityIndicator size="small" color={colors.text.inverse} />
+        </View>
+      )}
+
+      {/* Style signals exhausted indicator - tap to retry */}
+      {hasStyleSignalsExhausted && (
+        <Pressable
+          onPress={handleRetry}
+          style={{
+            position: "absolute",
+            top: spacing.sm,
+            left: spacing.sm,
+            backgroundColor: colors.status.error,
+            borderRadius: borderRadius.pill,
+            paddingVertical: spacing.xs,
+            paddingHorizontal: spacing.sm,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing.xs / 2,
+            zIndex: 10,
+          }}
+        >
+          <RefreshCw size={12} color={colors.text.inverse} strokeWidth={2} />
+          <Text 
+            style={{ 
+              ...typography.ui.caption,
+              color: colors.text.inverse, 
+              fontFamily: typography.fontFamily.medium,
+            }}
+          >
+            Retry
+          </Text>
         </Pressable>
       )}
 
@@ -525,6 +597,13 @@ export default function WardrobeScreen() {
     if (__DEV__) console.log('[Wardrobe] Pull-to-refresh triggered');
     setIsRefreshing(true);
     try {
+      // Retry any failed style signals
+      const exhaustedItems = wardrobe.filter((item) => isRetryExhausted(item.id));
+      if (exhaustedItems.length > 0) {
+        console.log('[Wardrobe] Retrying', exhaustedItems.length, 'exhausted style signals');
+        await Promise.all(exhaustedItems.map((item) => retryStyleSignals(item.id)));
+      }
+
       // Add minimum delay so spinner is visible even if data is cached
       await Promise.all([
         refetch(),
@@ -533,7 +612,7 @@ export default function WardrobeScreen() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [refetch]);
+  }, [refetch, wardrobe]);
 
   // Check for add/delete flags when screen gains focus
   useFocusEffect(
