@@ -61,60 +61,6 @@ export function evaluateOutfit(
       return acc;
     }, {} as Record<string, number>);
     console.log('[evaluateOutfit] DEBUG tier distribution:', tierCounts);
-
-    // DEBUG: Log detailed scores for shoe evaluations
-    const shoeEvaluations = allEvaluations.filter(e => e.is_shoes_involved);
-    if (shoeEvaluations.length > 0) {
-      console.log('[CE Shoes Debug] Shoe evaluations:', shoeEvaluations.length);
-      for (const e of shoeEvaluations) {
-        const wardrobeItem = wardrobeItems.find(
-          w => w.id === e.item_b_id || w.id === e.item_a_id
-        );
-        const label = wardrobeItem?.label || e.item_b_id.slice(0, 8);
-        console.log(
-          `[CE Shoes] ${label}: score=${e.raw_score.toFixed(3)} (threshold=${e.high_threshold_used}) → ${e.confidence_tier}`,
-          {
-            features: {
-              C: e.features.C.value.toFixed(2),
-              S: e.features.S.value.toFixed(2),
-              F: e.features.F.value.toFixed(2),
-              T: e.features.T.value.toFixed(2),
-              U: e.features.U.value.toFixed(2),
-              ...(e.features.V ? { V: e.features.V.value.toFixed(2) } : {}),
-            },
-            weights: e.weights_used,
-            capReasons: e.cap_reasons,
-          }
-        );
-      }
-    }
-
-    // DEBUG: Log detailed scores for non-shoe evaluations
-    const nonShoeEvaluations = allEvaluations.filter(e => !e.is_shoes_involved);
-    if (nonShoeEvaluations.length > 0) {
-      console.log('[CE Non-Shoes Debug] Non-shoe evaluations:', nonShoeEvaluations.length);
-      for (const e of nonShoeEvaluations) {
-        const wardrobeItem = wardrobeItems.find(
-          w => w.id === e.item_b_id || w.id === e.item_a_id
-        );
-        const label = wardrobeItem?.label || e.item_b_id.slice(0, 8);
-        console.log(
-          `[CE Non-Shoes] ${label}: score=${e.raw_score.toFixed(3)} (threshold=${e.high_threshold_used}) → ${e.confidence_tier}`,
-          {
-            features: {
-              C: e.features.C.value.toFixed(2),
-              S: e.features.S.value.toFixed(2),
-              F: e.features.F.value.toFixed(2),
-              T: e.features.T.value.toFixed(2),
-              U: e.features.U.value.toFixed(2),
-              ...(e.features.V ? { V: e.features.V.value.toFixed(2) } : {}),
-            },
-            weights: e.weights_used,
-            capReasons: e.cap_reasons,
-          }
-        );
-      }
-    }
   }
 
   // Handle empty wardrobe

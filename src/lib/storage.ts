@@ -15,7 +15,8 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { Platform } from 'react-native';
 import { enqueueUpload, processQueue, UploadJob, initUploadQueue, cancelUpload, logUploadEvent, UploadKind } from './uploadQueue';
 import { updateWardrobeItemImageUriGuarded, updateRecentCheckImageUriGuarded } from './database';
-import { enqueueWardrobeEnrichment } from './style-signals-service';
+import { enqueueWardrobeEnrichment, generateWardrobeStyleSignals } from './style-signals-service';
+import { initStyleSignalsQueue } from './style-signals-retry-queue';
 
 // Re-export queue functions for use in UI
 export { cancelUpload, isUploadFailed, getFailedUpload, retryFailedUpload, hasPendingUpload, getPendingUploadLocalUris, hasAnyPendingUploads, onQueueIdle } from './uploadQueue';
@@ -493,11 +494,19 @@ async function uploadWorker(job: UploadJob): Promise<void> {
 }
 
 /**
- * Initialize background uploads - call once on app start
+ * Initialize background uploads AND style signals retry queue.
+ * Call once on app start.
  */
 export async function initializeBackgroundUploads(): Promise<void> {
   console.log('[Storage] Initializing background uploads...');
   await initUploadQueue(uploadWorker);
+  
+  // Also initialize style signals retry queue
+  console.log('[Storage] Initializing style signals retry queue...');
+  await initStyleSignalsQueue(async (itemId: string) => {
+    const result = await generateWardrobeStyleSignals(itemId);
+    return result.ok;
+  });
 }
 
 /**

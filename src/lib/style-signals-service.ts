@@ -14,6 +14,7 @@ import { supabase } from './supabase';
 import * as Crypto from 'expo-crypto';
 import type { StyleSignalsV1 } from './trust-filter/types';
 import { trackEvent } from './analytics';
+import { enqueueStyleSignalsRetry } from './style-signals-retry-queue';
 
 // ============================================
 // TYPES
@@ -572,25 +573,34 @@ export async function generateWardrobeStyleSignals(
 
 /**
  * Fire-and-forget enrichment for wardrobe items.
- * Does not wait for response - used for lazy enrichment.
+ * On network error, enqueues for retry via the retry queue.
  *
  * @param itemId - The wardrobe item ID to enrich
  */
 export function enqueueWardrobeEnrichment(itemId: string): void {
   console.log('[StyleSignals] Enqueuing background enrichment for:', itemId);
   
-  // Fire and forget - don't await
-  generateWardrobeStyleSignals(itemId).catch((error) => {
-    console.warn('[StyleSignals] Background enrichment unexpected error:', itemId, error);
-    
-    // Track unexpected errors (errors not caught by generateWardrobeStyleSignals)
-    trackEvent('style_signals_failed', {
-      type: 'wardrobe',
-      item_id: itemId,
-      error_type: 'unexpected_error',
-      error_message: error instanceof Error ? error.message : 'Unknown error',
+  generateWardrobeStyleSignals(itemId)
+    .then((result) => {
+      // If API returned a network error, enqueue for retry
+      if (!result.ok && result.error?.kind === 'network_error') {
+        console.log('[StyleSignals] Network error, queueing retry for:', itemId);
+        enqueueStyleSignalsRetry(itemId, result.error.message);
+      }
+    })
+    .catch((error) => {
+      // Unexpected error (network interruption, etc.)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.warn('[StyleSignals] Unexpected error, queueing retry:', itemId, errorMessage);
+      enqueueStyleSignalsRetry(itemId, errorMessage);
+      
+      trackEvent('style_signals_failed', {
+        type: 'wardrobe',
+        item_id: itemId,
+        error_type: 'unexpected_error',
+        error_message: errorMessage,
+      });
     });
-  });
 }
 
 /**
