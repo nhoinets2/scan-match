@@ -4938,6 +4938,9 @@ function ResultsSuccess({
 
           {/* Outfit Ideas - tab-aware: uses tab.outfits + MissingPiecesCard when empty */}
           {(() => {
+            // SOLO mode: Hide outfit section entirely (no core matches = no meaningful outfits)
+            if (isSoloMode) return null;
+
             const hasCombos = tab.outfits && tab.outfits.length > 0;
             const hasEmptyReason = tab.outfitEmptyReason !== null;
             
