@@ -157,6 +157,17 @@ interface StyleSignalsV1 {
   material: { family: string; confidence: number };
 }
 
+class AnthropicError extends Error {
+  status: number;
+  details: string;
+
+  constructor(status: number, details: string) {
+    super(`Anthropic API error: ${status}`);
+    this.status = status;
+    this.details = details;
+  }
+}
+
 // ============================================
 // VALIDATION
 // ============================================
@@ -275,14 +286,59 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-async function fetchImageAsBase64(imageUrl: string): Promise<{ mediaType: string; data: string }> {
+function detectMediaType(bytes: Uint8Array): string {
+  // JPEG: FF D8 FF
+  if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
+    return "image/jpeg";
+  }
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4E &&
+    bytes[3] === 0x47
+  ) {
+    return "image/png";
+  }
+  // WebP: RIFF....WEBP
+  if (
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    return "image/webp";
+  }
+  // GIF: GIF8
+  if (
+    bytes[0] === 0x47 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x38
+  ) {
+    return "image/gif";
+  }
+  return "application/octet-stream";
+}
+
+async function fetchImageAsBase64(imageUrl: string): Promise<{ mediaType: string; data: string; byteSize: number }> {
   const response = await fetch(imageUrl);
   if (!response.ok) {
     throw new Error(`Failed to fetch image: ${response.status}`);
   }
-  const contentType = response.headers.get("content-type") || "image/webp";
+  const headerType = response.headers.get("content-type") || "image/webp";
   const buffer = await response.arrayBuffer();
-  return { mediaType: contentType, data: arrayBufferToBase64(buffer) };
+  const bytes = new Uint8Array(buffer);
+  const detectedType = detectMediaType(bytes);
+  if (detectedType !== headerType && detectedType !== "application/octet-stream") {
+    console.warn(`[style-signals] Media type mismatch: header=${headerType}, detected=${detectedType}`);
+  }
+  const mediaType = detectedType !== "application/octet-stream" ? detectedType : headerType;
+  return { mediaType, data: arrayBufferToBase64(buffer), byteSize: buffer.byteLength };
 }
 
 function computeInputHash(imageUri: string, updatedAt?: string): string {
@@ -838,7 +894,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    let imagePayload: { mediaType: string; data: string };
+    let imagePayload: { mediaType: string; data: string; byteSize: number };
     try {
       imagePayload = await fetchImageAsBase64(imageUri);
     } catch (error) {
@@ -861,6 +917,7 @@ Deno.serve(async (req) => {
     let signals: StyleSignalsV1;
     let retryCount = 0;
     const maxRetries = 1;
+    const imageMeta = `image_meta: type=${imagePayload.mediaType}, bytes=${imagePayload.byteSize}`;
 
     while (retryCount <= maxRetries) {
       try {
@@ -889,7 +946,7 @@ Deno.serve(async (req) => {
         if (!anthropicResponse.ok) {
           const errorText = await anthropicResponse.text();
           console.error(`[style-signals] Anthropic error: ${anthropicResponse.status}`, errorText);
-          throw new Error(`Anthropic API error: ${anthropicResponse.status}`);
+          throw new AnthropicError(anthropicResponse.status, `${errorText} | ${imageMeta}`);
         }
 
         const anthropicData = await anthropicResponse.json();
@@ -911,7 +968,10 @@ Deno.serve(async (req) => {
         break; // Success, exit retry loop
 
       } catch (error) {
-        console.error(`[style-signals] Attempt ${retryCount + 1} failed:`, error);
+        const errorDetails = error instanceof AnthropicError
+          ? `${error.message}: ${error.details.slice(0, 500)}`
+          : String(error);
+        console.error(`[style-signals] Attempt ${retryCount + 1} failed:`, errorDetails);
         retryCount++;
 
         if (retryCount > maxRetries) {
@@ -925,7 +985,7 @@ Deno.serve(async (req) => {
               style_signals_v1: signals,
               style_signals_version: 1,
               style_signals_status: 'failed',
-              style_signals_error: String(error),
+              style_signals_error: errorDetails,
               style_signals_updated_at: new Date().toISOString(),
               style_signals_source: type === 'scan' ? 'scan_ai' : 'wardrobe_ai',
               style_signals_prompt_version: CURRENT_PROMPT_VERSION,

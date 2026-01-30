@@ -15,6 +15,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { Platform } from 'react-native';
 import { enqueueUpload, processQueue, UploadJob, initUploadQueue, cancelUpload, logUploadEvent, UploadKind } from './uploadQueue';
 import { updateWardrobeItemImageUriGuarded, updateRecentCheckImageUriGuarded } from './database';
+import { enqueueWardrobeEnrichment } from './style-signals-service';
 
 // Re-export queue functions for use in UI
 export { cancelUpload, isUploadFailed, getFailedUpload, retryFailedUpload, hasPendingUpload, getPendingUploadLocalUris, hasAnyPendingUploads, onQueueIdle } from './uploadQueue';
@@ -479,6 +480,10 @@ async function uploadWorker(job: UploadJob): Promise<void> {
   // Telemetry
   if (updatedCount > 0) {
     logUploadEvent('upload_succeeded', jobId, { kind, publicUrl });
+    if (kind === 'wardrobe') {
+      console.log('[UploadWorker] Triggering style signal generation for:', jobId);
+      enqueueWardrobeEnrichment(jobId);
+    }
   } else {
     // 0 rows updated: item deleted OR image changed OR (for scans) unsaved
     logUploadEvent('upload_stale_ignored', jobId, { kind, reason: 'no_matching_row' });

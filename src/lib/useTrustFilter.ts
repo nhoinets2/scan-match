@@ -791,7 +791,7 @@ export function useTrustFilter(
         nearFinal: nearFinal.length,
         hidden: hiddenMatches.length,
         tf: { demoted: demoted.length, hidden: hiddenMatches.length },
-        ai: { demoted: 0, hidden: 0, dryRun: true },
+        ai: { demoted: 0, hidden: 0, dryRun: isAiSafetyDryRun() },
       });
 
       // ─────────────────────────────────────────────
