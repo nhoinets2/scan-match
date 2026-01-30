@@ -6,7 +6,7 @@
  */
 
 import type { ConfidenceEngineResult } from './useConfidenceEngine';
-import type { MatchResult, Category, WardrobeItem } from './types';
+import type { Category, WardrobeItem } from './types';
 import type { UiState } from './results-ui-policy';
 import { buildResultsRenderModel } from './results-ui-policy';
 
@@ -128,10 +128,6 @@ export interface EngineSnapshot {
       suggestionsMode: "A" | "B";
       modeA: boolean;
       modeB: boolean;
-    };
-    legacy: {
-      usedForMatches: boolean;
-      bestComboCount: number;
     };
   };
   topMatches?: Array<{
@@ -409,8 +405,6 @@ function checkCategoryAssertions(
  */
 export function buildEngineSnapshot(
   confidenceResult: ConfidenceEngineResult,
-  matchResult: MatchResult | null,
-  usedLegacyForMatches: boolean,
   scanId: string,
   scannedCategory: Category,
   wardrobeCount: number = 0,
@@ -628,10 +622,6 @@ export function buildEngineSnapshot(
         suggestionsMode: confidenceResult.suggestionsMode,
         modeA: !!confidenceResult.modeASuggestions,
         modeB: !!confidenceResult.modeBSuggestions,
-      },
-      legacy: {
-        usedForMatches: usedLegacyForMatches,
-        bestComboCount: matchResult?.outfitCombos?.[0]?.items?.length ?? 0,
       },
     },
     topMatches: topMatches.length > 0 ? topMatches : undefined,

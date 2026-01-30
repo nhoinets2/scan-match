@@ -532,8 +532,8 @@ describe('AI Safety merge precedence', () => {
   describe('monotonic merge (can only reduce confidence)', () => {
     it('AI hide always wins (even if TF kept)', () => {
       // TF: keep, AI: hide → final: hide
-      const tfAction = 'keep';
-      const aiAction = 'hide';
+      const tfAction: 'keep' | 'demote' | 'hide' = 'keep';
+      const aiAction: 'keep' | 'demote' | 'hide' = 'hide';
       
       const finalAction = aiAction === 'hide' ? 'hide' : tfAction;
       expect(finalAction).toBe('hide');
@@ -541,8 +541,9 @@ describe('AI Safety merge precedence', () => {
 
     it('AI demote wins if TF kept', () => {
       // TF: keep, AI: demote → final: demote
-      const tfAction = 'keep';
-      const aiAction = 'demote';
+      const toAction = (value: FinalMatchAction): FinalMatchAction => value;
+      const tfAction = toAction('keep');
+      const aiAction = toAction('demote');
       
       const finalAction = aiAction === 'hide' ? 'hide' 
         : aiAction === 'demote' ? 'demote'
@@ -552,8 +553,8 @@ describe('AI Safety merge precedence', () => {
 
     it('AI demote cannot undo TF hide', () => {
       // TF: hide, AI: demote → final: hide (hide wins)
-      const tfAction = 'hide';
-      const aiAction = 'demote';
+      const tfAction: 'keep' | 'demote' | 'hide' = 'hide';
+      const aiAction: 'keep' | 'demote' | 'hide' = 'demote';
       
       // hide always takes precedence
       const finalAction = tfAction === 'hide' ? 'hide' : aiAction;
@@ -562,8 +563,8 @@ describe('AI Safety merge precedence', () => {
 
     it('AI keep never upgrades TF demote', () => {
       // TF: demote, AI: keep → final: demote (AI keep cannot upgrade)
-      const tfAction = 'demote';
-      const aiAction = 'keep';
+      const tfAction: FinalMatchAction = 'demote';
+      const aiAction: FinalMatchAction = 'keep';
       
       // AI keep doesn't change anything
       const finalAction = aiAction === 'keep' ? tfAction : aiAction;
@@ -572,8 +573,8 @@ describe('AI Safety merge precedence', () => {
 
     it('AI keep never undoes TF hide', () => {
       // TF: hide, AI: keep → final: hide
-      const tfAction = 'hide';
-      const aiAction = 'keep';
+      const tfAction: FinalMatchAction = 'hide';
+      const aiAction: FinalMatchAction = 'keep';
       
       const finalAction = aiAction === 'keep' ? tfAction : aiAction;
       expect(finalAction).toBe('hide');

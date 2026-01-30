@@ -43,8 +43,8 @@ export default function ResetPasswordConfirmScreen() {
 
     console.log("[ResetPassword] Starting session validation...");
     
-    let validationTimeout: NodeJS.Timeout;
-    let pollInterval: NodeJS.Timeout;
+    let validationTimeout: ReturnType<typeof setTimeout> | null = null;
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
     let hasCompleted = false;
     
     const completeValidation = (isValid: boolean, errorMessage?: string) => {

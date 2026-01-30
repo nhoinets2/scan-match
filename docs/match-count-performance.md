@@ -255,10 +255,68 @@ If you consistently see warnings >10ms, it's time to implement the age-based opt
 
 ---
 
+## Test Coverage
+
+The `useMatchCount` hook has comprehensive unit tests in `src/lib/__tests__/useMatchCount.test.ts`.
+
+**Total Tests: 18** (all passing)
+
+### Test Categories
+
+**Basic Functionality (4 tests)**
+- Calculate match count against wardrobe items
+- Return singular "1 match" for single match
+- Return plural "N matches" for multiple matches
+- Count both HIGH and MEDIUM tier matches (ignores LOW)
+
+**Edge Cases (6 tests)**
+- Return "0 matches" when no matches found
+- Fall back to snapshot when wardrobe is empty
+- Handle missing scannedItem
+- Return empty string when no snapshot and no items
+- Handle missing confidence data in snapshot
+- Handle null matchesHighCount in snapshot
+
+**Snapshot Fallback Behavior (3 tests)**
+- Format snapshot counts correctly for 0, 1, and multiple matches
+
+**Real-World Scenarios (3 tests)**
+- Recalculate when wardrobe has items (not use stale snapshot)
+- Handle conversion of scanned/wardrobe items to confidence format
+
+**Integration with Confidence Engine (2 tests)**
+- Call confidence engine functions with correct data
+- Handle evaluation results correctly
+
+### Testing Approach
+
+Tests use the **actual confidence engine** rather than mocks for real-world validation:
+
+```typescript
+import { 
+  scannedItemToConfidenceItem, 
+  wardrobeItemToConfidenceItem, 
+  evaluateAgainstWardrobe 
+} from '../confidence-engine';
+```
+
+### Running the Tests
+
+```bash
+# Run only useMatchCount tests
+npm test -- useMatchCount.test.ts
+
+# Run with coverage
+npm test:coverage
+```
+
+---
+
 ## Summary
 
 - ✅ **Current solution is optimal for current scale**
 - 📄 **Age-based optimization is documented and ready**
 - 🎯 **Implement only if performance becomes measurable issue**
 - 📊 **Monitor with dev warnings to detect need**
+- ✅ **18 unit tests provide comprehensive coverage**
 

@@ -17,7 +17,6 @@ globalThis.__DEV__ = true;
 import {
   getUiState,
   buildResultsRenderModel,
-  shouldUseLegacyEngine,
   type UiState,
   type ResultsRenderModel,
   type MatchesSectionVariant,
@@ -620,72 +619,6 @@ describe('Scenario Coverage', () => {
       expect(model.uiState).toBe('LOW');
       expect(model.showRescanCta).toBe(false);
     });
-  });
-});
-
-// ============================================
-// LEGACY ENGINE POLICY
-// ============================================
-
-describe('shouldUseLegacyEngine', () => {
-  it('returns true when confidence not evaluated', () => {
-    const result = shouldUseLegacyEngine({
-      isViewingSavedCheck: false,
-      confidenceEvaluated: false,
-      confidenceRawEvaluation: null,
-      confidenceMatchesCount: 0,
-    });
-
-    expect(result.useLegacy).toBe(true);
-    expect(result.reason).toBe('CONFIDENCE_NOT_EVALUATED');
-  });
-
-  it('returns true when rawEvaluation is null', () => {
-    const result = shouldUseLegacyEngine({
-      isViewingSavedCheck: false,
-      confidenceEvaluated: true,
-      confidenceRawEvaluation: null,
-      confidenceMatchesCount: 0,
-    });
-
-    expect(result.useLegacy).toBe(true);
-    expect(result.reason).toBe('CONFIDENCE_NO_RAW_EVAL');
-  });
-
-  it('returns true for saved check fallback when no matches', () => {
-    const result = shouldUseLegacyEngine({
-      isViewingSavedCheck: true,
-      confidenceEvaluated: true,
-      confidenceRawEvaluation: {},
-      confidenceMatchesCount: 0,
-    });
-
-    expect(result.useLegacy).toBe(true);
-    expect(result.reason).toBe('VIEWING_SAVED_CHECK_FALLBACK');
-  });
-
-  it('returns false when confidence is valid', () => {
-    const result = shouldUseLegacyEngine({
-      isViewingSavedCheck: false,
-      confidenceEvaluated: true,
-      confidenceRawEvaluation: {},
-      confidenceMatchesCount: 0,
-    });
-
-    expect(result.useLegacy).toBe(false);
-    expect(result.reason).toBe(null);
-  });
-
-  it('returns false for saved check when matches exist', () => {
-    const result = shouldUseLegacyEngine({
-      isViewingSavedCheck: true,
-      confidenceEvaluated: true,
-      confidenceRawEvaluation: {},
-      confidenceMatchesCount: 2,
-    });
-
-    expect(result.useLegacy).toBe(false);
-    expect(result.reason).toBe(null);
   });
 });
 

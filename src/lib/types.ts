@@ -1,4 +1,4 @@
-import type { AestheticArchetype } from "./trust-filter/types";
+import type { AestheticArchetype, StyleSignalsV1 } from "./trust-filter/types";
 
 // Scan & Match Types
 
@@ -288,6 +288,7 @@ export interface WardrobeItem {
   detectedLabel?: string;
   attributes?: WardrobeItemAttributes;
   colors: ColorInfo[];
+  style_signals_v1?: StyleSignalsV1;
   styleNotes?: string[]; // Brief style descriptors from AI analysis
   // Optional user-provided fields
   brand?: string;
@@ -338,16 +339,6 @@ export interface ScannedItem {
   isFashionItem?: boolean;
 }
 
-export interface OutfitCombo {
-  id: string;
-  items: WardrobeItem[];
-  scannedItem: ScannedItem;
-  confidence: ConfidenceLevel;
-  confidenceScore: number;
-  explanation: string;
-  cappedByWardrobeSize?: boolean;
-}
-
 export interface MissingPiece {
   category: Category;
   description: string;
@@ -359,22 +350,6 @@ export interface MissingPiece {
 }
 
 export type WardrobeCoverage = "low" | "normal";
-
-export interface MatchResult {
-  scannedItem: ScannedItem;
-  itemSummary: {
-    category: Category;
-    colors: ColorInfo[];
-    styleTags: StyleVibe[];
-  };
-  outfitCombos: OutfitCombo[];
-  missingPieces: MissingPiece[];
-  wardrobeCoverage: WardrobeCoverage;
-  /** True when required wardrobe categories are missing - UI should use softer "add one of these" language */
-  missingRequiredCategories: boolean;
-  /** True when wardrobe has items but none match the scanned item's style - UI should show "Nothing that naturally fits this style" */
-  noStyleCompatibleItems?: boolean;
-}
 
 // Outcome states for recent checks
 export type OutcomeState =

@@ -1,4 +1,4 @@
-import type { AddOnItem, ElevateBullet } from "../types";
+import type { AddOnItem, Category, ElevateBullet } from "../types";
 import { scoreAndSortAddOns } from "../add-ons-sorting";
 
 // ============================================
@@ -18,7 +18,7 @@ function createAddOn(overrides: Partial<AddOnItem> = {}): AddOnItem {
 }
 
 function createElevateBullet(
-  category: ElevateBullet["recommend"]["category"],
+  category: Category,
   attributes: string[] = []
 ): ElevateBullet {
   return {

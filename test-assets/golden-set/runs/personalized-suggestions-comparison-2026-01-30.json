@@ -1,0 +1,93 @@
+{
+  "generatedAt": "2026-01-30T02:58:11.210Z",
+  "results": [
+    {
+      "name": "PAIRED: Casual tops + jeans",
+      "mode": "paired",
+      "gpt4oMini": {
+        "latencyMs": 4741,
+        "valid": true,
+        "issues": []
+      },
+      "claudeHaiku": {
+        "latencyMs": 401,
+        "valid": false,
+        "issues": [
+          "No result"
+        ],
+        "error": "{\"type\":\"not_found_error\",\"message\":\"model: claude-3-5-haiku-20241022\"}"
+      },
+      "claudeSonnet": {
+        "latencyMs": 5143,
+        "valid": true,
+        "issues": []
+      }
+    },
+    {
+      "name": "PAIRED: Statement dress + heels",
+      "mode": "paired",
+      "gpt4oMini": {
+        "latencyMs": 3675,
+        "valid": true,
+        "issues": []
+      },
+      "claudeHaiku": {
+        "latencyMs": 448,
+        "valid": false,
+        "issues": [
+          "No result"
+        ],
+        "error": "{\"type\":\"not_found_error\",\"message\":\"model: claude-3-5-haiku-20241022\"}"
+      },
+      "claudeSonnet": {
+        "latencyMs": 4908,
+        "valid": true,
+        "issues": []
+      }
+    },
+    {
+      "name": "SOLO: Leather jacket (no matches)",
+      "mode": "solo",
+      "gpt4oMini": {
+        "latencyMs": 3449,
+        "valid": true,
+        "issues": []
+      },
+      "claudeHaiku": {
+        "latencyMs": 433,
+        "valid": false,
+        "issues": [
+          "No result"
+        ],
+        "error": "{\"type\":\"not_found_error\",\"message\":\"model: claude-3-5-haiku-20241022\"}"
+      },
+      "claudeSonnet": {
+        "latencyMs": 3947,
+        "valid": true,
+        "issues": []
+      }
+    },
+    {
+      "name": "NEAR: Western boots with casual wardrobe",
+      "mode": "near",
+      "gpt4oMini": {
+        "latencyMs": 4733,
+        "valid": true,
+        "issues": []
+      },
+      "claudeHaiku": {
+        "latencyMs": 401,
+        "valid": false,
+        "issues": [
+          "No result"
+        ],
+        "error": "{\"type\":\"not_found_error\",\"message\":\"model: claude-3-5-haiku-20241022\"}"
+      },
+      "claudeSonnet": {
+        "latencyMs": 5386,
+        "valid": true,
+        "issues": []
+      }
+    }
+  ]
+}

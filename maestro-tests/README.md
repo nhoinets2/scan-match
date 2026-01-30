@@ -86,7 +86,7 @@ maestro test maestro-tests/ --no-launch
 1. Create a new `.yaml` file in this directory
 2. Start with:
    ```yaml
-   appId: com.anonymous.vibecode
+   appId: com.snaptomatch.app
    ---
    - launchApp
    - waitForAnimationToEnd
@@ -132,7 +132,7 @@ maestro test maestro-tests/ --no-launch
 
 ## App Bundle ID
 
-The app bundle identifier is: `com.anonymous.vibecode`
+The app bundle identifier is: `com.snaptomatch.app`
 
 Make sure this matches your `app.json` configuration.
 

@@ -1635,7 +1635,7 @@ describe('FinalizedMatches integration with ResultsTabs', () => {
         createMockEnrichedMatch({
           evaluation: createMockPairEvaluation({ 
             confidence_tier: 'MEDIUM',
-            cap_reasons: ['FORMALITY_MISMATCH'],
+            cap_reasons: ['FORMALITY_TENSION'],
           }),
         }),
       ];
@@ -1645,7 +1645,7 @@ describe('FinalizedMatches integration with ResultsTabs', () => {
 
       expect(nearMatchEvaluations).toHaveLength(2);
       expect(nearMatchEvaluations[0].cap_reasons).toContain('COLOR_TENSION');
-      expect(nearMatchEvaluations[1].cap_reasons).toContain('FORMALITY_MISMATCH');
+      expect(nearMatchEvaluations[1].cap_reasons).toContain('FORMALITY_TENSION');
     });
   });
 

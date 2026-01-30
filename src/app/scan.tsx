@@ -75,7 +75,10 @@ function ScanOverlay({ currentTip }: { currentTip: string }) {
   }));
 
   return (
-    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}>
+    <View
+      pointerEvents="none"
+      style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}
+    >
       {/* Subtle rounded frame guide */}
       <Animated.View
         style={[
@@ -362,7 +365,7 @@ export default function ScanScreen() {
 
   // Determine current screen state for UI-driven logic
   const showPostDenied = permission && !permission.granted && permission.status !== 'undetermined' && !showPrePrompt;
-  const showRestricted = permission?.status === 'restricted';
+  const showRestricted = permission?.status === 'denied' && permission?.canAskAgain === false;
   const isCameraGateScreen = showPrePrompt || showPostDenied || showRestricted;
 
   // Listen for app returning from background after user opens Settings
@@ -644,7 +647,7 @@ export default function ScanScreen() {
     );
   } else {
     // Permission denied or restricted - show post-denial screen
-    const isRestricted = permission.status === 'restricted';
+    const isRestricted = permission.status === 'denied' && permission.canAskAgain === false;
     
     const handleOpenSettings = () => {
       openedSettingsRef.current = true;
@@ -709,6 +712,11 @@ export default function ScanScreen() {
         ref={cameraRef}
         style={{ flex: 1 }}
         facing="back"
+      />
+
+      <View
+        pointerEvents="box-none"
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
       >
         {/* Scan overlay with rotating tips */}
         <ScanOverlay currentTip={TIPS[currentTipIndex]} />
@@ -822,7 +830,7 @@ export default function ScanScreen() {
             </View>
           </Animated.View>
         </View>
-      </CameraView>
+      </View>
 
       {/* Help bottom sheet */}
       <HelpBottomSheet visible={showHelp} onClose={() => setShowHelp(false)} />

@@ -1027,11 +1027,14 @@ describe('Guarded update logic', () => {
 // ============================================
 
 describe('Helper hook logic', () => {
+  const getCount = (items?: Array<{ id: string }>): number => items?.length ?? 0;
   describe('useOnboardingComplete', () => {
+    const getOnboardingComplete = (prefs?: { onboardingComplete: boolean }): boolean =>
+      prefs?.onboardingComplete ?? false;
     it('returns false when no user', () => {
       const user = null;
       const preferences = { onboardingComplete: true };
-      const isComplete = !user ? false : preferences?.onboardingComplete ?? false;
+      const isComplete = !user ? false : (preferences ? preferences.onboardingComplete : false);
       expect(isComplete).toBe(false);
     });
 
@@ -1044,8 +1047,9 @@ describe('Helper hook logic', () => {
 
     it('defaults to false when preferences undefined', () => {
       const user = { id: 'user-123' };
-      const preferences = undefined;
-      const isComplete = !user ? false : preferences?.onboardingComplete ?? false;
+      let preferences: { onboardingComplete: boolean } | undefined;
+      preferences = undefined;
+      const isComplete = !user ? false : getOnboardingComplete(preferences);
       expect(isComplete).toBe(false);
     });
   });
@@ -1053,19 +1057,20 @@ describe('Helper hook logic', () => {
   describe('useWardrobeCount', () => {
     it('returns wardrobe length', () => {
       const wardrobe = [{ id: '1' }, { id: '2' }, { id: '3' }];
-      const count = wardrobe?.length ?? 0;
+      const count = getCount(wardrobe);
       expect(count).toBe(3);
     });
 
     it('returns 0 when wardrobe undefined', () => {
-      const wardrobe = undefined;
-      const count = wardrobe?.length ?? 0;
+      let wardrobe: Array<{ id: string }> | undefined;
+      wardrobe = undefined;
+      const count = getCount(wardrobe);
       expect(count).toBe(0);
     });
 
     it('returns 0 for empty wardrobe', () => {
       const wardrobe: unknown[] = [];
-      const count = wardrobe?.length ?? 0;
+      const count = getCount(wardrobe as Array<{ id: string }>);
       expect(count).toBe(0);
     });
   });
@@ -1073,13 +1078,14 @@ describe('Helper hook logic', () => {
   describe('useRecentChecksCount', () => {
     it('returns checks length', () => {
       const checks = [{ id: '1' }, { id: '2' }];
-      const count = checks?.length ?? 0;
+      const count = getCount(checks);
       expect(count).toBe(2);
     });
 
     it('returns 0 when checks undefined', () => {
-      const checks = undefined;
-      const count = checks?.length ?? 0;
+      let checks: Array<{ id: string }> | undefined;
+      checks = undefined;
+      const count = getCount(checks);
       expect(count).toBe(0);
     });
   });

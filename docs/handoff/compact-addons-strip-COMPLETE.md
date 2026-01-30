@@ -8,11 +8,12 @@
 
 ## Overview
 
-Redesigned the Optional Add-ons section on HIGH/NEAR tabs from a 3-row category layout to a compact, AI-connected strip that:
+Redesigned the Optional Add-ons section on the HIGH tab from a 3-row category layout to a compact, AI-connected strip that:
 - Displays max 6 thumbnails with category badges
 - Sorts intelligently based on AI recommendations
 - Expands to bottom sheet with fixed tab order (Layers → Bags → Accessories)
 - Shows AI-aware title ("Suggested add-ons" vs "Finish the look")
+- **HIGH tab only** - NEAR tab does not show add-ons (focuses on making outfit work, not accessorizing)
 
 ## Implementation Timeline
 
@@ -88,15 +89,17 @@ Redesigned the Optional Add-ons section on HIGH/NEAR tabs from a 3-row category 
 ### Files Modified
 - `src/app/results.tsx`
   - **Line 1980:** Added `addOnsSheetVisible` state
-  - **Lines 3022-3087:** Updated `highAddOns`/`nearAddOns` with full AddOnItem properties
-  - **Lines 4572-4604:** Integrated OptionalAddOnsStrip (replaces old 3-row section)
+  - **Lines 3406-3422:** Computed `highAddOns` from HIGH tier matches with full AddOnItem properties
+  - **Lines 4999-5038:** Integrated OptionalAddOnsStrip (replaces old 3-row section)
+    - **HIGH tab only** - early return on NEAR tab
     - Computes `isEligibleForAiSorting` (HIGH tab + has matches + has add-ons)
     - Passes to component for stable title logic
-  - **Lines 5100-5128:** Integrated AddOnsBottomSheet with internal photo viewer
-  - **Removed:** Old 126-line add-ons section + `getAddOnsByCategory` helper + external photo viewer dependency
+  - **Lines 5576-5594:** Integrated AddOnsBottomSheet with internal photo viewer
+    - **HIGH tab only** - early return on NEAR tab
+  - **Removed:** Old 126-line add-ons section + `nearAddOns` useMemo + `getAddOnsByCategory` helper + external photo viewer dependency
 
 ### Key Integration Points
-- **Tab-aware data:** Strip/sheet show different items per HIGH/NEAR tab
+- **HIGH tab only:** Add-ons strip and bottom sheet only render on HIGH tab (NEAR tab removed after Jan 28)
 - **AI suggestions:** Passed safely via `suggestionsResult?.ok ? suggestionsResult.data : null`
 - **Eligibility:** Computed once per render, stable throughout session
 - **Photo viewer:** Strip uses external modal, sheet has internal viewer (prevents modal stacking)
@@ -222,8 +225,8 @@ Confidence Engine → highAddOns/nearAddOns (with AddOnCategory)
 - [ ] Haptic feedback on all interactions
 - [ ] Empty states (0 add-ons, missing categories)
 - [ ] Edge cases (6 items, >6 items, mixed tiers)
-- [ ] Tab switching with sheet open
 - [ ] VoiceOver/TalkBack validation
+- **Note:** NEAR tab add-ons testing is N/A (feature is HIGH tab only)
 
 ---
 
@@ -345,9 +348,22 @@ Confidence Engine → highAddOns/nearAddOns (with AddOnCategory)
 - Photo viewer background consistent across all modals (dark translucent)
 - Haptic feedback added to all interactions
 
+### NEAR Tab Add-ons Removal (After January 28, 2026)
+**Problem:** Showing add-ons on NEAR tab ("Worth trying") was confusing - users should focus on making uncertain outfits work, not accessorizing them.
+
+**Solution:** Add-ons strip and bottom sheet now only render on HIGH tab:
+- Both components have `if (!isHighTab) return null` guards
+- `nearAddOns` useMemo removed from results.tsx
+- Comment added: "Only show on HIGH tab - NEAR tab should focus on making outfit work, not accessorizing"
+
+**Benefits:**
+- Clearer user experience - NEAR tab focuses on outfit viability
+- Simpler mental model - add-ons are for confident matches only
+- Reduced confusion about what "Worth trying" means
+
 ---
 
 **Implementation Date:** January 28, 2026  
-**Last Updated:** January 28, 2026  
+**Last Updated:** January 29, 2026  
 **Status:** ✅ Code Complete | 🔍 Pending Manual QA  
 **Ready for:** On-device testing and design review

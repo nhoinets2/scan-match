@@ -41,6 +41,7 @@ export function scoreAndSortAddOns(
 
   if (toElevate) {
     toElevate.forEach((bullet) => {
+      if (bullet.recommend.type !== "consider_adding") return;
       const cat = bullet.recommend.category;
       // Deduplicate: only add if not already present AND is add-on category
       if (isAddOnCategory(cat) && !wantedCategories.includes(cat)) {

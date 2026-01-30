@@ -57,66 +57,6 @@ export function getUiState(confidenceResult: ConfidenceEngineResult): UiState {
 }
 
 // ============================================
-// LEGACY ENGINE POLICY
-// ============================================
-
-export type LegacyReason =
-  | 'CONFIDENCE_NOT_EVALUATED'
-  | 'CONFIDENCE_NO_RAW_EVAL'
-  | 'VIEWING_SAVED_CHECK_FALLBACK'
-  | null;
-
-export interface LegacyPolicyResult {
-  useLegacy: boolean;
-  reason: LegacyReason;
-}
-
-/**
- * Determine if legacy engine should be used for matches.
- *
- * Legacy triggers when:
- * - confidence.evaluated === false (engine didn't run)
- * - confidence.rawEvaluation === null (engine failed)
- * - Viewing saved check AND confidence didn't produce results (fallback only)
- *
- * IMPORTANT: Do NOT use legacy just because highMatchCount === 0.
- * Zero HIGH matches with evaluated === true means "no good matches found",
- * which is valid. Using legacy would break the "silence preserves trust" rule.
- */
-export function shouldUseLegacyEngine(args: {
-  isViewingSavedCheck: boolean;
-  confidenceEvaluated: boolean;
-  confidenceRawEvaluation: unknown | null;
-  confidenceMatchesCount: number;
-}): LegacyPolicyResult {
-  const {
-    isViewingSavedCheck,
-    confidenceEvaluated,
-    confidenceRawEvaluation,
-    confidenceMatchesCount,
-  } = args;
-
-  // Confidence engine didn't run (missing scanned item / crash / early return)
-  if (!confidenceEvaluated) {
-    return { useLegacy: true, reason: 'CONFIDENCE_NOT_EVALUATED' };
-  }
-
-  // Confidence ran but produced no raw evaluation object (treat as failure)
-  if (confidenceRawEvaluation == null) {
-    return { useLegacy: true, reason: 'CONFIDENCE_NO_RAW_EVAL' };
-  }
-
-  // For saved checks: use legacy as fallback only if confidence has no matches
-  // This maintains backwards compatibility for historical checks
-  if (isViewingSavedCheck && confidenceMatchesCount === 0) {
-    return { useLegacy: true, reason: 'VIEWING_SAVED_CHECK_FALLBACK' };
-  }
-
-  // Confidence is valid — even if it has 0 HIGH matches — do NOT use legacy matches
-  return { useLegacy: false, reason: null };
-}
-
-// ============================================
 // RENDER MODEL
 // ============================================
 

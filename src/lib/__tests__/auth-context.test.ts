@@ -1361,8 +1361,7 @@ describe("State management", () => {
     });
 
     it("user is null when session is null", () => {
-      const session: Session | null = null;
-      const user = session?.user ?? null;
+      const user: User | null = null;
       expect(user).toBeNull();
     });
   });
@@ -1578,7 +1577,7 @@ describe("Apple auth availability", () => {
   });
 
   it("defaults to false on non-iOS", () => {
-    const platform = "android";
+    const platform: string = "android";
     const isAppleAuthAvailable = platform === "ios" ? true : false;
     expect(isAppleAuthAvailable).toBe(false);
   });

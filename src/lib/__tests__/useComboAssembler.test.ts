@@ -257,9 +257,9 @@ describe('AssembledCombo structure', () => {
 
     // tierFloor should be MEDIUM (the lowest)
     const tierOrder = { HIGH: 0, MEDIUM: 1, LOW: 2 };
-    const lowestTier = candidates.reduce((lowest, c) => {
+    const lowestTier = candidates.reduce<"HIGH" | "MEDIUM" | "LOW">((lowest, c) => {
       return tierOrder[c.tier] > tierOrder[lowest] ? c.tier : lowest;
-    }, 'HIGH' as const);
+    }, 'HIGH');
 
     expect(lowestTier).toBe('MEDIUM');
   });

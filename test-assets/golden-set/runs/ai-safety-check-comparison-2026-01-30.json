@@ -1,0 +1,205 @@
+{
+  "generatedAt": "2026-01-30T02:58:08.743Z",
+  "results": [
+    {
+      "name": "OBVIOUS CLASH: Stilettos + Gym Shorts",
+      "expected": "hide",
+      "gpt4o": {
+        "latencyMs": 1168,
+        "valid": true,
+        "verdicts": [
+          {
+            "itemId": "gym-shorts-1",
+            "action": "hide",
+            "reason_code": "ai_sanity_veto",
+            "confidence": 0.98,
+            "reason": "Glam evening shoes clash with sporty gym shorts."
+          }
+        ]
+      },
+      "claudeSonnet": {
+        "latencyMs": 2014,
+        "valid": true,
+        "verdicts": [
+          {
+            "itemId": "gym-shorts-1",
+            "action": "hide",
+            "reason_code": "ai_sanity_veto",
+            "confidence": 0.98,
+            "reason": "Evening glam leather shoes clash with athletic gym shorts."
+          }
+        ]
+      },
+      "verdictMatch": true
+    },
+    {
+      "name": "GOOD PAIRING: White Sneakers + Jeans",
+      "expected": "keep",
+      "gpt4o": {
+        "latencyMs": 980,
+        "valid": true,
+        "verdicts": [
+          {
+            "itemId": "dark-jeans-1",
+            "action": "keep",
+            "reason_code": "ai_keep",
+            "confidence": 0.95,
+            "reason": "Both items are minimalist and casual, making them a cohesive pairing."
+          }
+        ]
+      },
+      "claudeSonnet": {
+        "latencyMs": 1983,
+        "valid": true,
+        "verdicts": [
+          {
+            "itemId": "dark-jeans-1",
+            "action": "keep",
+            "reason_code": "ai_keep",
+            "confidence": 0.95,
+            "reason": "Minimalist leather shoes pair naturally with dark casual denim."
+          }
+        ]
+      },
+      "verdictMatch": true
+    },
+    {
+      "name": "QUESTIONABLE: Western Boots + Athleisure Hoodie",
+      "expected": "demote",
+      "gpt4o": {
+        "latencyMs": 1065,
+        "valid": true,
+        "verdicts": [
+          {
+            "itemId": "athleisure-hoodie-1",
+            "action": "demote",
+            "reason_code": "ai_sanity_demote",
+            "confidence": 0.85,
+            "reason": "Statement western boots with sporty hoodie is questionable but possible."
+          }
+        ]
+      },
+      "claudeSonnet": {
+        "latencyMs": 2109,
+        "valid": true,
+        "verdicts": [
+          {
+            "itemId": "athleisure-hoodie-1",
+            "action": "demote",
+            "reason_code": "ai_sanity_demote",
+            "confidence": 0.85,
+            "reason": "Statement western boots clash with low-key sporty athleisure aesthetic."
+          }
+        ]
+      },
+      "verdictMatch": true
+    },
+    {
+      "name": "CLASH: Sequin Top + Cargo Pants",
+      "expected": "hide",
+      "gpt4o": {
+        "latencyMs": 967,
+        "valid": true,
+        "verdicts": [
+          {
+            "itemId": "cargo-pants-1",
+            "action": "hide",
+            "reason_code": "ai_sanity_veto",
+            "confidence": 0.95,
+            "reason": "Glam evening top clashes with casual workwear cargo pants."
+          }
+        ]
+      },
+      "claudeSonnet": {
+        "latencyMs": 2498,
+        "valid": true,
+        "verdicts": [
+          {
+            "itemId": "cargo-pants-1",
+            "action": "hide",
+            "reason_code": "ai_sanity_veto",
+            "confidence": 0.95,
+            "reason": "Evening glam piece clashes severely with casual workwear cargo pants."
+          }
+        ]
+      },
+      "verdictMatch": true
+    },
+    {
+      "name": "GOOD: Navy Blazer + Chinos",
+      "expected": "keep",
+      "gpt4o": {
+        "latencyMs": 1275,
+        "valid": true,
+        "verdicts": [
+          {
+            "itemId": "tan-chinos-1",
+            "action": "keep",
+            "reason_code": "ai_keep",
+            "confidence": 0.95,
+            "reason": "Both items are classic and smart casual, suitable for mid-season."
+          }
+        ]
+      },
+      "claudeSonnet": {
+        "latencyMs": 1877,
+        "valid": true,
+        "verdicts": [
+          {
+            "itemId": "tan-chinos-1",
+            "action": "keep",
+            "reason_code": "ai_keep",
+            "confidence": 0.95,
+            "reason": "Both classic smart casual pieces in complementary neutrals."
+          }
+        ]
+      },
+      "verdictMatch": true
+    },
+    {
+      "name": "MULTIPLE PAIRS: Leather Jacket + Various",
+      "expected": "mixed",
+      "gpt4o": {
+        "latencyMs": 2243,
+        "valid": true,
+        "verdicts": [
+          {
+            "itemId": "black-jeans-1",
+            "action": "keep",
+            "reason_code": "ai_keep",
+            "confidence": 0.95,
+            "reason": "Both items share an edgy aesthetic and casual formality, making them a compatible pairing."
+          },
+          {
+            "itemId": "pink-tutu-1",
+            "action": "hide",
+            "reason_code": "ai_sanity_veto",
+            "confidence": 0.9,
+            "reason": "The edgy leather clashes with the romantic, evening formality of the tutu."
+          }
+        ]
+      },
+      "claudeSonnet": {
+        "latencyMs": 2657,
+        "valid": true,
+        "verdicts": [
+          {
+            "itemId": "black-jeans-1",
+            "action": "keep",
+            "reason_code": "ai_keep",
+            "confidence": 0.95,
+            "reason": "Edgy leather pairs naturally with dark denim for cohesive casual look."
+          },
+          {
+            "itemId": "pink-tutu-1",
+            "action": "hide",
+            "reason_code": "ai_sanity_veto",
+            "confidence": 0.92,
+            "reason": "Edgy leather jacket clashes with romantic evening tutu formality."
+          }
+        ]
+      },
+      "verdictMatch": true
+    }
+  ]
+}

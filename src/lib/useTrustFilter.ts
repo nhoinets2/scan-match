@@ -497,6 +497,7 @@ export function useTrustFilter(
         isLoading: false,
         scanSignals: null,
         finalized,
+        isFullyReady: true,
       };
     }
 
@@ -512,6 +513,7 @@ export function useTrustFilter(
         isLoading,
         scanSignals,
         finalized,
+        isFullyReady: !isLoading,
       };
     }
 
@@ -539,6 +541,7 @@ export function useTrustFilter(
         isLoading: true,
         scanSignals: null,
         finalized,
+        isFullyReady: false,
       };
     }
 
@@ -593,6 +596,7 @@ export function useTrustFilter(
         isLoading: false,
         scanSignals,
         finalized,
+        isFullyReady: true,
       };
     }
 
@@ -877,6 +881,7 @@ export function useTrustFilter(
       wasApplied: true,
       isLoading: false,
       scanSignals,
+      isFullyReady: false,
       stats: enableTrace ? {
         totalEvaluated: batchResult.stats.totalEvaluated,
         hiddenCount: batchResult.stats.hiddenCount,

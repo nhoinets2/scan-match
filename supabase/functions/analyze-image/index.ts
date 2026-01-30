@@ -3,19 +3,19 @@
 /**
  * Analyze Image Edge Function
  *
- * Server-side OpenAI Vision API calls for clothing analysis.
- * This keeps the OpenAI API key secret and enables server-side rate limiting.
+ * Server-side Anthropic Vision API calls for clothing analysis.
+ * This keeps the Anthropic API key secret and enables server-side rate limiting.
  *
  * Deploy: supabase functions deploy analyze-image --no-verify-jwt
  * 
  * Environment variables needed:
- * - OPENAI_API_KEY: Your OpenAI API key (set in Supabase dashboard)
+ * - ANTHROPIC_API_KEY: Your Anthropic API key (set in Supabase dashboard)
  * - SUPABASE_URL: Auto-set by Supabase
  * - SUPABASE_SERVICE_ROLE_KEY: Auto-set by Supabase
  *
  * Security features:
  * - Requires valid Supabase auth token
- * - Consumes quota before making OpenAI call
+ * - Consumes quota before making Anthropic call
  * - Short-term rate limiting (max 10 requests/hour per user)
  * - Global rate limiting (max 100 requests/minute)
  */
@@ -65,7 +65,16 @@ function checkRateLimit(userId: string): { allowed: boolean; retryAfter?: number
   return { allowed: true };
 }
 
-// OpenAI prompt for clothing analysis
+function parseImageDataUrl(imageDataUrl: string): { mediaType: string; data: string } | null {
+  const [header, data] = imageDataUrl.split(",");
+  if (!header || !data) return null;
+  const match = header.match(/^data:([^;]+);base64$/);
+  const mediaType = match?.[1];
+  if (!mediaType) return null;
+  return { mediaType, data };
+}
+
+// Analysis prompt for clothing analysis
 const ANALYSIS_PROMPT = `Analyze this image and respond ONLY with a valid JSON object (no markdown, no explanation).
 
 The JSON must have exactly this structure:
@@ -336,50 +345,58 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Quota consumed - now make the OpenAI call
-    const openaiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openaiKey) {
-      console.error("[analyze-image] OPENAI_API_KEY not configured");
+    // Quota consumed - now make the Anthropic call
+    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!anthropicKey) {
+      console.error("[analyze-image] ANTHROPIC_API_KEY not configured");
       return new Response(
         JSON.stringify({ ok: false, error: { kind: "server_error", message: "Analysis service not configured" } }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`[analyze-image] Calling OpenAI API...`);
-    const openaiStart = Date.now();
+    const parsedImage = parseImageDataUrl(imageDataUrl);
+    if (!parsedImage) {
+      return new Response(
+        JSON.stringify({ ok: false, error: { kind: "bad_request", message: "Invalid image data URL" } }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+    console.log(`[analyze-image] Calling Anthropic API...`);
+    const anthropicStart = Date.now();
+
+    const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${openaiKey}`,
         "Content-Type": "application/json",
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: "claude-sonnet-4-5-20250929",
+        max_tokens: 1000,
         messages: [
           {
             role: "user",
             content: [
+              { type: "image", source: { type: "base64", media_type: parsedImage.mediaType, data: parsedImage.data } },
               { type: "text", text: ANALYSIS_PROMPT },
-              { type: "image_url", image_url: { url: imageDataUrl } },
             ],
           },
         ],
-        max_tokens: 800,
-        temperature: 0,
       }),
     });
 
-    const openaiDuration = Date.now() - openaiStart;
-    console.log(`[analyze-image] OpenAI responded in ${openaiDuration}ms, status: ${openaiResponse.status}`);
+    const anthropicDuration = Date.now() - anthropicStart;
+    console.log(`[analyze-image] Anthropic responded in ${anthropicDuration}ms, status: ${anthropicResponse.status}`);
 
-    if (!openaiResponse.ok) {
-      const errorText = await openaiResponse.text();
-      console.error(`[analyze-image] OpenAI error: ${openaiResponse.status}`, errorText);
+    if (!anthropicResponse.ok) {
+      const errorText = await anthropicResponse.text();
+      console.error(`[analyze-image] Anthropic error: ${anthropicResponse.status}`, errorText);
       
-      // Map OpenAI errors to client-friendly errors
-      if (openaiResponse.status === 429) {
+      // Map Anthropic errors to client-friendly errors
+      if (anthropicResponse.status === 429) {
         return new Response(
           JSON.stringify({ ok: false, error: { kind: "rate_limited", message: "Analysis service is busy. Try again shortly." } }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -392,11 +409,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    const openaiData = await openaiResponse.json();
-    const responseText = openaiData.choices?.[0]?.message?.content ?? "";
+    const anthropicData = await anthropicResponse.json();
+    const responseText = anthropicData.content?.[0]?.text ?? "";
 
     if (!responseText) {
-      console.error("[analyze-image] Empty response from OpenAI");
+      console.error("[analyze-image] Empty response from Anthropic");
       return new Response(
         JSON.stringify({ ok: false, error: { kind: "parse_error", message: "No analysis returned" } }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -414,7 +431,7 @@ Deno.serve(async (req) => {
     try {
       analysis = JSON.parse(cleanedResponse);
     } catch (parseError) {
-      console.error("[analyze-image] Failed to parse OpenAI response:", cleanedResponse.slice(0, 200));
+      console.error("[analyze-image] Failed to parse Anthropic response:", cleanedResponse.slice(0, 200));
       return new Response(
         JSON.stringify({ ok: false, error: { kind: "parse_error", message: "Couldn't understand the analysis" } }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -422,7 +439,7 @@ Deno.serve(async (req) => {
     }
 
     const totalDuration = Date.now() - startTime;
-    console.log(`[analyze-image] Success in ${totalDuration}ms (OpenAI: ${openaiDuration}ms)`);
+    console.log(`[analyze-image] Success in ${totalDuration}ms (Anthropic: ${anthropicDuration}ms)`);
 
     // Return success with analysis and quota info
     const response: AnalyzeResponse = {

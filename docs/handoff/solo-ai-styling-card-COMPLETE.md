@@ -20,6 +20,89 @@ The `personalized-suggestions` system now supports **solo mode** (0 HIGH/NEAR ma
 
 ---
 
+## Critical Bug Fixes (2026-01-28/29)
+
+### Client-Side Validation Input Bug
+
+**Status:** ✅ Fixed in commit `9b9dc7d`
+
+**Problem:** The client passed the entire API response object `{ok, data, meta}` to `validateAndRepairSuggestions()`, but the function expected `{why_it_works, to_elevate}` at the top level.
+
+**Impact on Solo Mode:**
+- Solo mode showed generic fallback text: "The colors and styles complement each other well" (duplicate)
+- Recommendations: "simple, neutral accessories" and "complementary bags" (not core pieces)
+- Edge function logs proved AI returned item-specific content (e.g., "Layer over graphic tees")
+- Client validation incorrectly treated valid AI output as broken
+
+**Root Cause:** Mismatch between API response structure and validation function expectations.
+
+**Fix Applied:**
+```typescript
+// BEFORE (buggy):
+const payload = await response.json();
+validateAndRepairSuggestions(payload, ...)  // payload = {ok, data, meta}
+
+// AFTER (fixed):
+const payload = await response.json();
+const rawSuggestions = payload?.data ?? payload;
+validateAndRepairSuggestions(rawSuggestions, ...)  // rawSuggestions = {why_it_works, to_elevate}
+```
+
+**Result:** Solo mode now displays item-specific styling advice (e.g., brown leather jacket → "Layer over graphic tee for edgy casual vibe").
+
+### Solo Prompt Enhancement: scannedCategory Parameter
+
+**Status:** ✅ Implemented (2026-01-28)
+
+**Change:** Updated `buildSoloPrompt()` signature to include scanned item category:
+
+```typescript
+// BEFORE:
+function buildSoloPrompt(
+  scanSignals: StyleSignalsV1,
+  wardrobeSummary: WardrobeSummary,
+  intent: 'shopping' | 'own_item'
+): string
+
+// AFTER:
+function buildSoloPrompt(
+  scanSignals: StyleSignalsV1,
+  scannedCategory: Category,  // NEW: e.g., "outerwear", "tops", "dresses"
+  wardrobeSummary: WardrobeSummary,
+  intent: 'shopping' | 'own_item'
+): string
+```
+
+**Context Added to Prompt:**
+```
+CONTEXT:
+scanned_item:category=${scannedCategory}
+```
+
+**Prompt Rules Added:**
+- Rule 7: "Focus on how to style THIS ${scannedCategory}, not generic advice"
+- Rule 8: "For to_elevate: PRIORITIZE core outfit-forming pieces first"
+- Rule 9: "If scanned item is outerwear/accessories: suggest tops, bottoms, shoes, dresses"
+
+**Impact:**
+- AI now knows what item it's styling (jacket vs. dress vs. shoes)
+- Suggestions adapted to item type (outerwear → core pieces; dress → add-ons)
+- Reduced generic/duplicate content
+
+### PROMPT_VERSION Bump (1 → 2 → 3)
+
+**History:**
+- **1 → 2 (2026-01-28):** Solo prompt enhancement with scannedCategory parameter
+- **2 → 3 (2026-01-29):** Added scanCategory to PAIRED and NEAR prompts for better context
+
+**Files Updated:**
+- `supabase/functions/personalized-suggestions/index.ts` (line 28): `const PROMPT_VERSION = 3;`
+- `src/lib/personalized-suggestions-service.ts` (line 34): `const PROMPT_VERSION = 3;`
+
+**Cache Key Impact:** Cache keys include `PROMPT_VERSION`, so existing cached suggestions are naturally invalidated with each bump.
+
+---
+
 ## Request & Mode Derivation
 
 - `top_matches` now accepts **0–5** items.
@@ -90,16 +173,18 @@ The `personalized-suggestions` system now supports **solo mode** (0 HIGH/NEAR ma
   ```typescript
   const rawKey = [
     scanId,
-    topIds,  // empty string for solo mode
+    topIds,   // empty string for solo mode
+    nearIds,  // empty string for paired/solo modes
     wardrobeSummary.updated_at,
-    PROMPT_VERSION,
+    PROMPT_VERSION,  // 3 (bumped for scanCategory in PAIRED/NEAR prompts)
     SCHEMA_VERSION,
     `mode:${mode}`,
     `scanCat:${scanCategory ?? "null"}`,
     `preferAddOns:${preferAddOnCategories ? 1 : 0}`,
   ].join("|");
   ```
-- Ensures cache isolation between solo and paired modes
+- Ensures cache isolation between solo, paired, and near modes
+- Includes `nearIds` for NEAR mode support
 - Includes `scanCategory` and `preferAddOnCategories` for correct filtering
 
 **3. Client-side Validation**
@@ -475,8 +560,106 @@ const shouldSuppressModeA =
 
 ---
 
-**Last Updated:** 2026-01-27  
+**Last Updated:** 2026-01-29  
 **Status:** ✅ Complete and ready for QA  
 **Latest Fixes:** 
 - Core category filtering for add-on edge case (2026-01-27)
 - Mode A suppression in solo mode (2026-01-27)
+- PROMPT_VERSION bumped to 3 for scanCategory in PAIRED/NEAR prompts (2026-01-29)
+- Cache key updated to include nearIds for multi-mode support (2026-01-29)
+
+---
+
+## Recent Updates (2026-01-29)
+
+### NEAR Mode Integration
+
+**Status:** ✅ Fully integrated alongside SOLO mode
+
+NEAR mode was added to the unified AI styling suggestions system, providing styling tips for "Worth trying" matches that are close but not perfect.
+
+**Key Changes:**
+1. **Server-side mode derivation:** `near_matches > 0 ? 'near' : top_matches === 0 ? 'solo' : 'paired'`
+2. **NEAR prompt builder:** `buildNearPrompt()` focuses on "how to make it work" with styling tips
+3. **Cache key includes nearIds:** Ensures proper cache isolation across all three modes
+4. **PROMPT_VERSION bumped to 3:** Added scanCategory parameter to PAIRED and NEAR prompts
+
+### NEAR Tab Add-ons Removal
+
+**Status:** ✅ Implemented (after Jan 28)
+
+Add-ons strip and bottom sheet now only render on HIGH tab. NEAR tab focuses on making outfit work, not accessorizing.
+
+**Rationale:**
+- NEAR matches are "Worth trying" (uncertain outfits)
+- User should focus on making the outfit work, not adding accessories
+- Clearer mental model: add-ons are for confident matches only
+
+**Implementation:**
+- Both `OptionalAddOnsStrip` and `AddOnsBottomSheet` have `if (!isHighTab) return null` guards
+- `nearAddOns` useMemo removed from results.tsx
+- Comments added: "Only show on HIGH tab - NEAR tab should focus on making outfit work, not accessorizing"
+
+### NEAR Mode AI Gating
+
+**Status:** ✅ Implemented with core category filtering
+
+NEAR mode AI now requires at least 1 **core** NEAR match (add-on matches don't count).
+
+**Gating Logic (src/app/results.tsx lines 2580-2595):**
+```typescript
+const coreNearMatches = nearFinal.filter(m =>
+  isCoreCategory(m.wardrobeItem.category as Category)
+);
+
+if (coreNearMatches.length === 0) {
+  // No core NEAR matches - skip NEAR AI (SOLO will handle it if needed)
+  setNearSuggestionsResult(null);
+  setNearSuggestionsLoading(false);
+  return;
+}
+```
+
+**Key Behavior:**
+- Add-on matches (outerwear, bags, accessories) don't trigger NEAR AI
+- Only core categories (tops, bottoms, dresses, shoes, skirts) trigger NEAR mode
+- Prevents SOLO mode from being skipped when only add-on near matches exist
+
+### Only Core NEAR Matches Sent to AI
+
+**Status:** ✅ Implemented (line 2638 change)
+
+AI can only reference items visible on NEAR tab:
+
+```typescript
+// BEFORE: Sent all NEAR matches (core + add-ons)
+nearFinal: nearFinal
+
+// AFTER: Send only CORE NEAR matches
+nearFinal: coreNearMatches
+```
+
+**Benefits:**
+- AI suggestions always reference items user can see
+- No confusing mentions of add-ons that aren't displayed
+- Cleaner, more focused AI recommendations
+
+---
+
+## Related Optimizations
+
+This feature benefits from two infrastructure improvements:
+
+### Parallel Style Signals Pre-fetch
+- Style signals are now fetched **in parallel** with image analysis at scan start
+- Trust Filter finds cached signals instantly (no 10s timeout)
+- Solo mode AI suggestions arrive faster
+- See: [Parallel Style Signals](./parallel-style-signals-COMPLETE.md)
+
+### Claude Sonnet 4.5 Migration
+- `analyze-image` and `style-signals` Edge Functions switched from GPT-4o to Claude Sonnet 4.5
+- Faster latency (~4.3s vs ~8s for style-signals)
+- Better style interpretation accuracy
+- See: [Claude Sonnet Migration](./claude-sonnet-migration-COMPLETE.md)
+
+**Combined Impact:** Scan-to-AI-suggestions time reduced from ~27s to ~12-15s.

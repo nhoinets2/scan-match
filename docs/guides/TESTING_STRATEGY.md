@@ -96,24 +96,32 @@ npm test -- --coverage
 **Test Structure:**
 ```
 maestro-tests/
-├── flows/
-│   ├── scan-item-flow.yaml
-│   ├── results-high-state.yaml
-│   ├── results-medium-state.yaml
-│   ├── results-low-state.yaml
-│   └── wardrobe-management.yaml
-├── fixtures/
-│   ├── high-match-state.yaml
-│   ├── medium-match-state.yaml
-│   └── empty-wardrobe-state.yaml
-└── smoke/
-    └── critical-paths.yaml
+├── account-settings.yaml
+├── add-wardrobe-item.yaml
+├── auth-login.yaml
+├── auth-signup.yaml
+├── critical-path-all.yaml
+├── home-screen.yaml
+├── login-basic.yaml
+├── navigation-tabs.yaml
+├── onboarding-flow.yaml
+├── quota-limit-display.yaml
+├── scan-error-states.yaml
+├── scan-flow-critical.yaml
+├── scan-flow.yaml
+├── scan-results-flow.yaml
+├── subscription-flow.yaml
+├── wardrobe-add-flow.yaml
+├── wardrobe-management.yaml
+└── README.md
 ```
+
+**Note:** Tests are organized in a flat structure (no subdirectories).
 
 **Example Test:**
 ```yaml
-# maestro-tests/flows/results-high-state.yaml
-appId: com.anonymous.vibecode
+# maestro-tests/scan-flow.yaml
+appId: com.snaptomatch.app
 ---
 # Launch with deep-link fixture
 - launchApp: "vibecode://results?fixture=high-match&wardrobeCount=10"
@@ -129,6 +137,8 @@ appId: com.anonymous.vibecode
 - launchApp: "vibecode://results?scannedItem=top&wardrobeCount=5&state=high"
 - launchApp: "vibecode://wardrobe?items=10&categories=top,bottom,shoes"
 ```
+
+**Note:** Current bundle identifier is `com.snaptomatch.app` (see `app.json`).
 
 **Best Practices:**
 - Use deep-link fixtures to set up complex states

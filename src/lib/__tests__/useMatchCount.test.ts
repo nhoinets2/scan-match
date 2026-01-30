@@ -29,6 +29,7 @@ const createMockScannedItem = (overrides: Partial<ScannedItem> = {}): ScannedIte
   colors: [{ hex: '#1E3A5F', name: 'Navy' }],
   styleTags: ['casual'],
   styleNotes: ['Classic fit'],
+  scannedAt: Date.now(),
   contextSufficient: true,
   ...overrides,
 });

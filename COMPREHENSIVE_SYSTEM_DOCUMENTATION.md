@@ -12,13 +12,20 @@ This document provides a complete explanation of how the Confidence Engine works
 
 1. [Introduction](#introduction)
 2. [Confidence Engine Overview](#confidence-engine-overview)
-3. [UI States & Decision Flow](#ui-states--decision-flow)
-4. [Complete Decision Table](#complete-decision-table)
-5. [UI Rendering Outcomes](#ui-rendering-outcomes)
-6. [Mode A Suggestions](#mode-a-suggestions)
-7. [Mode B Suggestions](#mode-b-suggestions)
-8. [Complete Examples](#complete-examples)
-9. [Edge Cases & FAQ](#edge-cases--faq)
+3. [Trust Filter (Post-CE Guardrail)](#trust-filter-post-ce-guardrail)
+4. [UI States & Decision Flow](#ui-states--decision-flow)
+5. [Complete Decision Table](#complete-decision-table)
+6. [UI Rendering Outcomes](#ui-rendering-outcomes)
+7. [Mode A Suggestions](#mode-a-suggestions)
+8. [Mode B Suggestions](#mode-b-suggestions)
+9. [Personalized AI Suggestions](#personalized-ai-suggestions)
+10. [Outfit Ideas Display](#outfit-ideas-display)
+11. [Optional Add-ons Strip](#optional-add-ons-strip)
+12. [Fallback Chains Summary](#fallback-chains-summary)
+13. [Complete Examples](#complete-examples)
+14. [Edge Cases & FAQ](#edge-cases--faq)
+15. [AI Models & Performance](#ai-models--performance)
+16. [Summary](#summary)
 
 ---
 
@@ -37,42 +44,26 @@ When the engine isn't confident about a pairing, it stays silent rather than mak
 ### System Components
 
 1. **Confidence Engine**: Evaluates item compatibility using feature signals (color, style, formality, texture, usage)
-2. **UI Policy**: Determines what to show on the results screen based on engine results
-3. **Suggestions System**: Generates Mode A ("what to add") and Mode B ("make it work") guidance
-4. **Results Screen**: Renders matches, suggestions, and CTAs based on UI state
+2. **Trust Filter**: Post-CE guardrail that uses style signals to prevent trust-breaking matches (can demote or hide)
+3. **Style Signals**: Aesthetic archetypes, formality bands, and pattern signals generated via Claude Sonnet 4.5 for Trust Filter
+4. **Personalized Suggestions**: AI-powered styling guidance with three modes (PAIRED, NEAR, SOLO) using GPT-4o-mini
+5. **Suggestions System**: Deterministic Mode A ("what to add") and Mode B ("make it work") as fallbacks
+6. **UI Policy**: Determines what to show on the results screen based on engine results
+7. **Results Screen**: Renders matches, outfits, suggestions, and AI cards based on UI state
+
+**Performance Note:** Style signals are pre-fetched in parallel with image analysis, eliminating Trust Filter timeout issues. See [AI Models & Performance](#ai-models--performance) for details.
 
 ---
 
 ## Confidence Engine Overview
 
-### Two Engines: Confidence Engine vs Matching Engine
+The **Confidence Engine** is the sole matching system in the app. It uses deterministic, rules-based scoring to evaluate how well clothing items work together.
 
-The app has **two separate matching systems** that run in parallel:
-
-1. **Confidence Engine** (New, Preferred)
-   - Deterministic, rules-based scoring using feature signals
-   - Produces tiers: HIGH, MEDIUM, LOW
-   - Has gates system (hard fails, soft caps)
-   - **Always preferred when available**
-
-2. **Matching Engine** (Legacy, Fallback)
-   - Older scoring system (0-90 points)
-   - Produces confidence levels: great, okay, risky
-   - **Only used as fallback** when confidence engine fails
-
-**Key Point: The matching engine does NOT override or affect confidence engine scores.** They are completely separate systems. The matching engine is only used when:
-- Confidence engine didn't run (`evaluated = false`)
-- Confidence engine failed (`rawEvaluation = null`)
-- Viewing a saved check with no confidence results (backwards compatibility)
-
-**Decision Logic:**
-```
-1. Try Confidence Engine first
-   ├─ Success? → Use confidence engine results (preferred)
-   └─ Failed? → Fallback to matching engine
-```
-
-The confidence engine's scores, tiers, and gates are **never modified** by the matching engine. They operate independently.
+**Key characteristics:**
+- Deterministic, rules-based scoring using feature signals
+- Produces tiers: HIGH, MEDIUM, LOW
+- Has gates system (hard fails, soft caps)
+- Results feed into Trust Filter for additional safety checks
 
 ### Architecture
 
@@ -80,27 +71,43 @@ The confidence engine's scores, tiers, and gates are **never modified** by the m
 ┌─────────────────────────────────────────────────────────────────┐
 │                         UI LAYER                                │
 │                    (results.tsx screen)                         │
+│                                                                 │
+│  "Wear now" tab │ "Worth trying" tab │ AI Suggestions Card      │
 └─────────────────────────────────────────────────────────────────┘
                               │
-                              ▼
+          ┌───────────────────┼───────────────────┐
+          ▼                   ▼                   ▼
+┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+│  useTrustFilter  │ │ useResultsTabs   │ │ Personalized     │
+│      Hook        │ │     Hook         │ │ Suggestions      │
+│                  │ │                  │ │ Service          │
+│ • Fetches style  │ │ • Tab visibility │ │                  │
+│   signals        │ │ • Display caps   │ │ • AI PAIRED mode │
+│ • Applies Trust  │ │ • Core vs        │ │ • AI NEAR mode   │
+│   Filter         │ │   optional cats  │ │ • AI SOLO mode   │
+│ • Returns final  │ │                  │ │ • Cache + repair │
+│   matches        │ │                  │ │                  │
+└──────────────────┘ └──────────────────┘ └──────────────────┘
+          │                                         │
+          ▼                                         │
 ┌─────────────────────────────────────────────────────────────────┐
 │                   useConfidenceEngine Hook                      │
 │              (src/lib/useConfidenceEngine.ts)                   │
 │                                                                 │
 │  • Converts app types to engine types                           │
 │  • Calls outfit evaluation                                      │
-│  • Enriches results with explanations                           │
+│  • Generates Mode A/B suggestions (V2 style-aware)              │
 │  • Returns UI-ready data structure                              │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    CONFIDENCE ENGINE                            │
-│               (src/lib/confidence-engine/)                       │
+│               (src/lib/confidence-engine/)                      │
 │                                                                 │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
 │  │  Integration │  │    Outfit    │  │ Suggestions  │          │
-│  │    Layer     │──│  Evaluation  │──│   (Mode A/B) │          │
+│  │    Layer     │──│  Evaluation  │──│  (Mode A/B)  │          │
 │  └──────────────┘  └──────────────┘  └──────────────┘          │
 │         │                 │                                     │
 │         ▼                 ▼                                     │
@@ -114,6 +121,29 @@ The confidence engine's scores, tiers, and gates are **never modified** by the m
 │  │    Gates     │  │   Scoring    │  │    Tiers     │          │
 │  │ (Hard/Soft)  │  │  (Weights)   │  │  (Thresholds)│          │
 │  └──────────────┘  └──────────────┘  └──────────────┘          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      TRUST FILTER                               │
+│                 (src/lib/trust-filter/)                         │
+│                                                                 │
+│  • Evaluates HIGH matches using style signals                   │
+│  • Actions: keep, demote_to_near, hide                          │
+│  • Uses aesthetic distance, formality gaps, pattern clashes     │
+│  • Fail-open: passes through if signals unavailable             │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    STYLE SIGNALS SERVICE                        │
+│              (src/lib/style-signals-service.ts)                 │
+│                                                                 │
+│  • Generates signals via Edge Function (Claude Sonnet 4.5)      │
+│  • 12 aesthetic archetypes, formality bands, pattern levels     │
+│  • Two-tier caching: in-memory + DB-backed                      │
+│  • Lazy enrichment for wardrobe items                           │
+│  • Pre-fetched in parallel with image analysis                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -300,26 +330,134 @@ Result: tier = MEDIUM (multiple cap reasons for Mode B)
 
 ---
 
+## Trust Filter (Post-CE Guardrail)
+
+The **Trust Filter** is a post-processing layer that runs after the Confidence Engine. It uses **style signals** to identify and handle trust-breaking matches that passed CE scoring.
+
+### Purpose
+
+Even when two items score well on color/formality/texture, they may have **style incompatibilities** that would look wrong together. Trust Filter catches these cases.
+
+### Style Signals
+
+Style signals are generated via **Claude Sonnet 4.5** (migrated from GPT-4 Vision for faster latency and better accuracy) and include:
+
+| Signal | Description | Example Values |
+|--------|-------------|----------------|
+| **Aesthetic** | Primary style archetype | minimal, feminine, street, preppy, bohemian, etc. (12 types) |
+| **Formality Band** | Dress code level | casual, smart_casual, business_casual, formal |
+| **Statement Level** | How bold/attention-grabbing | subtle, moderate, statement |
+| **Pattern Level** | Pattern intensity | solid, subtle_pattern, bold_pattern |
+| **Season Heaviness** | Visual weight | light, medium, heavy |
+
+### Trust Filter Actions
+
+| Action | Result | When Used |
+|--------|--------|-----------|
+| `keep` | Match stays in HIGH tab | Style signals are compatible |
+| `demote_to_near` | Match moves to NEAR tab | Manageable style tension (soft reason) |
+| `hide` | Match removed entirely | Severe style clash (hard reason) |
+
+### Evaluation Rules
+
+**Hard Reasons (→ hide):**
+- Extreme aesthetic distance (e.g., preppy + punk)
+- Severe formality mismatch with style opposition
+
+**Soft Reasons (→ demote):**
+- Moderate aesthetic distance
+- Formality band gaps
+- Competing statement pieces
+- Pattern clashes
+
+### Category-Specific Policies
+
+- **Bags/Accessories**: Never hidden for aesthetic-only reasons (always kept or demoted)
+- **Skirts**: Can't escalate from demote to hide
+- **Anchor pairs** (shoes+tops, outerwear+shoes): More lenient evaluation
+
+### Fail-Open Behavior
+
+If style signals are unavailable (timeout, error), Trust Filter passes through all matches unchanged. The system is "fail-open" to ensure users always see content.
+
+### Performance Optimization: Parallel Pre-fetch
+
+Style signals generation runs **in parallel** with image analysis at scan start, rather than waiting for Trust Filter to request them:
+
+```
+BEFORE (Sequential):                    AFTER (Parallel):
+                                        
+analyze-image ──────▶ 2-4s             analyze-image ──────┐
+         ↓                                                 ├──▶ max(2-4s, 4s) = ~4s
+CE + TF start                          style-signals ──────┘
+         ↓                                      ↓
+style-signals ──────▶ 8-15s            CE + TF start (signals CACHED)
+         ↓                                      ↓
+AI suggestions ─────▶ 5-6s             AI suggestions ────▶ 5-6s
+         ↓                                      ↓
+TOTAL: ~27s                            TOTAL: ~12-15s
+```
+
+**How it works:**
+1. `results.tsx` fires both `analyzeClothingImage()` and `generateScanStyleSignalsDirect()` in parallel using `Promise.allSettled`
+2. Style signals result is cached in memory (Tier 0) and DB (Tier 1)
+3. When Trust Filter later calls `generateScanStyleSignalsDirect()` with the same image URI, it finds a cache hit
+4. Trust Filter proceeds instantly without waiting for API call
+
+**Key behaviors:**
+- Fire-and-forget: Style signals call doesn't block analysis completion
+- Fail-open: If pre-fetch fails, Trust Filter retries as before
+- Abortable: Both calls cancel cleanly when user navigates away
+
+### Integration
+
+```typescript
+// In results.tsx
+const trustFilterResult = useTrustFilter(confidenceResult, wardrobeItems);
+
+// Returns:
+// - highFinal: HIGH matches that passed Trust Filter
+// - nearFinal: NEAR matches + demoted HIGH matches
+// - hidden: Matches that were hidden
+```
+
+---
+
 ## UI States & Decision Flow
 
-### The Three UI States
+### The Four UI States
 
-The results screen has three possible states that control everything:
+The results screen has four possible states that control everything:
 
-1. **HIGH**: User has HIGH confidence matches
-2. **MEDIUM**: User has near-matches (no HIGH matches)
-3. **LOW**: No matches, no near-matches
+1. **HIGH**: User has HIGH confidence matches (shows "Wear now" tab)
+2. **MEDIUM**: User has near-matches but no HIGH matches (shows "Worth trying" tab)
+3. **SOLO**: No core HIGH or NEAR matches, but wardrobe exists (shows AI styling card)
+4. **LOW**: Empty wardrobe or engine failed (shows empty state)
+
+**Note:** SOLO mode is distinct from MEDIUM/LOW - it activates when the user has wardrobe items but no matchable pairs for the scanned item.
 
 ### UI State Determination
 
 ```typescript
-function getUiState(confidenceResult: ConfidenceEngineResult): UiState {
+function getUiState(confidenceResult: ConfidenceEngineResult, wardrobeCount: number): UiState {
   if (!confidenceResult.evaluated) { return 'LOW'; }
-  if (confidenceResult.highMatchCount > 0) { return 'HIGH'; }
-  if (confidenceResult.nearMatchCount > 0) { return 'MEDIUM'; }
-  return 'LOW';
+  
+  // Count only CORE categories (tops, bottoms, shoes, dresses, skirts)
+  const coreHighCount = confidenceResult.coreHighMatchCount ?? confidenceResult.highMatchCount;
+  const coreNearCount = confidenceResult.coreNearMatchCount ?? confidenceResult.nearMatchCount;
+  
+  if (coreHighCount > 0) { return 'HIGH'; }
+  if (coreNearCount > 0) { return 'MEDIUM'; }
+  if (wardrobeCount > 0) { return 'SOLO'; }  // Has wardrobe but no matches
+  return 'LOW';  // Empty wardrobe
 }
 ```
+
+**Priority Order:**
+1. HIGH (if `coreHighCount > 0`)
+2. MEDIUM (if `coreNearCount > 0` and no HIGH)
+3. SOLO (if wardrobe exists but no core matches)
+4. LOW (empty wardrobe or engine failed)
 
 **Priority Order:**
 1. HIGH (if `highMatchCount > 0`)
@@ -363,18 +501,41 @@ function getUiState(confidenceResult: ConfidenceEngineResult): UiState {
   - Intro: "To make this pairing work:"
   - (Note: The descriptive message "We found some potential matches, but they need styling help" is NOT displayed - it's just a documentation description)
 
-### UI State: LOW
+### UI State: SOLO
 
 **When It Occurs:**
 - Confidence engine successfully evaluated
-- No HIGH matches (`highMatchCount = 0`)
-- No near-matches (`nearMatchCount = 0`)
+- No core HIGH matches (`coreHighMatchCount = 0`)
+- No core NEAR matches (`coreNearMatchCount = 0`)
+- User HAS wardrobe items (`wardrobeCount > 0`)
+
+**What Users See:**
+- ❌ **Matches Section**: Hidden
+- 🤖 **AI Styling Card**: Visible (PersonalizedSuggestionsCard in SOLO mode)
+- 📝 **Mode A Fallback**: Visible if AI fails/times out
+- ❌ **Rescan CTA**: Hidden
+
+**User Experience:**
+- Primary action: View AI-generated styling suggestions
+- Sections: "How to style it" + "What to add first"
+- Fallback: Mode A suggestions if AI unavailable
+- Trust level: Medium (providing guidance for styling this item)
+
+**Key Distinction from MEDIUM/LOW:**
+- SOLO = "We couldn't find matches, but here's how to style this item"
+- MEDIUM = "We found near-matches that need styling help"
+- LOW = "Empty wardrobe or engine failed"
+
+### UI State: LOW
+
+**When It Occurs:**
+- Empty wardrobe (`wardrobeCount = 0`)
 - OR confidence engine didn't evaluate (`evaluated = false`)
 
 **What Users See:**
-- ❌ **Matches Section**: Hidden (or empty-cta if wardrobe is empty)
-- 📝 **Suggestions Section**: Visible (Mode A) OR Rescan CTA (if no suggestions)
-- ✅ **Rescan CTA**: Visible (if no actionable content)
+- ❌ **Matches Section**: Shows empty-cta encouraging wardrobe building
+- 📝 **Suggestions Section**: Visible (Mode A) with "What to add first"
+- ✅ **Add to Wardrobe CTA**: Visible
 
 **Decision Logic: Mode A vs Rescan CTA**
 
@@ -442,52 +603,77 @@ The UI rendering follows a **four-phase decision process**. Each phase determine
 
 ### Phase 1: Determine UI State
 
-| Rule | `evaluated` | `highMatchCount` | `nearMatchCount` | **UI State** |
-|------|-------------|------------------|------------------|--------------|
-| 1.1 | false | - | - | **LOW** |
-| 1.2 | true | > 0 | - | **HIGH** |
-| 1.3 | true | 0 | > 0 | **MEDIUM** |
-| 1.4 | true | 0 | 0 | **LOW** |
+| Rule | `evaluated` | `coreHighCount` | `coreNearCount` | `wardrobeCount` | **UI State** |
+|------|-------------|-----------------|-----------------|-----------------|--------------|
+| 1.1 | false | - | - | - | **LOW** |
+| 1.2 | true | > 0 | - | - | **HIGH** |
+| 1.3 | true | 0 | > 0 | - | **MEDIUM** |
+| 1.4 | true | 0 | 0 | > 0 | **SOLO** |
+| 1.5 | true | 0 | 0 | 0 | **LOW** |
 
-**Priority Order:** Rule 1.2 > Rule 1.3 > Rule 1.4
+**Priority Order:** Rule 1.2 > Rule 1.3 > Rule 1.4 > Rule 1.5
 
----
-
-### Phase 2: Determine Matches Section
-
-| Rule | UI State | `matches.length` | `wardrobeCount` | **Variant** | **Visible** | **More Options CTA** |
-|------|----------|------------------|-----------------|-------------|------------|---------------------|
-| 2.1 | HIGH | > 0 | any | `matches` | ✅ true | See Phase 3 |
-| 2.2 | HIGH | 0 | any | `hidden` | ❌ false | ❌ false |
-| 2.3 | MEDIUM | any | 0 | `empty-cta` | ✅ true | ❌ false |
-| 2.4 | MEDIUM | any | > 0 | `hidden` | ❌ false | ❌ false |
-| 2.5 | LOW | any | 0 | `empty-cta` | ✅ true | ❌ false |
-| 2.6 | LOW | any | > 0 | `hidden` | ❌ false | ❌ false |
-
-**More Options CTA Logic:**
-- Visible only if: `uiState === HIGH` AND `nearMatchCount > 0` AND `variant === 'matches'` AND `matches.length > 0`
+**Note:** `coreHighCount` and `coreNearCount` only count core categories (tops, bottoms, shoes, dresses, skirts). Optional categories (outerwear, bags, accessories) don't drive UI state.
 
 ---
 
-### Phase 3: Determine Suggestions Section
+### Phase 2: Determine Tab Visibility
 
-| Rule | UI State | `hasModeBBullets` | `hasModeABullets` | **Mode** | **Visible** | **Title** | **Intro** |
-|------|----------|-------------------|-------------------|----------|-------------|-----------|------------|
-| 3.1 | HIGH | any | true | **A** | ✅ true | "If you want to expand this look" | "Optional ideas to try:" |
-| 3.2 | HIGH | any | false | **A** | ❌ false | "If you want to expand this look" | "Optional ideas to try:" |
-| 3.3 | MEDIUM | true | any | **B** | ✅ true | "To make this work" | "To make this pairing work:" |
-| 3.4 | MEDIUM | false | true | **A** | ✅ true | "To make this work" | "To make this pairing work:" |
-| 3.5 | MEDIUM | false | false | **A** | ❌ false | "To make this work" | "To make this pairing work:" |
-| 3.6 | LOW | any | true | **A** | ✅ true | "What would help" | "To make this easier to style:" |
-| 3.7 | LOW | any | false | **A** | ❌ false | "What would help" | "To make this easier to style:" |
+| Rule | UI State | `coreHighCount` | `coreNearCount` | **"Wear now" Tab** | **"Worth trying" Tab** |
+|------|----------|-----------------|-----------------|--------------------|-----------------------|
+| 2.1 | HIGH | > 0 | > 0 | ✅ Visible | ✅ Visible |
+| 2.2 | HIGH | > 0 | 0 | ✅ Visible (no tabs) | ❌ Hidden |
+| 2.3 | MEDIUM | 0 | > 0 | ❌ Hidden | ✅ Visible (no tabs) |
+| 2.4 | SOLO | 0 | 0 | ❌ Hidden | ❌ Hidden |
+| 2.5 | LOW | 0 | 0 | ❌ Hidden | ❌ Hidden |
 
-**Note:** In MEDIUM state, Mode B takes priority over Mode A (fallback).
+**Note:** Tabs only appear when both have content. Single-content states show content without tab controls.
 
-**Key Rule 3.2 Explanation:**
-- When UI State is HIGH and `hasModeABullets = false` (all bullets filtered out)
-- Section is **hidden** (not shown)
-- Title/Intro are still set for render model consistency
-- This prevents showing empty sections when user already has matches covering all categories
+---
+
+### Phase 3: Determine Suggestions (AI + Fallback)
+
+The suggestions system has two layers: **AI Personalized Suggestions** (preferred) and **Mode A/B** (fallback).
+
+| UI State | AI Mode | AI Sections | Fallback |
+|----------|---------|-------------|----------|
+| **HIGH** | PAIRED | "Why it works" + "To elevate" | Mode A (filtered) |
+| **MEDIUM** | NEAR | "Why it's close" + "How to upgrade" | Mode B → Mode A |
+| **SOLO** | SOLO | "How to style it" + "What to add first" | Mode A (unfiltered) |
+| **LOW** | - | - | Mode A (unfiltered) |
+
+**Fallback Chain per State:**
+
+**HIGH Tab:**
+```
+AI PAIRED suggestions (7.5s timeout)
+  ↓ fails/times out
+Mode A suggestions (filtered by covered categories)
+  ↓ all bullets filtered
+Nothing shown (matches are primary content)
+```
+
+**NEAR Tab:**
+```
+AI NEAR suggestions (fast timeout)
+  ↓ fails/times out
+Mode B suggestions (from cap reasons)
+  ↓ no Mode B bullets
+Mode A suggestions (unfiltered)
+```
+
+**SOLO Mode:**
+```
+AI SOLO suggestions (7.5s timeout)
+  ↓ fails/times out
+Mode A suggestions (unfiltered)
+```
+
+**Key Behaviors:**
+- AI suggestions suppress Mode A/B when loading or present
+- Mode A is filtered in HIGH state only (removes categories covered by matches)
+- Mode B excludes TEXTURE_CLASH from bullet generation
+- System is "fail-open" - always shows something on failure
 
 ---
 
@@ -674,31 +860,55 @@ The UI rendering follows a **four-phase decision process**. Each phase determine
 
 Mode A suggests missing pieces from your wardrobe that would work well with the scanned item. It's a **category-based** system that provides structured, actionable guidance.
 
+**Important:** Mode A is a **fallback** to AI Personalized Suggestions. When AI suggestions are available, Mode A is suppressed.
+
+### V2 Style-Aware Templates
+
+Mode A uses **style-aware templates** (`MODE_A_TEMPLATES_V2`) that can vary copy based on the scanned item's style vibe:
+
+```typescript
+// Style vibe is resolved from the scanned item's style signals
+const uiVibe = resolveUiVibeForCopy({
+  styleTags: analysisResult?.styleTags,
+  styleNotes: analysisResult?.styleNotes,
+  explicitStyleFamily: analysisResult?.confidenceSignals?.style_family
+});
+
+// Bullet text is resolved based on vibe
+const bulletText = resolveBulletTitle(bulletKey, uiVibe);
+```
+
 ### When Mode A Is Used
 
-Mode A suggestions appear in three scenarios:
+Mode A suggestions appear as fallback in these scenarios:
 
-1. **HIGH State** (Optional/Bonus)
-   - When: User has HIGH confidence matches
+1. **HIGH Tab** (Fallback when AI unavailable)
+   - When: AI PAIRED suggestions fail or time out
    - Purpose: Optional expansion ideas
    - Filtering: **YES** - Filters out categories already covered by matches
    - Visibility: Only shown if bullets remain after filtering
 
-2. **MEDIUM State** (Fallback)
-   - When: No HIGH matches, but Mode B suggestions are empty
-   - Purpose: Fallback guidance when Mode B unavailable
+2. **NEAR Tab** (Fallback when Mode B unavailable)
+   - When: AI NEAR suggestions fail AND Mode B has no bullets
+   - Purpose: Fallback guidance
    - Filtering: **NO** - Shows all bullets
    - Copy: Uses MEDIUM state copy ("To make this work")
 
-3. **LOW State** (Primary Guidance)
-   - When: No matches found, or confidence engine didn't evaluate
+3. **SOLO Mode** (Fallback when AI unavailable)
+   - When: AI SOLO suggestions fail or time out
+   - Purpose: Primary guidance on what would help
+   - Filtering: **NO** - Shows all bullets
+   - Copy: Uses "What to add first" section
+
+4. **LOW State** (Primary when no wardrobe)
+   - When: Empty wardrobe or engine failed
    - Purpose: Constructive guidance on what would help
    - Filtering: **NO** - Shows all bullets
    - Copy: Uses LOW state copy ("What would help")
 
 ### Category-Specific Templates
 
-Mode A uses **category-specific templates** stored in `MODE_A_TEMPLATES`. Each scanned category has its own template with:
+Mode A uses **category-specific templates** stored in `MODE_A_TEMPLATES_V2`. Each scanned category has its own template with:
 - **Intro text**: Section introduction (e.g., "To make this item easy to wear:")
 - **Bullets**: Array of suggestions with target categories
 
@@ -827,12 +1037,32 @@ This is **Rule 3.2** from Phase 3: HIGH state with `hasModeABullets = false` →
 
 Mode B provides styling tips for near-matches—items that have some tension but can still work together with the right styling approach.
 
+**Important:** Mode B is a **fallback** to AI Personalized Suggestions on the NEAR tab. When AI NEAR suggestions are available, Mode B is suppressed.
+
+### V2 Style-Aware, Deterministic Generation
+
+Mode B now uses **deterministic bullet selection** (no `Math.random()`) and **style-aware templates** (`MODE_B_COPY_BY_REASON`):
+
+```typescript
+// Deterministic selection via buildModeBBullets()
+const bullets = buildModeBBullets(capReasons, uiVibe, {
+  maxBullets: 3,
+  minBullets: 2,
+  excludedReasons: ['TEXTURE_CLASH']
+});
+```
+
+**Key V2 Changes:**
+- **Deterministic**: Always picks first bullet per reason (no randomness = no UI flicker)
+- **Style-aware**: Bullet text varies by vibe (e.g., "minimal" vs "feminine" copy)
+- **Stable sorting**: Reasons sorted by priority, then stable order
+
 ### When Mode B Is Used
 
-Mode B suggestions appear **only in MEDIUM state**:
-- No HIGH matches exist
+Mode B suggestions appear as fallback on the **NEAR tab**:
+- AI NEAR suggestions failed or timed out
 - Near-matches exist (capped HIGH or strong MEDIUM)
-- Mode B takes priority over Mode A in MEDIUM state
+- Mode B takes priority over Mode A on NEAR tab
 
 ### How Mode B Suggestions Are Generated
 
@@ -852,8 +1082,8 @@ Near-matches are selected from MEDIUM tier evaluations:
 #### Step 2: Aggregate Cap Reasons
 
 Cap reasons from near-matches are aggregated:
-- Count occurrences of each reason
-- Sort by count (descending), then by priority
+- Filter excluded reasons (TEXTURE_CLASH, SHOES_CONFIDENCE_DAMPEN when shoes scanned)
+- Sort by priority (descending), then stable order
 
 **Cap Reason Priority:**
 ```
@@ -861,18 +1091,19 @@ FORMALITY_TENSION: 5 (highest)
 STYLE_TENSION: 4
 COLOR_TENSION: 3
 USAGE_MISMATCH: 2
-SHOES_CONFIDENCE_DAMPEN: 1
-TEXTURE_CLASH: 0 (excluded from Mode B)
+SHOES_CONFIDENCE_DAMPEN: 1 (excluded when shoes scanned)
+TEXTURE_CLASH: 0 (always excluded from Mode B)
 ```
 
-#### Step 3: Generate Bullets
+#### Step 3: Generate Bullets (Deterministic)
 
-For each top reason (up to 2-3):
-1. Look up template pool for that reason
-2. Pick a random bullet from the pool
-3. Add to bullets array
+For each top reason (up to 3):
+1. Look up template pool for that reason in `MODE_B_COPY_BY_REASON`
+2. Resolve text based on style vibe using `resolveBulletTitle()`
+3. Pick **first** bullet (deterministic, not random)
+4. Add to bullets array
 
-**Example Templates:**
+**Example Templates by Reason:**
 
 **FORMALITY_TENSION:**
 - "Keep the rest of the outfit at the same level of dressiness"
@@ -885,6 +1116,12 @@ For each top reason (up to 2-3):
 **COLOR_TENSION:**
 - "Keep the other pieces neutral to avoid competing colors"
 - "Let this piece be the color focus"
+
+#### Step 4: Type 2b Fallback
+
+If only Type 2b near-matches exist (no cap reasons):
+- Use generic fallback bullets
+- These are less specific since there's no cap reason to explain
 
 ### Mode B Output Structure
 
@@ -904,8 +1141,282 @@ For each top reason (up to 2-3):
 | **Content** | Category suggestions | Styling tips |
 | **Structure** | Structured bullets with targets | Plain text bullets |
 | **Filtering** | Yes (HIGH state only) | No |
-| **When Used** | HIGH (optional), MEDIUM (fallback), LOW (primary) | MEDIUM (primary) |
+| **When Used** | HIGH (fallback), NEAR (fallback), SOLO (fallback), LOW (primary) | NEAR tab (fallback) |
 | **Example** | "Dark or structured bottoms" | "Keep outfit at same dressiness level" |
+
+---
+
+## Personalized AI Suggestions
+
+### Overview
+
+**Personalized Suggestions** are AI-generated styling guidance that provides context-aware advice based on the scanned item, matched wardrobe items, and overall wardrobe composition.
+
+**Key characteristics:**
+- Generated via Edge Function using GPT-4o-mini
+- Three modes: PAIRED, NEAR, SOLO
+- Cache-first with validation and repair
+- Fail-open: Falls back to Mode A/B on failure
+
+### Three AI Modes
+
+| Mode | UI State | Sections | When Used |
+|------|----------|----------|-----------|
+| **PAIRED** | HIGH | "Why it works" + "To elevate" | User has HIGH matches |
+| **NEAR** | MEDIUM | "Why it's close" + "How to upgrade" | User has NEAR matches only |
+| **SOLO** | SOLO | "How to style it" + "What to add first" | No matches but has wardrobe |
+
+### Response Schema
+
+```typescript
+interface PersonalizedSuggestions {
+  version: 1;
+  why_it_works: Array<{
+    text: string;
+    mentions: string[];  // Item IDs mentioned
+  }>;
+  to_elevate: Array<{
+    text: string;
+    recommend: {
+      type: 'consider_adding';
+      category: Category;
+      attributes: string[];
+    };
+  }>;
+}
+```
+
+### Cache Strategy
+
+```typescript
+// Cache key includes all inputs that affect output
+const cacheKey = sha256([
+  scanId,
+  topMatchIds,
+  nearMatchIds,
+  wardrobeSummary.updated_at,
+  PROMPT_VERSION,  // Currently 3
+  SCHEMA_VERSION,  // Currently 2
+  mode,            // 'paired' | 'near' | 'solo'
+  scanCategory,
+  preferAddOns
+].join('|'));
+```
+
+**Cache behavior:**
+- Cache hit still runs validation/repair
+- Timeout: 7500ms (slightly under Edge Function 8000ms)
+- Telemetry tracks `source: 'ai_call' | 'cache_hit'`
+
+### Validation & Repair
+
+The service validates and repairs AI responses:
+- Ensures `mentions` reference valid item IDs
+- Filters `to_elevate` categories by scan category
+- Backfills missing bullets with deterministic fallbacks
+- Bumps schema version on structural changes
+
+### Mode-Specific Behavior
+
+**PAIRED Mode (HIGH tab):**
+- Mentions HIGH match items in "Why it works"
+- "To elevate" suggests optional add-ons
+- Add-ons preference when add-ons strip visible
+
+**NEAR Mode (NEAR tab):**
+- Mentions NEAR match items
+- "How to upgrade" suggests styling improvements
+- No add-ons preference (focus on making outfit work)
+
+**SOLO Mode (No matches):**
+- No item mentions (nothing matched)
+- "How to style it" gives general styling advice
+- "What to add first" prioritizes core categories
+
+### UI Integration
+
+```typescript
+// In results.tsx
+const aiSuggestionsResult = useQuery({
+  queryKey: ['personalized-suggestions', scanId, mode],
+  queryFn: () => fetchPersonalizedSuggestions({
+    scanId,
+    mode,
+    topMatchIds: highMatches.map(m => m.itemId),
+    nearMatchIds: nearMatches.map(m => m.itemId),
+    wardrobeSummary,
+    scanCategory,
+    preferAddOns: addOnsVisible && mode === 'paired'
+  }),
+  enabled: !!scanId && wardrobeCount > 0
+});
+
+// Render PersonalizedSuggestionsCard when data available
+{aiSuggestionsResult.data && (
+  <PersonalizedSuggestionsCard
+    mode={mode}
+    suggestions={aiSuggestionsResult.data}
+    wardrobeItems={wardrobeItems}
+  />
+)}
+```
+
+### Fallback Behavior
+
+When AI suggestions fail or time out:
+
+| Mode | Fallback |
+|------|----------|
+| PAIRED | Mode A (filtered by covered categories) |
+| NEAR | Mode B → Mode A |
+| SOLO | Mode A (unfiltered) |
+
+**Suppression:** Mode A/B is suppressed while AI suggestions are loading or present.
+
+---
+
+## Outfit Ideas Display
+
+### Overview
+
+The **Outfit Ideas Section** displays assembled outfit combinations using the scanned item plus wardrobe matches. It provides a visual way to see complete looks.
+
+### Display by Tab
+
+| Tab | Title | Badge | Outfit Selection |
+|-----|-------|-------|------------------|
+| **HIGH ("Wear now")** | "Outfits you can wear now" | None | ❌ No |
+| **NEAR ("Worth trying")** | "Outfits worth trying" | MEDIUM badge | ✅ Yes |
+
+### Outfit Assembly
+
+Outfits are assembled by the **Combo Assembler** (`src/lib/combo-assembler.ts`):
+- Fills slots (TOP, BOTTOM, SHOES, DRESS) with matching items
+- Applies coherence filtering (no conflicting pieces)
+- Ranks by tier floor and average score
+- Returns top combos with tier badges
+
+### NEAR Tab Outfit Selection
+
+On the NEAR tab, users can **select a specific outfit** to get precise Mode B bullets:
+
+```typescript
+// When user taps an outfit
+const selectedOutfit = outfitCombos[selectedIndex];
+
+// Mode B bullets are generated for that specific outfit's cap reasons
+const bullets = getModeBBullets(selectedOutfit, nearMatches, uiVibe);
+```
+
+**Behavior:**
+- Selection clears on tab switch or scan change
+- "Show all" chip appears when outfit selected
+- Tapping "Show all" clears selection and shows aggregate bullets
+
+### Missing Pieces Card
+
+When outfits can't be formed (missing essential slots):
+
+```typescript
+<MissingPiecesCard
+  missingSlots={['BOTTOM', 'SHOES']}
+  scannedCategory="tops"
+/>
+```
+
+**Shows:**
+- Which slots are missing
+- CTA to add missing categories to wardrobe
+
+---
+
+## Optional Add-ons Strip
+
+### Overview
+
+The **Optional Add-ons Strip** displays HIGH-tier optional category matches (outerwear, bags, accessories) as a horizontal scrollable strip.
+
+### Visibility Rules
+
+| Condition | Visible |
+|-----------|---------|
+| HIGH tab | ✅ Yes (if add-ons exist) |
+| NEAR tab | ❌ No (focus on making outfit work) |
+| SOLO mode | ❌ No |
+| LOW state | ❌ No |
+
+### AI-Aware Sorting
+
+When AI suggestions are available, add-ons are sorted to match AI recommendations:
+
+```typescript
+// If AI suggests "outerwear" in to_elevate
+// → outerwear items appear first in the strip
+const sortedAddOns = sortAddOnsByAiPreference(
+  addOnMatches,
+  aiSuggestions.to_elevate
+);
+```
+
+### Display
+
+- Horizontal scroll with category icons
+- Title changes: "Optional add-ons" → "Suggested add-ons" (when AI eligible)
+- Tapping opens item detail
+
+---
+
+## Fallback Chains Summary
+
+This section summarizes all fallback behaviors in the system.
+
+### Suggestions Fallback (by Tab/Mode)
+
+```
+HIGH Tab:
+  AI PAIRED → Mode A (filtered) → Nothing
+
+NEAR Tab:
+  AI NEAR → Mode B → Mode A (unfiltered)
+
+SOLO Mode:
+  AI SOLO → Mode A (unfiltered)
+
+LOW State:
+  Mode A (unfiltered)
+```
+
+### Mode B Bullet Generation
+
+```
+Type 2a near-matches (has cap_reasons)
+  → Cap reason-based bullets
+    ↓ no Type 2a
+Type 2b near-matches (strong MEDIUM)
+  → Generic fallback bullets
+    ↓ no near-matches
+Mode A fallback
+```
+
+### Near-Match Selection
+
+```
+Type 2a: raw_score ≥ HIGH_THRESHOLD && cap_reasons.length > 0
+  ↓ none found
+Type 2b: raw_score ≥ 0.70 && !TEXTURE_CLASH
+```
+
+### Trust Filter
+
+```
+Trust Filter evaluation (10s timeout, rarely hit due to parallel pre-fetch)
+  ↓ signals unavailable
+Pass-through (all HIGH matches kept)
+```
+
+### Key Principle
+
+**Fail-open design:** When AI, Trust Filter, or signals fail, the system falls back to deterministic alternatives (Mode A/B) ensuring users always see actionable content.
 
 ---
 
@@ -1124,15 +1635,75 @@ Even though the section is hidden, the title and intro are still set in the rend
 
 ---
 
+## AI Models & Performance
+
+### AI Model Configuration
+
+The system uses different AI models optimized for each task:
+
+| Edge Function | Model | Purpose | Avg Latency |
+|---------------|-------|---------|-------------|
+| `analyze-image` | Claude Sonnet 4.5 | Basic clothing analysis (category, colors, style signals) | ~2-4s |
+| `style-signals` | Claude Sonnet 4.5 | Trust Filter signals (aesthetic, formality, statement) | ~4.3s |
+| `personalized-suggestions` | GPT-4o-mini | AI styling suggestions (PAIRED/NEAR/SOLO modes) | ~2-3s |
+| `ai-safety-check` | GPT-4o | Outfit pairing safety validation | ~1-2s |
+
+**Why Claude for Vision Tasks:**
+- Faster latency (~4.3s vs ~8s for GPT-4o Vision)
+- Better style interpretation accuracy
+- More nuanced aesthetic understanding
+
+**Why GPT-4o-mini for Suggestions:**
+- Good quality for text generation
+- Fast and cost-effective
+- Sufficient for structured response generation
+
+### Performance Timeline
+
+Optimizations reduced scan-to-results time significantly:
+
+```
+ORIGINAL (~27s):
+  analyze-image ────▶ 2-4s
+  CE + TF start
+  style-signals ────▶ 8-15s (GPT-4o, sequential)
+  AI suggestions ───▶ 5-6s
+  TOTAL: ~27s
+
+AFTER PARALLEL OPTIMIZATION (~17s):
+  analyze-image ────┐
+                    ├──▶ 8-15s (parallel, but GPT-4o still slow)
+  style-signals ────┘
+  CE + TF (cache hit)
+  AI suggestions ───▶ 5-6s
+  TOTAL: ~17s
+
+AFTER CLAUDE MIGRATION (~12-15s):
+  analyze-image ────┐
+                    ├──▶ ~4s (parallel + Claude is faster)
+  style-signals ────┘
+  CE + TF (cache hit) ▶ instant
+  AI suggestions ───▶ 2-3s
+  TOTAL: ~12-15s
+```
+
+### Related Documentation
+
+- [Parallel Style Signals](docs/handoff/parallel-style-signals-COMPLETE.md) - Pre-fetch optimization
+- [Claude Migration](docs/handoff/claude-sonnet-migration-COMPLETE.md) - GPT-4o → Claude switch
+
+---
+
 ## Summary
 
 ### Key Principles
 
-1. **Trust Preservation**: Only show HIGH matches (never show uncertain matches)
-2. **Actionable Guidance**: Always provide next steps (suggestions or rescan)
-3. **Progressive Disclosure**: More options CTA reveals additional matches
-4. **Context Awareness**: Empty wardrobe shows different messaging
-5. **Mode Priority**: Mode B (styling tips) preferred over Mode A (missing pieces) in MEDIUM state
+1. **Trust Preservation**: Only show HIGH matches; Trust Filter prevents misleading pairings
+2. **Fail-Open Design**: When AI or Trust Filter fails, deterministic fallbacks ensure content
+3. **AI-First Suggestions**: AI Personalized Suggestions preferred, Mode A/B as fallback
+4. **Tab-Based Navigation**: "Wear now" (HIGH) and "Worth trying" (NEAR) tabs
+5. **SOLO Mode Support**: Styling guidance even when no matches exist
+6. **Context Awareness**: Empty wardrobe shows different messaging
 
 ### Decision Flow Summary
 
@@ -1141,24 +1712,33 @@ User scans item
     ↓
 Confidence Engine evaluates
     ↓
-┌─────────────────────────────────┐
-│ HIGH matches?                    │
-│   YES → Show matches + optional  │
-│         Mode A suggestions       │
-│   NO  → Continue                │
-└─────────────────────────────────┘
+Trust Filter processes HIGH matches
+  (keep / demote / hide)
     ↓
-┌─────────────────────────────────┐
-│ Near-matches exist?              │
-│   YES → Show Mode B styling tips │
-│   NO  → Continue                │
-└─────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│ Core HIGH matches after Trust Filter?    │
+│   YES → "Wear now" tab                   │
+│         AI PAIRED suggestions            │
+│         (fallback: Mode A filtered)      │
+│   NO  → Continue                         │
+└─────────────────────────────────────────┘
     ↓
-┌─────────────────────────────────┐
-│ Mode A suggestions available?    │
-│   YES → Show Mode A suggestions  │
-│   NO  → Show Rescan CTA         │
-└─────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│ Core NEAR matches exist?                 │
+│   YES → "Worth trying" tab               │
+│         AI NEAR suggestions              │
+│         (fallback: Mode B → Mode A)      │
+│   NO  → Continue                         │
+└─────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────┐
+│ Wardrobe has items?                      │
+│   YES → SOLO mode                        │
+│         AI SOLO suggestions              │
+│         (fallback: Mode A unfiltered)    │
+│   NO  → LOW state                        │
+│         Empty wardrobe guidance          │
+└─────────────────────────────────────────┘
 ```
 
 ### System Files
@@ -1167,17 +1747,41 @@ Confidence Engine evaluates
 - `src/lib/confidence-engine/` - Confidence engine implementation
 - `src/lib/useConfidenceEngine.ts` - React hook integration
 
+**Trust Filter:**
+- `src/lib/trust-filter/` - Trust Filter module (evaluate, config, helpers)
+- `src/lib/useTrustFilter.ts` - Trust Filter React hook
+- `src/lib/style-signals-service.ts` - Style signals generation and caching
+
+**Personalized Suggestions:**
+- `src/lib/personalized-suggestions-service.ts` - AI suggestions service
+- `src/components/PersonalizedSuggestionsCard.tsx` - AI card UI component
+
 **UI Policy:**
 - `src/lib/results-ui-policy.ts` - Single source of truth for UI rendering
+- `src/lib/useResultsTabs.ts` - Tab state management
 
-**Suggestions:**
-- `src/lib/confidence-engine/suggestions.ts` - Mode A/B generation
-- `src/lib/confidence-engine/config.ts` - Templates and configuration
+**Suggestions (Fallback):**
+- `src/lib/confidence-engine/suggestions.ts` - Mode A/B V2 generation
+- `src/lib/confidence-engine/config.ts` - V2 templates and configuration
 
-**UI:**
+**Outfit Assembly:**
+- `src/lib/combo-assembler.ts` - Outfit combination assembly
+- `src/lib/useComboAssembler.ts` - Combo assembler hook
+
+**UI Components:**
 - `src/app/results.tsx` - Results screen implementation
+- `src/components/OutfitIdeasSection.tsx` - Outfit display component
+- `src/components/OptionalAddOnsStrip.tsx` - Add-ons strip component
+- `src/components/MissingPiecesCard.tsx` - Missing pieces guidance
+
+**Related Documentation:**
+- `docs/handoff/personalized-suggestions-COMPLETE.md` - AI suggestions handoff
+- `docs/handoff/parallel-style-signals-COMPLETE.md` - Parallel pre-fetch optimization
+- `docs/handoff/claude-sonnet-migration-COMPLETE.md` - Claude Sonnet 4.5 migration
+- `docs/STYLE_AWARE_SUGGESTIONS_SPEC.md` - V2 suggestions specification
+- `docs/specs/CONFIDENCE_ENGINE.md` - Engine specification
 
 ---
 
-**This document is the complete reference for understanding how the Confidence Engine and Results Screen UI work together.**
+**This document is the complete reference for understanding how the Confidence Engine, Trust Filter, AI Suggestions, and Results Screen UI work together.**
 

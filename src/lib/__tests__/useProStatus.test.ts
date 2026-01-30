@@ -408,13 +408,15 @@ describe("Edge cases", () => {
     it("handles user logging out during check", async () => {
       let currentUser: User | null = { id: "user-123" };
       
+      const hasUserId = (value: User | null): value is User => !!value && !!value.id;
+
       const checkWithUserChange = async (): Promise<boolean> => {
         // Simulate user change during async operation
         await new Promise((resolve) => setTimeout(resolve, 10));
         currentUser = null;
         
         // Check user again after delay
-        if (!currentUser?.id) {
+        if (!hasUserId(currentUser)) {
           return false;
         }
         return true;

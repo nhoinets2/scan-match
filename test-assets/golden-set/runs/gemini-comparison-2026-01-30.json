@@ -1,0 +1,536 @@
+{
+  "generatedAt": "2026-01-30T02:10:50.198Z",
+  "summary": {
+    "total": 30,
+    "successCount": 30,
+    "avgMatchRate": 0.8166666666666668,
+    "avgLatencyMs": 3444.128205128205,
+    "criticalMatchRate": 0.7
+  },
+  "fieldAccuracy": {
+    "aesthetic": 24,
+    "formality": 25,
+    "statement": 22,
+    "season": 28,
+    "pattern": 24,
+    "material": 24
+  },
+  "results": [
+    {
+      "filename": "MIN-03_black_leather_ankle_boots.webp",
+      "matchCount": 5,
+      "matches": {
+        "aesthetic": true,
+        "formality": false,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3888
+    },
+    {
+      "filename": "MIN-01_white_crewneck_tee.webp",
+      "matchCount": 5,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": false
+      },
+      "latencyMs": 3446
+    },
+    {
+      "filename": "MIN-02_black_straight_leg_trousers.webp",
+      "matchCount": 4,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": false,
+        "season": true,
+        "pattern": true,
+        "material": false
+      },
+      "latencyMs": 3669
+    },
+    {
+      "filename": "CLA-01_beige_trench_coat.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 4266
+    },
+    {
+      "filename": "CLA-02_navy_blazer.webp",
+      "matchCount": 0,
+      "matches": {
+        "aesthetic": false,
+        "formality": false,
+        "statement": false,
+        "season": false,
+        "pattern": false,
+        "material": false
+      },
+      "latencyMs": 1838,
+      "error": "{\"code\":429,\"message\":\"Resource exhausted. Please try again later. Please refer to https://cloud.goo"
+    },
+    {
+      "filename": "CLA-03_structured_leather_tote.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 4220
+    },
+    {
+      "filename": "AMB-01_simple_black_slip_dress.webp",
+      "matchCount": 4,
+      "matches": {
+        "aesthetic": false,
+        "formality": true,
+        "statement": false,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3135
+    },
+    {
+      "filename": "AMB-02_tailored_black_blazer.webp",
+      "matchCount": 4,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": false,
+        "season": true,
+        "pattern": true,
+        "material": false
+      },
+      "latencyMs": 2966
+    },
+    {
+      "filename": "AMB-03_dark_skinny_jeans.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3002
+    },
+    {
+      "filename": "AMB-04_white_sneakers.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3282
+    },
+    {
+      "filename": "WRK-02_olive_utility_jacket.webp",
+      "matchCount": 5,
+      "matches": {
+        "aesthetic": false,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3331
+    },
+    {
+      "filename": "GLM-01_sequin_camisole.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 4375
+    },
+    {
+      "filename": "GLM-02_metalic_clutch.webp",
+      "matchCount": 0,
+      "matches": {
+        "aesthetic": false,
+        "formality": false,
+        "statement": false,
+        "season": false,
+        "pattern": false,
+        "material": false
+      },
+      "latencyMs": 3302,
+      "error": "{\"code\":429,\"message\":\"Resource exhausted. Please try again later. Please refer to https://cloud.goo"
+    },
+    {
+      "filename": "GLM-03_stiletto_heels.webp",
+      "matchCount": 0,
+      "matches": {
+        "aesthetic": false,
+        "formality": false,
+        "statement": false,
+        "season": false,
+        "pattern": false,
+        "material": false
+      },
+      "latencyMs": 1548,
+      "error": "{\"code\":429,\"message\":\"Resource exhausted. Please try again later. Please refer to https://cloud.goo"
+    },
+    {
+      "filename": "ROM-01_puff_sleeve_blouse.webp",
+      "matchCount": 4,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": false,
+        "pattern": false,
+        "material": true
+      },
+      "latencyMs": 3209
+    },
+    {
+      "filename": "ROM-02_satin_midi_slip_skirt.webp",
+      "matchCount": 5,
+      "matches": {
+        "aesthetic": true,
+        "formality": false,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3429
+    },
+    {
+      "filename": "ROM-03_pearl_necklace.webp",
+      "matchCount": 4,
+      "matches": {
+        "aesthetic": true,
+        "formality": false,
+        "statement": true,
+        "season": true,
+        "pattern": false,
+        "material": true
+      },
+      "latencyMs": 3628
+    },
+    {
+      "filename": "EDG-01_leather_moto_jacket.webp",
+      "matchCount": 5,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": false,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3771
+    },
+    {
+      "filename": "EDG-02_combat_boots.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3740
+    },
+    {
+      "filename": "EDG-03_silver_chain_necklace.webp",
+      "matchCount": 4,
+      "matches": {
+        "aesthetic": false,
+        "formality": false,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3536
+    },
+    {
+      "filename": "PRP-02_pleated_mini_skirt.webp",
+      "matchCount": 0,
+      "matches": {
+        "aesthetic": false,
+        "formality": false,
+        "statement": false,
+        "season": false,
+        "pattern": false,
+        "material": false
+      },
+      "latencyMs": 1658,
+      "error": "{\"code\":429,\"message\":\"Resource exhausted. Please try again later. Please refer to https://cloud.goo"
+    },
+    {
+      "filename": "SPT-02_black_leggins.webp",
+      "matchCount": 0,
+      "matches": {
+        "aesthetic": false,
+        "formality": false,
+        "statement": false,
+        "season": false,
+        "pattern": false,
+        "material": false
+      },
+      "latencyMs": 2199,
+      "error": "{\"code\":429,\"message\":\"Resource exhausted. Please try again later. Please refer to https://cloud.goo"
+    },
+    {
+      "filename": "SPT-03_running_shoes.webp",
+      "matchCount": 3,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": false,
+        "season": true,
+        "pattern": false,
+        "material": false
+      },
+      "latencyMs": 3101
+    },
+    {
+      "filename": "WES-01_white_cowboy_boots.webp",
+      "matchCount": 4,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": false,
+        "season": true,
+        "pattern": false,
+        "material": true
+      },
+      "latencyMs": 3404
+    },
+    {
+      "filename": "WES-03_denim_shirt_with_yoke.webp",
+      "matchCount": 0,
+      "matches": {
+        "aesthetic": false,
+        "formality": false,
+        "statement": false,
+        "season": false,
+        "pattern": false,
+        "material": false
+      },
+      "latencyMs": 2069,
+      "error": "{\"code\":429,\"message\":\"Resource exhausted. Please try again later. Please refer to https://cloud.goo"
+    },
+    {
+      "filename": "OUT-01_technical_shell_jacket.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3558
+    },
+    {
+      "filename": "OUT-02_trail_sneakers.webp",
+      "matchCount": 0,
+      "matches": {
+        "aesthetic": false,
+        "formality": false,
+        "statement": false,
+        "season": false,
+        "pattern": false,
+        "material": false
+      },
+      "latencyMs": 2198,
+      "error": "{\"code\":429,\"message\":\"Resource exhausted. Please try again later. Please refer to https://cloud.goo"
+    },
+    {
+      "filename": "OUT-03_nylon_crossbody.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 2735
+    },
+    {
+      "filename": "BOH-01_maxi_dress.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 2919
+    },
+    {
+      "filename": "BOH-02_bag.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3433
+    },
+    {
+      "filename": "BOH-03_hat.webp",
+      "matchCount": 4,
+      "matches": {
+        "aesthetic": false,
+        "formality": false,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3894
+    },
+    {
+      "filename": "PRP-01_preppy_ivory_sweater.webp",
+      "matchCount": 3,
+      "matches": {
+        "aesthetic": false,
+        "formality": true,
+        "statement": true,
+        "season": false,
+        "pattern": true,
+        "material": false
+      },
+      "latencyMs": 2977
+    },
+    {
+      "filename": "SPT-01_gray_cropped_athletic_sweatshirt.webp",
+      "matchCount": 0,
+      "matches": {
+        "aesthetic": false,
+        "formality": false,
+        "statement": false,
+        "season": false,
+        "pattern": false,
+        "material": false
+      },
+      "latencyMs": 1607,
+      "error": "{\"code\":429,\"message\":\"Resource exhausted. Please try again later. Please refer to https://cloud.goo"
+    },
+    {
+      "filename": "STR-01_graphic_t-shirt.webp",
+      "matchCount": 0,
+      "matches": {
+        "aesthetic": false,
+        "formality": false,
+        "statement": false,
+        "season": false,
+        "pattern": false,
+        "material": false
+      },
+      "latencyMs": 1712,
+      "error": "{\"code\":429,\"message\":\"Resource exhausted. Please try again later. Please refer to https://cloud.goo"
+    },
+    {
+      "filename": "STR-02_baggy_jeans.webp",
+      "matchCount": 5,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": false,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3482
+    },
+    {
+      "filename": "STR-03_chunky_sneakers.webp",
+      "matchCount": 4,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": false,
+        "material": false
+      },
+      "latencyMs": 9038
+    },
+    {
+      "filename": "WES-02_western_belt.webp",
+      "matchCount": 4,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": false,
+        "season": true,
+        "pattern": false,
+        "material": true
+      },
+      "latencyMs": 3314
+    },
+    {
+      "filename": "WRK-01_workwear_blue_denim_jacket.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3587
+    },
+    {
+      "filename": "WRK-03_dark_jeans.webp",
+      "matchCount": 5,
+      "matches": {
+        "aesthetic": false,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3674
+    }
+  ]
+}

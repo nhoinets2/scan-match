@@ -257,6 +257,34 @@ function normalizeColors(colors: unknown): string[] {
   return valid.length > 0 ? valid : ['unknown'];
 }
 
+function parseImageDataUrl(imageDataUrl: string): { mediaType: string; data: string } | null {
+  const [header, data] = imageDataUrl.split(",");
+  if (!header || !data) return null;
+  const match = header.match(/^data:([^;]+);base64$/);
+  const mediaType = match?.[1];
+  if (!mediaType) return null;
+  return { mediaType, data };
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+async function fetchImageAsBase64(imageUrl: string): Promise<{ mediaType: string; data: string }> {
+  const response = await fetch(imageUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image: ${response.status}`);
+  }
+  const contentType = response.headers.get("content-type") || "image/webp";
+  const buffer = await response.arrayBuffer();
+  return { mediaType: contentType, data: arrayBufferToBase64(buffer) };
+}
+
 function computeInputHash(imageUri: string, updatedAt?: string): string {
   // Simple hash: concatenate image URI and timestamp
   const input = `${imageUri}|${updatedAt || 'none'}`;
@@ -353,8 +381,8 @@ Deno.serve(async (req) => {
       const goldenSetUrl = signedData.signedUrl;
       console.log(`[style-signals] Golden set analysis for: ${imageName}`);
 
-      const openaiKey = Deno.env.get("OPENAI_API_KEY");
-      if (!openaiKey) {
+      const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+      if (!anthropicKey) {
         return new Response(
           JSON.stringify({ ok: false, error: { kind: "server_error", message: "Analysis service not configured" } }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -362,39 +390,40 @@ Deno.serve(async (req) => {
       }
 
       try {
-        const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        const imagePayload = await fetchImageAsBase64(goldenSetUrl);
+        const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${openaiKey}`,
             "Content-Type": "application/json",
+            "x-api-key": anthropicKey,
+            "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: "gpt-4o",
+            model: "claude-sonnet-4-5-20250929",
+            max_tokens: 800,
             messages: [
               {
                 role: "user",
                 content: [
+                  { type: "image", source: { type: "base64", media_type: imagePayload.mediaType, data: imagePayload.data } },
                   { type: "text", text: STYLE_SIGNALS_PROMPT },
-                  { type: "image_url", image_url: { url: goldenSetUrl } },
                 ],
               },
             ],
-            max_tokens: 800,
-            temperature: 0,
           }),
         });
 
-        if (!openaiResponse.ok) {
-          const errorText = await openaiResponse.text();
-          console.error(`[style-signals] OpenAI error for golden set:`, errorText);
+        if (!anthropicResponse.ok) {
+          const errorText = await anthropicResponse.text();
+          console.error(`[style-signals] Anthropic error for golden set:`, errorText);
           return new Response(
-            JSON.stringify({ ok: false, error: { kind: "openai_error", message: `OpenAI error: ${openaiResponse.status}` } }),
+            JSON.stringify({ ok: false, error: { kind: "anthropic_error", message: `Anthropic error: ${anthropicResponse.status}` } }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
-        const openaiData = await openaiResponse.json();
-        const responseText = openaiData.choices?.[0]?.message?.content ?? "";
+        const anthropicData = await anthropicResponse.json();
+        const responseText = anthropicData.content?.[0]?.text ?? "";
 
         let cleanedResponse = responseText.trim();
         if (cleanedResponse.startsWith("```json")) cleanedResponse = cleanedResponse.slice(7);
@@ -545,8 +574,8 @@ Deno.serve(async (req) => {
       const payloadSizeKB = Math.round(imageDataUrl.length / 1024);
       console.log(`[style-signals] scan_direct: user=${userId.slice(0, 8)}..., payload=${payloadSizeKB}KB`);
 
-      const openaiKey = Deno.env.get("OPENAI_API_KEY");
-      if (!openaiKey) {
+      const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+      if (!anthropicKey) {
         return new Response(
           JSON.stringify({ ok: false, error: { kind: "server_error", message: "Analysis service not configured" } }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -554,39 +583,47 @@ Deno.serve(async (req) => {
       }
 
       try {
-        const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        const parsedImage = parseImageDataUrl(imageDataUrl);
+        if (!parsedImage) {
+          return new Response(
+            JSON.stringify({ ok: false, error: { kind: "bad_request", message: "Invalid image data URL" } }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${openaiKey}`,
             "Content-Type": "application/json",
+            "x-api-key": anthropicKey,
+            "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: "gpt-4o",
+            model: "claude-sonnet-4-5-20250929",
+            max_tokens: 800,
             messages: [
               {
                 role: "user",
                 content: [
+                  { type: "image", source: { type: "base64", media_type: parsedImage.mediaType, data: parsedImage.data } },
                   { type: "text", text: STYLE_SIGNALS_PROMPT },
-                  { type: "image_url", image_url: { url: imageDataUrl } },
                 ],
               },
             ],
-            max_tokens: 800,
-            temperature: 0,
           }),
         });
 
-        if (!openaiResponse.ok) {
-          const errorText = await openaiResponse.text();
-          console.error(`[style-signals] OpenAI error for scan_direct:`, errorText);
+        if (!anthropicResponse.ok) {
+          const errorText = await anthropicResponse.text();
+          console.error(`[style-signals] Anthropic error for scan_direct:`, errorText);
           return new Response(
-            JSON.stringify({ ok: false, error: { kind: "openai_error", message: `OpenAI error: ${openaiResponse.status}` } }),
+            JSON.stringify({ ok: false, error: { kind: "anthropic_error", message: `Anthropic error: ${anthropicResponse.status}` } }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
-        const openaiData = await openaiResponse.json();
-        const responseText = openaiData.choices?.[0]?.message?.content ?? "";
+        const anthropicData = await anthropicResponse.json();
+        const responseText = anthropicData.content?.[0]?.text ?? "";
 
         let cleanedResponse = responseText.trim();
         if (cleanedResponse.startsWith("```json")) cleanedResponse = cleanedResponse.slice(7);
@@ -770,12 +807,12 @@ Deno.serve(async (req) => {
       .eq('id', recordId);
 
     // ============================================
-    // CALL OPENAI
+    // CALL ANTHROPIC
     // ============================================
 
-    const openaiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openaiKey) {
-      console.error("[style-signals] OPENAI_API_KEY not configured");
+    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!anthropicKey) {
+      console.error("[style-signals] ANTHROPIC_API_KEY not configured");
       return new Response(
         JSON.stringify({ ok: false, error: { kind: "server_error", message: "Analysis service not configured" } }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -801,45 +838,65 @@ Deno.serve(async (req) => {
       );
     }
 
+    let imagePayload: { mediaType: string; data: string };
+    try {
+      imagePayload = await fetchImageAsBase64(imageUri);
+    } catch (error) {
+      console.error("[style-signals] Failed to fetch image:", error);
+      await supabaseAdmin
+        .from(tableName)
+        .update({
+          style_signals_status: 'failed',
+          style_signals_error: 'Failed to fetch image for analysis',
+          style_signals_updated_at: new Date().toISOString(),
+        })
+        .eq('id', recordId);
+
+      return new Response(
+        JSON.stringify({ ok: false, error: { kind: "storage_error", message: "Failed to fetch image for analysis" } }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     let signals: StyleSignalsV1;
     let retryCount = 0;
     const maxRetries = 1;
 
     while (retryCount <= maxRetries) {
       try {
-        const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${openaiKey}`,
             "Content-Type": "application/json",
+            "x-api-key": anthropicKey,
+            "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: "gpt-4o",
+            model: "claude-sonnet-4-5-20250929",
+            max_tokens: 800,
             messages: [
               {
                 role: "user",
                 content: [
+                  { type: "image", source: { type: "base64", media_type: imagePayload.mediaType, data: imagePayload.data } },
                   { type: "text", text: STYLE_SIGNALS_PROMPT },
-                  { type: "image_url", image_url: { url: imageUri } },
                 ],
               },
             ],
-            max_tokens: 800,
-            temperature: 0,
           }),
         });
 
-        if (!openaiResponse.ok) {
-          const errorText = await openaiResponse.text();
-          console.error(`[style-signals] OpenAI error: ${openaiResponse.status}`, errorText);
-          throw new Error(`OpenAI API error: ${openaiResponse.status}`);
+        if (!anthropicResponse.ok) {
+          const errorText = await anthropicResponse.text();
+          console.error(`[style-signals] Anthropic error: ${anthropicResponse.status}`, errorText);
+          throw new Error(`Anthropic API error: ${anthropicResponse.status}`);
         }
 
-        const openaiData = await openaiResponse.json();
-        const responseText = openaiData.choices?.[0]?.message?.content ?? "";
+        const anthropicData = await anthropicResponse.json();
+        const responseText = anthropicData.content?.[0]?.text ?? "";
 
         if (!responseText) {
-          throw new Error("Empty response from OpenAI");
+          throw new Error("Empty response from Anthropic");
         }
 
         // Parse JSON response

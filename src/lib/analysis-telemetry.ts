@@ -26,6 +26,7 @@ import type { AnalyzeErrorKind } from './openai';
  * - analysis_succeeded: Analysis completed successfully
  * - analysis_failed: Analysis failed with an error
  * - analysis_retry_tapped: User tapped retry button
+ * - analysis_retry_background: Auto-retry after backgrounding during analysis
  * - analysis_recovered_success: Succeeded after a previous failure
  * - analysis_cancelled: User navigated away during loading
  * - analysis_max_retries: Max retry limit reached
@@ -35,6 +36,7 @@ export type AnalysisLifecycleEventName =
   | "analysis_succeeded"
   | "analysis_failed"
   | "analysis_retry_tapped"
+  | "analysis_retry_background"
   | "analysis_recovered_success"
   | "analysis_cancelled"
   | "analysis_max_retries";

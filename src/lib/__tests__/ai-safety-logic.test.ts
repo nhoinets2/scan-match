@@ -357,8 +357,8 @@ describe('Reset behavior invariants', () => {
   });
 
   it('different key should trigger reset', () => {
-    const prevKey = 'a|b|c';
-    const currentKey = 'a|b|d'; // different item
+    const prevKey: string = 'a|b|c';
+    const currentKey: string = 'a|b|d'; // different item
 
     const shouldReset = prevKey !== null && prevKey !== currentKey;
 

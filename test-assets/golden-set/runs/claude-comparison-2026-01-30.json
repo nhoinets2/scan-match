@@ -1,0 +1,529 @@
+{
+  "generatedAt": "2026-01-30T02:20:38.261Z",
+  "model": "claude-sonnet-4-5-20250929",
+  "summary": {
+    "total": 39,
+    "successCount": 39,
+    "avgMatchRate": 0.8333333333333334,
+    "avgLatencyMs": 4285.820512820513,
+    "criticalMatchRate": 0.8461538461538461,
+    "costPerCall": 0.010499999999999999
+  },
+  "fieldAccuracy": {
+    "aesthetic": 36,
+    "formality": 34,
+    "statement": 25,
+    "season": 34,
+    "pattern": 34,
+    "material": 32
+  },
+  "results": [
+    {
+      "filename": "MIN-03_black_leather_ankle_boots.webp",
+      "matchCount": 3,
+      "matches": {
+        "aesthetic": false,
+        "formality": false,
+        "statement": false,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3936
+    },
+    {
+      "filename": "MIN-01_white_crewneck_tee.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3891
+    },
+    {
+      "filename": "MIN-02_black_straight_leg_trousers.webp",
+      "matchCount": 5,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": false
+      },
+      "latencyMs": 4026
+    },
+    {
+      "filename": "CLA-01_beige_trench_coat.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3842
+    },
+    {
+      "filename": "CLA-02_navy_blazer.webp",
+      "matchCount": 5,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": false,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3887
+    },
+    {
+      "filename": "CLA-03_structured_leather_tote.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3939
+    },
+    {
+      "filename": "AMB-01_simple_black_slip_dress.webp",
+      "matchCount": 5,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": false,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3752
+    },
+    {
+      "filename": "AMB-02_tailored_black_blazer.webp",
+      "matchCount": 5,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": false
+      },
+      "latencyMs": 3467
+    },
+    {
+      "filename": "AMB-03_dark_skinny_jeans.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3926
+    },
+    {
+      "filename": "AMB-04_white_sneakers.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 4372
+    },
+    {
+      "filename": "WRK-02_olive_utility_jacket.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 4143
+    },
+    {
+      "filename": "GLM-01_sequin_camisole.webp",
+      "matchCount": 5,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": false
+      },
+      "latencyMs": 4019
+    },
+    {
+      "filename": "GLM-02_metalic_clutch.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 6146
+    },
+    {
+      "filename": "GLM-03_stiletto_heels.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 4452
+    },
+    {
+      "filename": "ROM-01_puff_sleeve_blouse.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 6272
+    },
+    {
+      "filename": "ROM-02_satin_midi_slip_skirt.webp",
+      "matchCount": 4,
+      "matches": {
+        "aesthetic": true,
+        "formality": false,
+        "statement": false,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3925
+    },
+    {
+      "filename": "ROM-03_pearl_necklace.webp",
+      "matchCount": 5,
+      "matches": {
+        "aesthetic": true,
+        "formality": false,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 5091
+    },
+    {
+      "filename": "EDG-01_leather_moto_jacket.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 4729
+    },
+    {
+      "filename": "EDG-02_combat_boots.webp",
+      "matchCount": 4,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": false,
+        "season": false,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 4432
+    },
+    {
+      "filename": "EDG-03_silver_chain_necklace.webp",
+      "matchCount": 4,
+      "matches": {
+        "aesthetic": false,
+        "formality": true,
+        "statement": false,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 4244
+    },
+    {
+      "filename": "PRP-02_pleated_mini_skirt.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 4026
+    },
+    {
+      "filename": "SPT-02_black_leggins.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3413
+    },
+    {
+      "filename": "SPT-03_running_shoes.webp",
+      "matchCount": 3,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": false,
+        "season": true,
+        "pattern": false,
+        "material": false
+      },
+      "latencyMs": 4054
+    },
+    {
+      "filename": "WES-01_white_cowboy_boots.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 4968
+    },
+    {
+      "filename": "WES-03_denim_shirt_with_yoke.webp",
+      "matchCount": 5,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": false,
+        "material": true
+      },
+      "latencyMs": 4413
+    },
+    {
+      "filename": "OUT-01_technical_shell_jacket.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 4223
+    },
+    {
+      "filename": "OUT-02_trail_sneakers.webp",
+      "matchCount": 2,
+      "matches": {
+        "aesthetic": true,
+        "formality": false,
+        "statement": false,
+        "season": false,
+        "pattern": false,
+        "material": true
+      },
+      "latencyMs": 4573
+    },
+    {
+      "filename": "OUT-03_nylon_crossbody.webp",
+      "matchCount": 5,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": false,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3893
+    },
+    {
+      "filename": "BOH-01_maxi_dress.webp",
+      "matchCount": 5,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": false,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 4238
+    },
+    {
+      "filename": "BOH-02_bag.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 4316
+    },
+    {
+      "filename": "BOH-03_hat.webp",
+      "matchCount": 5,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": false,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3710
+    },
+    {
+      "filename": "PRP-01_preppy_ivory_sweater.webp",
+      "matchCount": 3,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": false,
+        "season": false,
+        "pattern": true,
+        "material": false
+      },
+      "latencyMs": 4221
+    },
+    {
+      "filename": "SPT-01_gray_cropped_athletic_sweatshirt.webp",
+      "matchCount": 4,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": false,
+        "season": true,
+        "pattern": true,
+        "material": false
+      },
+      "latencyMs": 5498
+    },
+    {
+      "filename": "STR-01_graphic_t-shirt.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 5059
+    },
+    {
+      "filename": "STR-02_baggy_jeans.webp",
+      "matchCount": 5,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": false,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 3588
+    },
+    {
+      "filename": "STR-03_chunky_sneakers.webp",
+      "matchCount": 1,
+      "matches": {
+        "aesthetic": false,
+        "formality": false,
+        "statement": false,
+        "season": true,
+        "pattern": false,
+        "material": false
+      },
+      "latencyMs": 3643
+    },
+    {
+      "filename": "WES-02_western_belt.webp",
+      "matchCount": 4,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": false,
+        "pattern": false,
+        "material": true
+      },
+      "latencyMs": 4124
+    },
+    {
+      "filename": "WRK-01_workwear_blue_denim_jacket.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 4452
+    },
+    {
+      "filename": "WRK-03_dark_jeans.webp",
+      "matchCount": 6,
+      "matches": {
+        "aesthetic": true,
+        "formality": true,
+        "statement": true,
+        "season": true,
+        "pattern": true,
+        "material": true
+      },
+      "latencyMs": 4244
+    }
+  ]
+}

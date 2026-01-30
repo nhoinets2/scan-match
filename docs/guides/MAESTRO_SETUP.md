@@ -131,13 +131,13 @@ nano maestro-tests/example.yaml
 
 Paste this basic test:
 ```yaml
-appId: com.anonymous.vibecode
+appId: com.snaptomatch.app
 ---
 - launchApp
 - assertVisible: "Your app element"
 ```
 
-**Important:** Make sure `appId` matches your bundle identifier (check `app.json` or Xcode's "Signing & Capabilities" tab).
+**Important:** Make sure `appId` matches your bundle identifier (check `app.json` or Xcode's "Signing & Capabilities" tab). Current bundle ID is `com.snaptomatch.app`.
 
 ### Step 6: Run Maestro Tests (Repeat Every Time)
 

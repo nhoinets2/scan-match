@@ -8,13 +8,11 @@ Complete index of all project documentation, organized by category.
 
 ### Getting Started
 - [**Main README**](../README.md) - Project overview and tech stack
-- [**Fresh Setup**](guides/FRESH_SETUP.md) - Initial project setup
 - [**Comprehensive System Documentation**](../COMPREHENSIVE_SYSTEM_DOCUMENTATION.md) - Complete system guide
 
 ### For Developers
-- [**Confidence Engine Docs**](specs/CONFIDENCE_ENGINE_DOCUMENTATION.md) - How the matching engine works
+- [**Confidence Engine**](specs/CONFIDENCE_ENGINE.md) - How the matching engine works
 - [**Testing Strategy**](guides/TESTING_STRATEGY.md) - Testing approach and tools
-- [**CI/CD Guide**](guides/CI_CD_GUIDE.md) - Automated builds and testing
 
 ### For Designers
 - [**Style-Aware Suggestions Spec**](STYLE_AWARE_SUGGESTIONS_SPEC.md) - UI copy and messaging
@@ -35,7 +33,6 @@ docs/
 │   ├── results-screen-states.md
 │   ├── scan-retention.md
 │   ├── tailor-suggestions-roadmap.md
-│   ├── useMatchCount-tests.md
 │   ├── wardrobe-images-storage-setup.md
 │   ├── winback-retention-system.md
 │   ├── HYBRID_SCHEMA.md
@@ -48,22 +45,14 @@ docs/
 │   └── METRO_BUNDLER_FIX.md
 │
 ├── guides/              # Setup and workflow guides
-│   ├── FRESH_SETUP.md
-│   ├── TESTING_STRATEGY.md
-│   ├── CI_CD_GUIDE.md
-│   ├── CI_CD_RECOMMENDATION.md
-│   ├── MAESTRO_SETUP.md
 │   ├── MAESTRO_BUILD_TYPES.md
-│   ├── MAESTRO_CI_CD_MANAGEMENT.md
-│   ├── REMOTE_LOCAL_WORKFLOW.md
-│   ├── XCODE_GIT_WORKFLOW.md
-│   ├── XCODE_UPDATE_WORKFLOW.md
-│   └── MULTIPLE_SIMULATORS.md
+│   ├── MAESTRO_SETUP.md
+│   ├── MULTIPLE_SIMULATORS.md
+│   ├── TESTING_STRATEGY.md
+│   └── XCODE_UPDATE_WORKFLOW.md
 │
 └── specs/               # Technical specifications
-    ├── CONFIDENCE_ENGINE_DOCUMENTATION.md
-    ├── CONFIDENCE_ENGINE_SPEC.md
-    ├── MODE_A_SUGGESTIONS_EXPLAINED.md
+    ├── CONFIDENCE_ENGINE.md
     └── DISABLED_AND_PLANNED_FEATURES.md
 
 Root documentation:
@@ -82,17 +71,15 @@ Root documentation:
 | Document | Description |
 |----------|-------------|
 | [Comprehensive System Documentation](../COMPREHENSIVE_SYSTEM_DOCUMENTATION.md) | Complete guide to Confidence Engine and Results Screen |
-| [Confidence Engine Documentation](specs/CONFIDENCE_ENGINE_DOCUMENTATION.md) | Detailed engine architecture and modules |
-| [Confidence Engine Spec](specs/CONFIDENCE_ENGINE_SPEC.md) | Technical specification and integration guide |
+| [Confidence Engine](specs/CONFIDENCE_ENGINE.md) | Complete engine documentation: architecture, scoring, integration guide |
 | [Hybrid Schema](HYBRID_SCHEMA.md) | Database schema and data model |
 
 ### Features & Specifications
 
 | Document | Description |
 |----------|-------------|
-| [Mode A Suggestions](specs/MODE_A_SUGGESTIONS_EXPLAINED.md) | "What to add" suggestion system |
 | [Disabled & Planned Features](specs/DISABLED_AND_PLANNED_FEATURES.md) | Feature flags and roadmap |
-| [Style-Aware Suggestions](STYLE_AWARE_SUGGESTIONS_SPEC.md) | UI copy templates and messaging |
+| [Style-Aware Suggestions](STYLE_AWARE_SUGGESTIONS_SPEC.md) | Mode A/B suggestions with style-aware copy |
 | [Tailor Suggestions Roadmap](tailor-suggestions-roadmap.md) | Store preferences feature phases |
 | [Scan Retention](scan-retention.md) | Recent scans persistence |
 | [Winback Retention System](winback-retention-system.md) | User re-engagement strategy |
@@ -125,20 +112,14 @@ Root documentation:
 | Document | Description |
 |----------|-------------|
 | [Testing Strategy](guides/TESTING_STRATEGY.md) | Overall testing approach |
-| [useMatchCount Tests](useMatchCount-tests.md) | Hook testing examples |
 | [Maestro Setup](guides/MAESTRO_SETUP.md) | E2E test framework setup |
 | [Maestro Build Types](guides/MAESTRO_BUILD_TYPES.md) | iOS build configurations |
-| [Maestro CI/CD](guides/MAESTRO_CI_CD_MANAGEMENT.md) | Automated E2E testing |
+| [Match Count Performance](match-count-performance.md) | Includes test coverage section |
 
 ### Setup & Workflows
 
 | Document | Description |
 |----------|-------------|
-| [Fresh Setup](guides/FRESH_SETUP.md) | Initial project setup |
-| [CI/CD Guide](guides/CI_CD_GUIDE.md) | GitHub Actions workflows |
-| [CI/CD Recommendation](guides/CI_CD_RECOMMENDATION.md) | EAS Build + GitHub Actions setup |
-| [Remote/Local Workflow](guides/REMOTE_LOCAL_WORKFLOW.md) | Development workflow |
-| [Xcode Git Workflow](guides/XCODE_GIT_WORKFLOW.md) | iOS development with Git |
 | [Xcode Update Workflow](guides/XCODE_UPDATE_WORKFLOW.md) | Xcode version updates |
 | [Multiple Simulators](guides/MULTIPLE_SIMULATORS.md) | Testing on multiple devices |
 
@@ -159,7 +140,7 @@ Root documentation:
 
 **Backend Developer:**
 - Start with [Hybrid Schema](HYBRID_SCHEMA.md)
-- Then [Confidence Engine Documentation](specs/CONFIDENCE_ENGINE_DOCUMENTATION.md)
+- Then [Confidence Engine](specs/CONFIDENCE_ENGINE.md)
 - Review [Image Analysis Caching](image-analysis-caching.md)
 
 **Frontend Developer:**
@@ -170,12 +151,7 @@ Root documentation:
 **QA Engineer:**
 - Start with [Testing Strategy](guides/TESTING_STRATEGY.md)
 - Then [Maestro Setup](guides/MAESTRO_SETUP.md)
-- Review [CI/CD Guide](guides/CI_CD_GUIDE.md)
-
-**DevOps Engineer:**
-- Start with [CI/CD Guide](guides/CI_CD_GUIDE.md)
-- Then [CI/CD Recommendation](guides/CI_CD_RECOMMENDATION.md)
-- Review [Fresh Setup](guides/FRESH_SETUP.md)
+- Review [Maestro Build Types](guides/MAESTRO_BUILD_TYPES.md)
 
 **Product Manager:**
 - Start with [README](../README.md)
@@ -185,14 +161,14 @@ Root documentation:
 ### By Task
 
 **Setting up the project:**
-1. [Fresh Setup](guides/FRESH_SETUP.md)
-2. [README](../README.md)
-3. [CI/CD Guide](guides/CI_CD_GUIDE.md)
+1. [README](../README.md)
+2. [Comprehensive System Documentation](../COMPREHENSIVE_SYSTEM_DOCUMENTATION.md)
+3. [Testing Strategy](guides/TESTING_STRATEGY.md)
 
 **Understanding the matching system:**
 1. [Comprehensive System Documentation](../COMPREHENSIVE_SYSTEM_DOCUMENTATION.md)
-2. [Confidence Engine Documentation](specs/CONFIDENCE_ENGINE_DOCUMENTATION.md)
-3. [Mode A Suggestions](specs/MODE_A_SUGGESTIONS_EXPLAINED.md)
+2. [Confidence Engine](specs/CONFIDENCE_ENGINE.md)
+3. [Style-Aware Suggestions](STYLE_AWARE_SUGGESTIONS_SPEC.md)
 
 **Adding new features:**
 1. [Comprehensive System Documentation](../COMPREHENSIVE_SYSTEM_DOCUMENTATION.md)
@@ -274,4 +250,4 @@ If you can't find what you're looking for:
 
 ---
 
-**Last Updated:** January 2026
+**Last Updated:** January 29, 2026

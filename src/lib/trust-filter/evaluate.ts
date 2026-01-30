@@ -32,6 +32,7 @@ import type {
   TrustFilterDebug,
   TraceStep,
   ArchetypeDistance,
+  TFCategory,
 } from './types';
 
 const config = TRUST_FILTER_CONFIG_V1;

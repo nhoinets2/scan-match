@@ -83,7 +83,6 @@ import {
 } from "@/lib/database";
 import {
   ConfidenceLevel,
-  OutfitCombo,
   WardrobeItem,
   Category,
   CATEGORIES,
@@ -109,17 +108,17 @@ import { useConfidenceEngine, tierToVerdictState, tierToLabel, type EnrichedMatc
 import { useTrustFilter } from "@/lib/useTrustFilter";
 import { prepareScanForSave, completeScanSave, isLocalUri, cancelUpload, cleanupScanStorage, queueScanUpload } from "@/lib/storage";
 import { useAuth } from "@/lib/auth-context";
-import { useComboAssembler, runShadowModeComparison } from "@/lib/useComboAssembler";
+import { useComboAssembler } from "@/lib/useComboAssembler";
 import type { AssembledCombo } from "@/lib/combo-assembler";
 import { useResultsTabs, type ResultsTab } from "@/lib/useResultsTabs";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { MissingPiecesCard } from "@/components/MissingPiecesCard";
 import { PersonalizedSuggestionsCard } from "@/components/PersonalizedSuggestionsCard";
 import { fetchPersonalizedSuggestions, type SuggestionsResult } from "@/lib/personalized-suggestions-service";
+import { generateScanStyleSignalsDirect } from "@/lib/style-signals-service";
 import type { PersonalizedSuggestions, WardrobeSummary } from "@/lib/types";
 import {
   buildResultsRenderModel,
-  shouldUseLegacyEngine,
   type UiState,
   type ResultsRenderModel,
 } from "@/lib/results-ui-policy";
@@ -811,7 +810,7 @@ function ResultsFailed({
               borderRadius: borderRadius.card,
               padding: spacing.xl,
               alignItems: "center",
-              ...shadows.card,
+              ...shadows.md,
             }}
           >
             <Sparkles size={32} color={colors.accent.terracotta} style={{ marginBottom: spacing.md }} />
@@ -1677,13 +1676,30 @@ export default function ResultsScreen() {
     });
     
     (async () => {
-      const result = await analyzeClothingImage({
-        imageUri,
-        idempotencyKey: analysisKey, // Required for server-side quota enforcement
-        operationType: 'scan', // Use scan quota pool
-        signal: ac.signal,
-      });
-      
+      // Fire both calls in parallel - style signals cached for Trust Filter
+      const [analysisResult, _signalsResult] = await Promise.allSettled([
+        analyzeClothingImage({
+          imageUri,
+          idempotencyKey: analysisKey, // Required for server-side quota enforcement
+          operationType: 'scan', // Use scan quota pool
+          signal: ac.signal,
+        }),
+        // Pre-fetch style signals (fire-and-forget, result cached in memory + DB)
+        // Trust Filter will find this in cache when it runs later
+        generateScanStyleSignalsDirect(imageUri, { signal: ac.signal }).catch(err => {
+          if (__DEV__) {
+            console.log('[Pre-fetch] Style signals failed (non-blocking):', err?.message || err);
+          }
+          return null;
+        }),
+      ]);
+
+      // Extract analysis result (style signals are cached automatically)
+      const result =
+        analysisResult.status === 'fulfilled'
+          ? analysisResult.value
+          : { ok: false as const, error: { kind: 'unknown' as const, message: 'Analysis failed' } };
+
       if (ac.signal.aborted) return;
       
       const durationMs = Date.now() - startTime;
@@ -1843,7 +1859,7 @@ export default function ResultsScreen() {
   // 1. analysisState.item - from imageUri flow (fresh scan)
   // 2. currentScan - from store (if navigating back)
   // 3. savedCheck.scannedItem - from database (viewing saved check)
-  const scannedItem = 
+  const scannedItem: ScannedItemType | null =
     (analysisState?.status === "success" ? analysisState.item : null) ??
     currentScan ?? 
     savedCheck?.scannedItem ?? 
@@ -1855,9 +1871,11 @@ export default function ResultsScreen() {
   // For saved checks, ALWAYS prefer savedCheck.imageUri (remote URL) to trigger server-side
   // signal generation with DB caching, avoiding slow client-side regeneration on each visit
   // For fresh scans (imageUri flow), use imageUri from params (freshest source)
+  const savedCheckImageUri: string | undefined = savedCheck?.imageUri;
+  const scannedItemImageUri: string | undefined = scannedItem?.imageUri;
   const resolvedImageUri = isViewingSavedCheck
-    ? (savedCheck?.imageUri ?? scannedItem?.imageUri)
-    : (imageUri ?? savedCheck?.imageUri ?? scannedItem?.imageUri);
+    ? (savedCheckImageUri ?? scannedItemImageUri)
+    : (imageUri ?? savedCheckImageUri ?? scannedItemImageUri);
   
   // Debug log for image URI resolution
   if (__DEV__) {
@@ -2864,8 +2882,6 @@ function ResultsSuccess({
 
       engineSnapshot = buildEngineSnapshot(
         confidenceResult,
-        null, // No legacy matchResult
-        false, // Not using legacy engine
         tempScanId,
         scannedItem.category,
         wardrobeCount,
@@ -2985,7 +3001,7 @@ function ResultsSuccess({
     (!isViewingSavedCheck && !!currentCheckId && !isSaved) ||
     (isViewingSavedCheck && savedCheck?.outcome !== "saved_to_revisit" && !isSaved);
 
-  // Build wardrobe match rows from confidence engine (preferred) or legacy engine
+  // Build wardrobe match rows from confidence engine
   const fromWardrobeRows: GuidanceRowModel[] = useMemo(() => {
     const scannedCategory = itemSummary.category as Category;
     const scannedIcon = getCategoryIcon(scannedCategory);
@@ -3202,11 +3218,12 @@ function ResultsSuccess({
       // Compute Mode B suggestions using getModeBBullets
       // - If outfit selected: uses only MEDIUM candidates from that outfit
       // - If no selection: aggregates across all nearMatches
+      const scannedCategoryForModeB = itemSummary.category === "unknown" ? null : itemSummary.category;
       const modeBResult = getModeBBullets(
         selectedNearOutfit?.candidates ?? null,
         nearMatchEvals,
         confidenceResult.uiVibeForCopy,
-        itemSummary.category as Category
+        scannedCategoryForModeB
       );
 
       if (modeBResult && modeBResult.bullets.length > 0) {
@@ -3940,7 +3957,7 @@ function ResultsSuccess({
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl }}>
         <WifiOff size={64} color={colors.text.secondary} strokeWidth={1.5} style={{ marginBottom: spacing.lg }} />
-        <Text style={{ ...typography.ui.heading, textAlign: 'center', marginBottom: spacing.sm }}>
+        <Text style={{ ...typography.ui.sectionTitle, textAlign: 'center', marginBottom: spacing.sm }}>
           You're offline
         </Text>
         <Text style={{ ...typography.ui.body, color: colors.text.secondary, textAlign: 'center', marginBottom: spacing.xl }}>

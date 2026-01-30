@@ -112,12 +112,12 @@ async function getStyleSignalsFromCache(
     }
 
     // Fire-and-forget hit count increment
-    supabase.rpc('increment_style_signals_cache_hit', { 
+    void supabase.rpc('increment_style_signals_cache_hit', {
       p_user_id: userId,
       p_image_sha256: imageSha256,
       p_prompt_version: CURRENT_PROMPT_VERSION,
       p_model_version: STYLE_SIGNALS_MODEL_VERSION,
-    }).then(() => {}).catch(() => {});
+    });
 
     return data.style_signals as StyleSignalsV1;
   } catch (err) {
@@ -333,7 +333,8 @@ function cleanExpiredCache(): void {
  * @returns StyleSignalsResponse with the generated signals
  */
 export async function generateScanStyleSignalsDirect(
-  localImageUri: string
+  localImageUri: string,
+  options?: { signal?: AbortSignal }
 ): Promise<StyleSignalsResponse> {
   try {
     // Clean expired entries periodically
@@ -412,6 +413,7 @@ export async function generateScanStyleSignalsDirect(
         type: 'scan_direct',
         imageDataUrl,
       }),
+      signal: options?.signal,
     });
 
     const result = await response.json();

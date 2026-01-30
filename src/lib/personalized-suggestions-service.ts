@@ -205,7 +205,7 @@ export async function fetchPersonalizedSuggestions({
     dominant_color: match.wardrobeItem.colors?.[0]?.name ?? "unknown",
     aesthetic: getWardrobeItemAesthetic(match.wardrobeItem),
     label: match.wardrobeItem.detectedLabel,
-    cap_reasons: match.capReasons?.slice(0, 2) ?? [], // Top 2 cap reasons per match
+    cap_reasons: match.evaluation.cap_reasons?.slice(0, 2) ?? [], // Top 2 cap reasons per match
   }));
 
   const topIds = topMatches.map(match => match.id).sort().join("|");
@@ -718,11 +718,17 @@ export function validateAndRepairSuggestions(
         ) ??
         "accessories";
 
+      const fallbackAttributes =
+        FALLBACK_TO_ELEVATE.recommend.type === "consider_adding"
+          ? FALLBACK_TO_ELEVATE.recommend.attributes
+          : [];
+
       return {
-        ...FALLBACK_TO_ELEVATE,
+        text: FALLBACK_TO_ELEVATE.text,
         recommend: {
-          ...FALLBACK_TO_ELEVATE.recommend,
+          type: "consider_adding",
           category: fallbackCategory,
+          attributes: fallbackAttributes,
         },
       };
     };

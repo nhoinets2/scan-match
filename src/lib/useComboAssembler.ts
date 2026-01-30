@@ -12,8 +12,6 @@ import type { PairEvaluation } from './confidence-engine';
 import { effectiveEvaluation } from './useTrustFilter';
 import {
   assembleCombos,
-  compareCombosForShadowMode,
-  logShadowModeComparison,
   type AssembledCombo,
   type ComboAssemblerResult,
   type ComboAssemblerConfig,
@@ -293,17 +291,3 @@ export type { OutfitSlot };
  * Run shadow mode comparison between CE combos and legacy combos.
  * Call this in __DEV__ to log comparison metrics.
  */
-export function runShadowModeComparison(
-  ceCombos: AssembledCombo[],
-  legacyCombos: { items?: { id: string }[] }[] | undefined
-): void {
-  if (!__DEV__) return;
-  if (!legacyCombos) return;
-
-  const normalizedLegacy = legacyCombos.map(c => ({
-    items: c.items ?? [],
-  }));
-
-  const comparison = compareCombosForShadowMode(ceCombos, normalizedLegacy);
-  logShadowModeComparison(comparison);
-}

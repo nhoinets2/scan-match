@@ -191,7 +191,10 @@ function CameraOverlay({ currentTip }: { currentTip: string }) {
   }));
 
   return (
-    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}>
+    <View
+      pointerEvents="none"
+      style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}
+    >
       {/* Subtle rounded frame guide - same as Scan */}
       <Animated.View
         style={[
@@ -931,7 +934,7 @@ export default function AddItemScreen() {
 
   // Determine current screen state for UI-driven logic
   const showPostDenied = permission && !permission.granted && permission.status !== 'undetermined' && !showPrePrompt;
-  const showRestricted = permission?.status === 'restricted';
+  const showRestricted = permission?.status === 'denied' && permission?.canAskAgain === false;
   const isCameraGateScreen = showPrePrompt || showPostDenied || showRestricted;
 
   // Listen for app returning from background after user opens Settings
@@ -1541,7 +1544,7 @@ export default function AddItemScreen() {
     );
   } else {
     // Permission denied or restricted - show post-denial screen
-    const isRestricted = permission.status === 'restricted';
+    const isRestricted = permission.status === 'denied' && permission.canAskAgain === false;
     
     const handleOpenSettings = () => {
       openedSettingsRef.current = true;
@@ -1650,12 +1653,18 @@ export default function AddItemScreen() {
   if (screenState === "ready" || screenState === "processing") {
     return (
       <View style={{ flex: 1, backgroundColor: "#000000" }}>
-        <DebugOverlay />
         <CameraView
           ref={cameraRef}
           style={{ flex: 1 }}
           facing="back"
+        />
+
+        <View
+          pointerEvents="box-none"
+          style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
         >
+          <DebugOverlay />
+
           {/* Camera overlay with rotating tips */}
           <CameraOverlay currentTip={TIPS[currentTipIndex]} />
 
@@ -1773,7 +1782,7 @@ export default function AddItemScreen() {
               </View>
             </Animated.View>
           </View>
-        </CameraView>
+        </View>
 
         {/* Paywall modal */}
         <Paywall
@@ -1804,7 +1813,7 @@ export default function AddItemScreen() {
                 borderRadius: borderRadius.card,
                 padding: spacing.xl,
                 alignItems: "center",
-                ...shadows.card,
+                ...shadows.md,
               }}
             >
               <Sparkles size={32} color={colors.accent.terracotta} style={{ marginBottom: spacing.md }} />
