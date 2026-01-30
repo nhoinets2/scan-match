@@ -48,8 +48,9 @@ function getStyleSignalsUrl(): string {
 /**
  * Model version for style signals generation.
  * Bump when switching models to invalidate cache.
+ * Updated 2026-01-30: Migrated from GPT-4o to Claude Sonnet 4.5
  */
-export const STYLE_SIGNALS_MODEL_VERSION = 'default';
+export const STYLE_SIGNALS_MODEL_VERSION = 'claude-sonnet-4.5';
 
 /**
  * Compute SHA-256 hash of a string (base64 image data).

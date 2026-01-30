@@ -32,8 +32,9 @@ export const PROMPT_VERSION = '2026-01-25-rev';
 
 /**
  * Model used for analysis
+ * Updated 2026-01-30: Migrated from GPT-4o to Claude Sonnet 4.5
  */
-export const ANALYSIS_MODEL = 'gpt-5.1';
+export const ANALYSIS_MODEL = 'claude-sonnet-4.5';
 
 // ============================================
 // SHA-256 HASHING (Cross-platform)

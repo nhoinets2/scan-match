@@ -14,7 +14,7 @@ import { createHash } from 'crypto';
 // These constants must match analysis-cache.ts
 const ANALYSIS_CACHE_VERSION = 'v1';
 const PROMPT_VERSION = '2026-01-05';
-const ANALYSIS_MODEL = 'gpt-5.1';
+const ANALYSIS_MODEL = 'claude-sonnet-4.5';
 
 /**
  * Compute SHA-256 hash of a string (Node.js version for tests)
