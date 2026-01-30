@@ -13,6 +13,7 @@ Complete index of all project documentation, organized by category.
 ### For Developers
 - [**Confidence Engine**](specs/CONFIDENCE_ENGINE.md) - How the matching engine works
 - [**Testing Strategy**](guides/TESTING_STRATEGY.md) - Testing approach and tools
+- [**Known Issues**](KNOWN_ISSUES.md) - Known issues and limitations
 
 ### For Designers
 - [**Style-Aware Suggestions Spec**](STYLE_AWARE_SUGGESTIONS_SPEC.md) - UI copy and messaging
@@ -51,9 +52,16 @@ docs/
 │   ├── TESTING_STRATEGY.md
 │   └── XCODE_UPDATE_WORKFLOW.md
 │
-└── specs/               # Technical specifications
-    ├── CONFIDENCE_ENGINE.md
-    └── DISABLED_AND_PLANNED_FEATURES.md
+├── specs/               # Technical specifications
+│   ├── CONFIDENCE_ENGINE.md
+│   └── DISABLED_AND_PLANNED_FEATURES.md
+│
+├── handoff/             # Implementation notes and handoffs
+│   ├── wardrobe-retry-badge-no-flicker.md
+│   └── ...
+│
+├── KNOWN_ISSUES.md      # Known issues and limitations
+└── NAVIGATION.md        # This file - documentation index
 
 Root documentation:
 ├── README.md                               # Project overview
@@ -105,7 +113,6 @@ Root documentation:
 | Document | Description |
 |----------|-------------|
 | [Wardrobe Images Storage](wardrobe-images-storage-setup.md) | Supabase Storage configuration |
-| [Debug System](debug-system.md) | Development debugging tools |
 
 ### Testing
 
@@ -115,6 +122,19 @@ Root documentation:
 | [Maestro Setup](guides/MAESTRO_SETUP.md) | E2E test framework setup |
 | [Maestro Build Types](guides/MAESTRO_BUILD_TYPES.md) | iOS build configurations |
 | [Match Count Performance](match-count-performance.md) | Includes test coverage section |
+
+### Troubleshooting & Issues
+
+| Document | Description |
+|----------|-------------|
+| [Known Issues](KNOWN_ISSUES.md) | Active issues, limitations, and workarounds |
+| [Debug System](debug-system.md) | Development debugging tools |
+
+### Handoff & Implementation Notes
+
+| Document | Description |
+|----------|-------------|
+| [Wardrobe Retry Badge (No Flicker)](handoff/wardrobe-retry-badge-no-flicker.md) | Retry badge UX fix and implementation notes |
 
 ### Setup & Workflows
 
@@ -176,9 +196,10 @@ Root documentation:
 3. [Disabled & Planned Features](specs/DISABLED_AND_PLANNED_FEATURES.md)
 
 **Debugging issues:**
-1. [Debug System](debug-system.md)
-2. [Historical fixes](historical/) folder
-3. [Testing Strategy](guides/TESTING_STRATEGY.md)
+1. [Known Issues](KNOWN_ISSUES.md)
+2. [Debug System](debug-system.md)
+3. [Historical fixes](historical/) folder
+4. [Testing Strategy](guides/TESTING_STRATEGY.md)
 
 **Performance optimization:**
 1. [Match Count Performance](match-count-performance.md)
@@ -250,4 +271,4 @@ If you can't find what you're looking for:
 
 ---
 
-**Last Updated:** January 29, 2026
+**Last Updated:** January 30, 2026
